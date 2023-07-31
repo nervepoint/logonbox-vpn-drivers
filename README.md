@@ -26,7 +26,7 @@ You just need to add the appropriate driver library, and that will pull in requi
 dependencies (it is suggested you use profiles to activate the appropriate dependency).
 
  * `logonbox-vpn-linux` for Linux (all architectures)
- * `logonbox-vpn-macos` for Linux (all architectures)
+ * `logonbox-vpn-macos` for Mac OS (all architectures)
  * `logonbox-vpn-windows` for Windows (all architectures)
 
 For example,
