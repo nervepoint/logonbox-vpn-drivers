@@ -1,0 +1,220 @@
+<!--
+
+    Copyright © 2023 LogonBox Limited (support@logonbox.com)
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy of this
+    software and associated documentation files (the “Software”), to deal in the Software
+    without restriction, including without limitation the rights to use, copy, modify,
+    merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+    permit persons to whom the Software is furnished to do so, subject to the following
+    conditions:
+
+    The above copyright notice and this permission notice shall be included in all copies
+    or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+    INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+    PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+    OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.logonbox</groupId>
+        <artifactId>logonbox-vpn-drivers</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+    <artifactId>logonbox-vpn-quick</artifactId>
+    <name>LogonBox VPN Drivers - Example Utility</name>
+    <packaging>jar</packaging>
+    <properties>
+        <graalvm.version>21.2.0</graalvm.version>
+        <graalvm.pgo></graalvm.pgo>
+        <graalvm.compatibility></graalvm.compatibility>
+        <!-- Commented out quick build mode - has less optiisations, smaller
+		size, lower throuput -->
+        <!--<graalvm.pgo>-Ob</graalvm.pgo>-->
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli</artifactId>
+            <version>4.7.4</version>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>logonbox-vpn-lib</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+    <description>
+        An example of how to use logonbox-vpn-drivers, lbvq sets up a simple
+        wireguard tunnel.
+    </description>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>info.picocli</groupId>
+                            <artifactId>picocli-codegen</artifactId>
+                            <version>4.7.4</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!-- Native Driver Activation -->
+        <profile>
+            <id>windows</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                </os>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.logonbox</groupId>
+                    <artifactId>logonbox-vpn-windows</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>linux</id>
+            <activation>
+                <os>
+                    <family>linux</family>
+                </os>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.logonbox</groupId>
+                    <artifactId>logonbox-vpn-linux</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>macos</id>
+            <activation>
+                <os>
+                    <family>mac</family>
+                </os>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>com.logonbox</groupId>
+                    <artifactId>logonbox-vpn-macos</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+        <!-- Graal Native Image -->
+        <profile>
+            <id>instrument</id>
+            <properties>
+                <graalvm.pgo>--pgo-instrument</graalvm.pgo>
+            </properties>
+        </profile>
+        <profile>
+            <id>instrumented</id>
+            <properties>
+                <graalvm.pgo>--pgo=${basedir}/default.iprof</graalvm.pgo>
+            </properties>
+        </profile>
+        <profile>
+            <id>compatibility</id>
+            <properties>
+                <graalvm.march>-march=compatibility</graalvm.march>
+            </properties>
+        </profile>
+        <profile>
+            <id>native-image</id>
+
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.nativeimage</groupId>
+                        <artifactId>native-image-maven-plugin</artifactId>
+                        <version>${graalvm.version}</version>
+                        <executions>
+                            <execution>
+                                <id>lbvq-exe</id>
+                                <goals>
+                                    <goal>native-image</goal>
+                                </goals>
+                                <phase>package</phase>
+                                <configuration>
+                                    <mainClass>com.logonbox.vpn.quick.Lbvq</mainClass>
+                                    <imageName>lbvq</imageName>
+                                    <buildArgs>
+                                        --gc=G1
+                                        --report-unsupported-elements-at-runtime
+                                        -H:+BuildReport
+                                        -R:MaxHeapSize=64m
+                                        ${graalvm.pgo} ${graalvm.compatibility}
+                                    </buildArgs>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <profile>
+            <id>shaded</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-shade-plugin</artifactId>
+                        <version>2.4.3</version>
+                        <configuration>
+                            <transformers>
+                                <transformer
+                                    implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>com.logonbox.vpn.quick.Lbvq</mainClass>
+                                </transformer>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>launcher</shadedClassifierName>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>shade</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

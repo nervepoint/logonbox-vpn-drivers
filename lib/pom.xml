@@ -1,0 +1,80 @@
+<!--
+
+    Copyright © 2023 LogonBox Limited (support@logonbox.com)
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy of this
+    software and associated documentation files (the “Software”), to deal in the Software
+    without restriction, including without limitation the rights to use, copy, modify,
+    merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+    permit persons to whom the Software is furnished to do so, subject to the following
+    conditions:
+
+    The above copyright notice and this permission notice shall be included in all copies
+    or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+    INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+    PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+    OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.logonbox</groupId>
+        <artifactId>logonbox-vpn-drivers</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+    <artifactId>logonbox-vpn-lib</artifactId>
+    <name>LogonBox VPN Drivers - Library</name>
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.12.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.7</version>
+        </dependency>    
+        <dependency>
+            <groupId>com.github.jgonian</groupId>
+            <artifactId>commons-ip-math</artifactId>
+            <version>1.32</version>
+        </dependency>
+        <dependency>
+            <groupId>com.sshtools</groupId>
+            <artifactId>liftlib</artifactId>
+            <version>0.0.2-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.sshtools</groupId>
+            <artifactId>forker-client</artifactId>
+            <version>1.8-SNAPSHOT</version>
+        </dependency>
+    </dependencies>
+    <repositories>
+        <!-- For Forker -->
+        <repository>
+            <id>opensource-releases</id>
+            <url>https://artifactory.jadaptive.com/opensource-releases</url>
+            <releases />
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+        <repository>
+            <id>opensource-snapshots</id>
+            <url>https://artifactory.jadaptive.com/opensource-snapshots</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots />
+        </repository>
+    </repositories>
+</project>
