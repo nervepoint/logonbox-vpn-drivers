@@ -16,7 +16,7 @@ public interface SystemCommands {
             
             @Override
             public Map<String, String> env() {
-                return env;
+                return thisEnv;
             }
 
             @Override
