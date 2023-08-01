@@ -70,16 +70,16 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 					getPeer(), address));
 
 		if (address.matches(".*:.*"))
-			commands.privileged().withResult(OsUtil.debugCommandArgs("ifconfig", getName(), "inet6", address, "alias"));
+			commands.privileged().result(OsUtil.debugCommandArgs("ifconfig", getName(), "inet6", address, "alias"));
 		else
-			commands.privileged().withResult(OsUtil.debugCommandArgs("ifconfig", getName(), "inet", address,
+			commands.privileged().result(OsUtil.debugCommandArgs("ifconfig", getName(), "inet", address,
 					address.replace("/*", ""), "alias"));
 		addresses.add(address);
 	}
 
 	@Override
 	public void delete() throws IOException {
-		commands.privileged().withResult(OsUtil.debugCommandArgs("rm", "-f", getSocketFile().getAbsolutePath()));
+		commands.privileged().result(OsUtil.debugCommandArgs("rm", "-f", getSocketFile().getAbsolutePath()));
 	}
 
 	protected File getSocketFile() {
@@ -193,7 +193,7 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 					"Interface %s is configured to have a single peer %s, so cannot add a second address %s", getName(),
 					getPeer(), address));
 
-		commands.privileged().withResult(OsUtil.debugCommandArgs("ifconfig", getName(), "-alias", address));
+		commands.privileged().result(OsUtil.debugCommandArgs("ifconfig", getName(), "-alias", address));
 		addresses.remove(address);
 	}
 
@@ -249,7 +249,7 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 
 		/* Remove all the current routes for this interface */
 		boolean ipv6 = false;
-		for (String row : commands.privileged().withOutput(OsUtil.debugCommandArgs("netstat", "-nr"))) {
+		for (String row : commands.privileged().output(OsUtil.debugCommandArgs("netstat", "-nr"))) {
 			String[] l = row.trim().split("\\s+");
 			if (l[0].equals("Destination") || l[0].equals("Routing"))
 				continue;
@@ -265,10 +265,10 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 				}
 				LOG.info(String.format("Removing route %s %s for %s", l[0], gateway, getName()));
 				if (ipv6) {
-					commands.privileged().withResult(OsUtil.debugCommandArgs("route", "-qn", "delete", "-inet6", "-ifp",
+					commands.privileged().result(OsUtil.debugCommandArgs("route", "-qn", "delete", "-inet6", "-ifp",
 							getName(), l[0], gateway));
 				} else {
-					commands.privileged().withResult(
+					commands.privileged().result(
 							OsUtil.debugCommandArgs("route", "-qn", "delete", "-ifp", getName(), l[0], gateway));
 				}
 			}
@@ -288,13 +288,13 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 	public void up() throws IOException {
 		setMtu();
 
-		commands.privileged().withResult(OsUtil.debugCommandArgs("ifconfig", getName(), "up"));
+		commands.privileged().result(OsUtil.debugCommandArgs("ifconfig", getName(), "up"));
 	}
 
 	protected void setMtu() throws IOException {
 
 		int currentMtu = 0;
-		for (String line : commands.withOutput(OsUtil.debugCommandArgs("ifconfig", getName()))) {
+		for (String line : commands.output(OsUtil.debugCommandArgs("ifconfig", getName()))) {
 			List<String> parts = Arrays.asList(line.split("\\s+"));
 			int idx = parts.indexOf("mtu");
 			if (idx == -1 && idx < parts.size() - 1)
@@ -309,7 +309,7 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 			tmtu = getMtu();
 		} else {
 			String defaultIf = null;
-			for (String line : commands.withOutput(OsUtil.debugCommandArgs("netstat", "-nr", "-f", "inet"))) {
+			for (String line : commands.output(OsUtil.debugCommandArgs("netstat", "-nr", "-f", "inet"))) {
 				String[] arr = line.split("\\s+");
 				if (arr[0].equals("default")) {
 					defaultIf = arr[3];
@@ -319,7 +319,7 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 			if (StringUtils.isBlank(defaultIf))
 				LOG.warn("Could not determine default interface to get MTU from.");
 			else {
-				for (String line : commands.withOutput(OsUtil.debugCommandArgs("ifconfig", defaultIf))) {
+				for (String line : commands.output(OsUtil.debugCommandArgs("ifconfig", defaultIf))) {
 					List<String> parts = Arrays.asList(line.split("\\s+"));
 					int idx = parts.indexOf("mtu");
 					if (idx == -1 && idx < parts.size() - 1)
@@ -341,7 +341,7 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 		/* Bring it up! */
 		if (currentMtu > 0 && tmtu != currentMtu) {
 			LOG.info(String.format("Setting MTU to %d", tmtu));
-			commands.privileged().withResult(OsUtil.debugCommandArgs("ifconfig", getName(), "mtu", String.valueOf(tmtu)));
+			commands.privileged().result(OsUtil.debugCommandArgs("ifconfig", getName(), "mtu", String.valueOf(tmtu)));
 		} else
 			LOG.info(String.format("MTU already set to %d", tmtu));
 	}
@@ -356,15 +356,15 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 		if (route.endsWith("/0") && (StringUtils.isBlank(getTable()) || TABLE_AUTO.equals(getTable()))) {
 			if (route.matches(".*:.*")) {
 				autoRoute6 = true;
-				commands.privileged().withResult(OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-inet6", "::/1:",
+				commands.privileged().result(OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-inet6", "::/1:",
 						"-interface", getName()));
-				commands.privileged().withResult(OsUtil.debugCommandArgs("route", "-q", "-m", "add", "-inet6", "8000::/1",
+				commands.privileged().result(OsUtil.debugCommandArgs("route", "-q", "-m", "add", "-inet6", "8000::/1",
 						"-interface", getName()));
 			} else {
 				autoRoute4 = true;
-				commands.privileged().withResult(OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-inet", "0.0.0.0/1",
+				commands.privileged().result(OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-inet", "0.0.0.0/1",
 						"-interface", getName()));
-				commands.privileged().withResult(OsUtil.debugCommandArgs("route", "-q", "-m", "add", "-inet", "128.0.0.1/1",
+				commands.privileged().result(OsUtil.debugCommandArgs("route", "-q", "-m", "add", "-inet", "128.0.0.1/1",
 						"-interface", getName()));
 			}
 		} else {
@@ -372,7 +372,7 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 				throw new IOException("Darwin only supports TABLE=auto|main|off");
 			}
 
-			for (String line : commands.withOutput(OsUtil.debugCommandArgs("route", "-n", "get", "-" + proto, route))) {
+			for (String line : commands.output(OsUtil.debugCommandArgs("route", "-n", "get", "-" + proto, route))) {
 				line = line.trim();
 				String[] args = line.split(":");
 				if (args.length > 1 && args[0].equals("interface:") && args[1].equals(getName())) {
@@ -382,7 +382,7 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 			}
 
 			LOG.info(String.format("Adding route %s to %s for %s", route, getName(), proto));
-			commands.privileged().withResult(
+			commands.privileged().result(
 					OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-" + proto, route, "-interface", getName()));
 		}
 

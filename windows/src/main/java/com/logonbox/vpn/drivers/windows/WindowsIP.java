@@ -25,8 +25,7 @@ import com.logonbox.vpn.drivers.lib.DNSIntegrationMethod;
 import com.logonbox.vpn.drivers.lib.SystemCommands;
 import com.logonbox.vpn.drivers.lib.util.IpUtil;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
-import com.sshtools.forker.services.Service;
-import com.sshtools.forker.services.Services;
+import com.logonbox.vpn.drivers.windows.WindowsSystemServices.Service;
 import com.sun.jna.platform.win32.Advapi32Util;
 import com.sun.jna.platform.win32.WinReg;
 
@@ -74,7 +73,7 @@ public class WindowsIP extends AbstractVirtualInetAddress<WindowsPlatformService
 		synchronized (lock) {
 			try {
 				unsetDns();
-				Services.get().stopService(getService());
+				getPlatform().services().stopService(getService());
 			} catch (IOException ioe) {
 				throw ioe;
 			} catch (Exception e) {
@@ -95,7 +94,7 @@ public class WindowsIP extends AbstractVirtualInetAddress<WindowsPlatformService
 	}
 
 	protected Service getService() throws IOException {
-		Service service = Services.get().getService(getServiceName());
+		Service service = getPlatform().services().getService(getServiceName());
 		if (service == null)
 			throw new IOException(String.format("No service for interface %s.", getName()));
 		return service;
@@ -125,7 +124,7 @@ public class WindowsIP extends AbstractVirtualInetAddress<WindowsPlatformService
 	public void up() throws IOException {
 		synchronized (lock) {
 			try {
-				Services.get().startService(getService());
+			    getPlatform().services().startService(getService());
 
 				var tmtu = this.getMtu(); 
 				
@@ -140,7 +139,7 @@ public class WindowsIP extends AbstractVirtualInetAddress<WindowsPlatformService
 					tmtu -= 80;
 				}
 
-				commands.privileged().withResult("netsh", "interface", "ipv4", "set", "subinterface", getName(), "mtu=" + String.valueOf(tmtu), "store=persistent");
+				commands.privileged().result("netsh", "interface", "ipv4", "set", "subinterface", getName(), "mtu=" + String.valueOf(tmtu), "store=persistent");
 			} catch (IOException e) {
 				throw e;
 			} catch (Exception e) {
@@ -176,12 +175,12 @@ public class WindowsIP extends AbstractVirtualInetAddress<WindowsPlatformService
 						LOG.warn("Windows only supports a maximum of 2 DNS servers. {} were supplied, the last {} will be ignored.", dnsAddresses.length, dnsAddresses.length - 2);
 					}
 
-					commands.privileged().withResult(OsUtil.debugCommandArgs("netsh", "interface", "ipv4", "delete", "dnsservers", getName(), "all"));
+					commands.privileged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv4", "delete", "dnsservers", getName(), "all"));
 					if(dnsAddresses.length > 0) {
-					    commands.privileged().withResult(OsUtil.debugCommandArgs("netsh", "interface", "ipv4", "add", "dnsserver", getName(), dnsAddresses[0], "index=1", "no"));	
+					    commands.privileged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv4", "add", "dnsserver", getName(), dnsAddresses[0], "index=1", "no"));	
 					} 
 					if(dnsAddresses.length > 1) {
-					    commands.privileged().withResult(OsUtil.debugCommandArgs("netsh", "interface", "ipv4", "add", "dnsserver", getName(), dnsAddresses[1], "index=2", "no"));	
+					    commands.privileged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv4", "add", "dnsserver", getName(), dnsAddresses[1], "index=2", "no"));	
 					} 
 
 					/* Ipv6 */
@@ -190,12 +189,12 @@ public class WindowsIP extends AbstractVirtualInetAddress<WindowsPlatformService
 						LOG.warn("Windows only supports a maximum of 2 DNS servers. {} were supplied, the last {} will be ignored.", dnsAddresses.length, dnsAddresses.length - 2);
 					}
 
-					commands.privileged().withResult(OsUtil.debugCommandArgs("netsh", "interface", "ipv6", "delete", "dnsservers", getName(), "all"));
+					commands.privileged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv6", "delete", "dnsservers", getName(), "all"));
 					if(dnsAddresses.length > 0) {
-					    commands.privileged().withResult(OsUtil.debugCommandArgs("netsh", "interface", "ipv6", "add", "dnsserver", getName(), dnsAddresses[0], "index=1", "no"));	
+					    commands.privileged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv6", "add", "dnsserver", getName(), dnsAddresses[0], "index=1", "no"));	
 					} 
 					if(dnsAddresses.length > 1) {
-					    commands.privileged().withResult(OsUtil.debugCommandArgs("netsh", "interface", "ipv6", "add", "dnsserver", getName(), dnsAddresses[1], "index=2", "no"));	
+					    commands.privileged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv6", "add", "dnsserver", getName(), dnsAddresses[1], "index=2", "no"));	
 					} 
 
 					String[] dnsNames = IpUtil.filterNames(dns);

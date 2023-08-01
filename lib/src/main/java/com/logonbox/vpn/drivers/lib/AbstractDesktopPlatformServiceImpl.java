@@ -68,7 +68,7 @@ public abstract class AbstractDesktopPlatformServiceImpl<I extends VirtualInetAd
 	protected AbstractDesktopPlatformServiceImpl(String interfacePrefix) {
 		super(interfacePrefix);
 		
-		commands = new UnprivilegedSystemCommands();
+		commands = new ElevatableSystemCommands();
 	}
 
 	protected Path extractCommand(String platform, String arch, String name) throws IOException {

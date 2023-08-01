@@ -24,9 +24,9 @@ module com.logonbox.vpn.drivers.lib {
     exports com.logonbox.vpn.drivers.lib;
     exports com.logonbox.vpn.drivers.lib.util;
     requires org.apache.commons.lang3;
-    requires transitive com.sshtools.forker.client;
     requires transitive org.slf4j;
     requires commons.ip.math;
+    requires com.sshtools.liftlib;
     
     uses PlatformServiceFactory;
 }

@@ -20,7 +20,7 @@
  */
 package com.logonbox.vpn.drivers.windows;
 
-import com.sshtools.forker.common.OS;
+import com.sshtools.liftlib.OS;
 import com.sun.jna.Platform;
 
 import org.slf4j.Logger;

@@ -194,17 +194,17 @@ public class OSXNetworksetupDNS {
 				args.add("Empty");
 			else 
 				args.addAll(srvEn.getValue().getServers());
-			checkForError(commands.withOutput(OsUtil.debugCommandArgs(args.toArray(new String[0]))));
+			checkForError(commands.output(OsUtil.debugCommandArgs(args.toArray(new String[0]))));
 			args = new ArrayList<>(Arrays.asList("networksetup", "-setsearchdomains", srvEn.getKey()));
 			if(srvEn.getValue().getDomains().isEmpty()) 
 				args.add("Empty");
 			else
 				args.addAll(srvEn.getValue().getDomains());
-			checkForError(commands.withOutput(OsUtil.debugCommandArgs(args.toArray(new String[0]))));
+			checkForError(commands.output(OsUtil.debugCommandArgs(args.toArray(new String[0]))));
 		}
 
-		commands.privileged().withResult("dscacheutil", "-flushcache");
-		commands.privileged().withResult("killall", "-HUP", "mDNSResponder");
+		commands.privileged().result("dscacheutil", "-flushcache");
+		commands.privileged().result("killall", "-HUP", "mDNSResponder");
 		
 		currentServices = newServices;
 	}
@@ -213,7 +213,7 @@ public class OSXNetworksetupDNS {
 	private Set<String> collectNewServiceDns() throws IOException {
 		Set<String> foundServices = new HashSet<>();
 		LOG.debug("Running network setup to determine all network service.");
-		for(String service : commands.withOutput(debugCommandArgs("networksetup", "-listallnetworkservices"))) {
+		for(String service : commands.output(debugCommandArgs("networksetup", "-listallnetworkservices"))) {
 			if(service.startsWith("*")) {
 				service = service.substring(1);
 				LOG.debug(String.format("%s is disabled service.", service));
@@ -230,7 +230,7 @@ public class OSXNetworksetupDNS {
 				defaultServices.put(service, srv);
 			}
 			
-			for(String out : commands.withOutput(debugCommandArgs("networksetup", "-getdnsservers", service))) {
+			for(String out : commands.output(debugCommandArgs("networksetup", "-getdnsservers", service))) {
 				if(out.indexOf(' ') != -1) {
 					/* Multi-word message indicating no Dns servers */
 					srv.getServers().clear();
@@ -247,7 +247,7 @@ public class OSXNetworksetupDNS {
 				}
  			}
 			
-			for(String out : commands.withOutput(debugCommandArgs("networksetup", "-getsearchdomains", service))) {
+			for(String out : commands.output(debugCommandArgs("networksetup", "-getsearchdomains", service))) {
 				if(out.indexOf(' ') != -1) {
 					/* Multi-word message indicating no Dns servers */
 					srv.getDomains().clear();

@@ -25,10 +25,11 @@ module com.logonbox.vpn.drivers.os {
     exports com.logonbox.vpn.drivers.windows;
     requires transitive com.logonbox.vpn.drivers.lib; 
     requires transitive org.slf4j;
-    requires com.sun.jna.platform;
-    requires transitive com.sshtools.forker.services;
+    requires com.sshtools.liftlib;
+    requires transitive com.sun.jna.platform;
     requires transitive java.prefs;
     requires org.apache.commons.lang3;
+    requires transitive com.sun.jna;
     
     provides PlatformServiceFactory with WindowsPlatformServiceFactory;
 }

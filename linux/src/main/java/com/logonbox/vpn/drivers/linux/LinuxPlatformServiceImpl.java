@@ -85,14 +85,14 @@ public class LinuxPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl
     }
 
     protected LinuxIP add(String name, String type) throws IOException {
-        commands().privileged().withResult("ip", "link", "add", "dev", name, "type", type);
+        commands().privileged().result("ip", "link", "add", "dev", name, "type", type);
         return find(name, ips(false));
     }
 
     @Override
     protected String getDefaultGateway() throws IOException {
         String gw = null;
-        for (String line : commands().privileged().withOutput("ip", "route")) {
+        for (String line : commands().privileged().output("ip", "route")) {
             if (gw == null && line.startsWith("default via")) {
                 String[] args = line.split("\\s+");
                 if (args.length > 2)
@@ -107,7 +107,7 @@ public class LinuxPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl
 
     @Override
     public long getLatestHandshake(String iface, String publicKey) throws IOException {
-        for (String line : commands().privileged().withOutput(getWGCommand(), "show", iface, "latest-handshakes")) {
+        for (String line : commands().privileged().output(getWGCommand(), "show", iface, "latest-handshakes")) {
             String[] args = line.trim().split("\\s+");
             if (args.length == 2) {
                 if (args[0].equals(publicKey)) {
@@ -121,7 +121,7 @@ public class LinuxPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl
     @Override
     protected String getPublicKey(String interfaceName) throws IOException {
         try {
-            String pk = commands().privileged().withOutput(getWGCommand(), "show", interfaceName, "public-key")
+            String pk = commands().privileged().output(getWGCommand(), "show", interfaceName, "public-key")
                     .iterator().next().trim();
             if (pk.equals("(none)") || pk.equals(""))
                 return null;
@@ -142,7 +142,7 @@ public class LinuxPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl
         LinuxIP lastLink = null;
         try {
             IpAddressState state = IpAddressState.HEADER;
-            for (String r : commands().withOutput("ip", "address")) {
+            for (String r : commands().output("ip", "address")) {
                 if (!r.startsWith(" ")) {
                     String[] a = r.split(":");
                     String name = a[1].trim();
@@ -218,10 +218,10 @@ public class LinuxPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl
 
     @Override
     public StatusDetail status(String iface) throws IOException {
-        Collection<String> hs = commands().privileged().withOutput(getWGCommand(), "show", iface,
+        Collection<String> hs = commands().privileged().output(getWGCommand(), "show", iface,
                 "latest-handshakes");
         long lastHandshake = hs.isEmpty() ? 0 : Long.parseLong(hs.iterator().next().split("\\s+")[1]) * 1000;
-        hs = commands().privileged().withOutput(getWGCommand(), "show", iface, "transfer");
+        hs = commands().privileged().output(getWGCommand(), "show", iface, "transfer");
         long rx = hs.isEmpty() ? 0 : Long.parseLong(hs.iterator().next().split("\\s+")[1]);
         long tx = hs.isEmpty() ? 0 : Long.parseLong(hs.iterator().next().split("\\s+")[2]);
         return new StatusDetail() {
@@ -319,7 +319,7 @@ public class LinuxPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl
                 write(connection, writer);
             }
             log.info(String.format("Activating Wireguard configuration for %s (in %s)", ip.getName(), tempFile));
-            commands().privileged().withResult(getWGCommand(), "setconf", ip.getName(), tempFile.toString());
+            commands().privileged().result(getWGCommand(), "setconf", ip.getName(), tempFile.toString());
             log.info(String.format("Activated Wireguard configuration for %s", ip.getName()));
         } finally {
             Files.delete(tempFile);
@@ -396,7 +396,7 @@ public class LinuxPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl
     protected void rebuildAllows(ActiveSession<LinuxIP> session, LinuxIP ip) throws IOException {
         session.allows().clear();
 
-        for (String s : commands().privileged().withOutput(getWGCommand(), "show", ip.getName(), "allowed-ips")) {
+        for (String s : commands().privileged().output(getWGCommand(), "show", ip.getName(), "allowed-ips")) {
             StringTokenizer t = new StringTokenizer(s);
             if (t.hasMoreTokens()) {
                 t.nextToken();

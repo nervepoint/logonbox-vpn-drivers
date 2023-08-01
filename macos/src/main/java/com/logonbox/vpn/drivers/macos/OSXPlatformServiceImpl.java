@@ -66,7 +66,7 @@ public class OSXPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl<O
 
 	@Override
 	protected String getDefaultGateway() throws IOException {
-		for(String line : commands().privileged().withOutput("route", "-n", "get", "default")) {
+		for(String line : commands().privileged().output("route", "-n", "get", "default")) {
 			line = line.trim();
 			if(line.startsWith("gateway:")) {
 				String[] args = line.split(":");

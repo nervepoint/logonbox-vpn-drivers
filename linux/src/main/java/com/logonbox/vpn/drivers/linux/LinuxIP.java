@@ -98,9 +98,9 @@ public class LinuxIP extends AbstractVirtualInetAddress<LinuxPlatformServiceImpl
 					getPeer(), address));
 
 		if (StringUtils.isNotBlank(getPeer())) {
-            commands.privileged().withResult("ip", "address", "add", "dev", getName(), address, "peer", getPeer());
+            commands.privileged().result("ip", "address", "add", "dev", getName(), address, "peer", getPeer());
         } else
-            commands.privileged().withResult("ip", "address", "add", "dev", getName(), address);
+            commands.privileged().result("ip", "address", "add", "dev", getName(), address);
 		addresses.add(address);
 	}
 
@@ -116,24 +116,24 @@ public class LinuxIP extends AbstractVirtualInetAddress<LinuxPlatformServiceImpl
 		int fwmark = getFWMark("table");
 		if((StringUtils.isBlank(table) || table.equals(TABLE_AUTO)) && fwmark > -1 /* && [[ $(wg show "$INTERFACE" allowed-ips) =~ /0(\ |$'\n'|$) ]] */) {
 			while(commandOutputMatches(".*lookup " + fwmark + ".*", "ip", "-4", "rule", "show")) {
-				commands.privileged().withResult("ip", "-4", "rule", "delete", "table", String.valueOf(fwmark));
+				commands.privileged().result("ip", "-4", "rule", "delete", "table", String.valueOf(fwmark));
 			}
 			while(commandOutputMatches(".*from all lookup main suppress_prefixlength 0.*", "ip", "-4", "rule", "show")) {
-			    commands.privileged().withResult("ip", "-4", "rule", "delete", "table", "main", "suppress_prefixlength", "0");
+			    commands.privileged().result("ip", "-4", "rule", "delete", "table", "main", "suppress_prefixlength", "0");
 			}
 			while(commandOutputMatches(".*lookup " + fwmark + ".*", "ip", "-6", "rule", "show")) {
-			    commands.privileged().withResult("ip", "-6", "rule", "delete", "table", String.valueOf(fwmark));
+			    commands.privileged().result("ip", "-6", "rule", "delete", "table", String.valueOf(fwmark));
 			}
 			while(commandOutputMatches(".*from all lookup main suppress_prefixlength 0.*", "ip", "-6", "rule", "show")) {
-			    commands.privileged().withResult("ip", "-6", "rule", "delete", "table", "main", "suppress_prefixlength", "0");
+			    commands.privileged().result("ip", "-6", "rule", "delete", "table", "main", "suppress_prefixlength", "0");
 			}	
 		}
 
-		commands.privileged().withResult("ip", "link", "del", "dev", getName());
+		commands.privileged().result("ip", "link", "del", "dev", getName());
 	}
 	
 	private boolean commandOutputMatches(String pattern, String... args) throws IOException {
-		for(String line : commands.privileged().withOutput(args)) {
+		for(String line : commands.privileged().output(args)) {
 			if(line.matches(pattern))
 				return true;
 		}
@@ -202,7 +202,7 @@ public class LinuxIP extends AbstractVirtualInetAddress<LinuxPlatformServiceImpl
 					"Interface %s is configured to have a single peer %s, so cannot add a second address %s", getName(),
 					getPeer(), address));
 
-		commands.privileged().withResult("ip", "address", "del", address, "dev", getName());
+		commands.privileged().result("ip", "address", "del", address, "dev", getName());
 		addresses.remove(address);
 	}
 
@@ -253,13 +253,13 @@ public class LinuxIP extends AbstractVirtualInetAddress<LinuxPlatformServiceImpl
 
 		/* Remove all the current routes for this interface */
 		var have = new HashSet<>();
-		for (String row : commands.privileged().withOutput("ip", "route", "show", "dev", getName())) {
+		for (String row : commands.privileged().output("ip", "route", "show", "dev", getName())) {
 			String[] l = row.split("\\s+");
 			if (l.length > 0) {
 				have.add(l[0]);
 				if(!allows.contains(l[0])) {
 					LOG.info(String.format("Removing route %s for %s", l[0], getName()));
-					commands.privileged().withResult("ip", "route", "del", l[0], "dev", getName());
+					commands.privileged().result("ip", "route", "del", l[0], "dev", getName());
 				}
 			}
 		}
@@ -278,7 +278,7 @@ public class LinuxIP extends AbstractVirtualInetAddress<LinuxPlatformServiceImpl
 	@Override
 	public void up() throws IOException {
 		if (getMtu() > 0) {
-		    commands.privileged().withResult("ip", "link", "set", "mtu", String.valueOf(getMtu()), "up", "dev", getName());
+		    commands.privileged().result("ip", "link", "set", "mtu", String.valueOf(getMtu()), "up", "dev", getName());
 		} else {
 			/*
 			 * First detect MTU, then bring up. First try from existing Wireguard
@@ -295,12 +295,12 @@ public class LinuxIP extends AbstractVirtualInetAddress<LinuxPlatformServiceImpl
 
 			if (tmtu == 0) {
 				/* Not found, try the default route */
-				for (String line : commands.privileged().withOutput("ip", "route", "show", "default")) {
+				for (String line : commands.privileged().output("ip", "route", "show", "default")) {
 					StringTokenizer t = new StringTokenizer(line);
 					while (t.hasMoreTokens()) {
 						String tk = t.nextToken();
 						if (tk.equals("dev")) {
-							for (String iline : commands.privileged().withOutput("ip", "link", "show", "dev",
+							for (String iline : commands.privileged().output("ip", "link", "show", "dev",
 									t.nextToken())) {
 								StringTokenizer it = new StringTokenizer(iline);
 								while (it.hasMoreTokens()) {
@@ -327,14 +327,14 @@ public class LinuxIP extends AbstractVirtualInetAddress<LinuxPlatformServiceImpl
 			tmtu -= 80;
 
 			/* Bring it up! */
-			commands.privileged().withResult("ip", "link", "set", "mtu", String.valueOf(tmtu), "up", "dev", getName());
+			commands.privileged().result("ip", "link", "set", "mtu", String.valueOf(tmtu), "up", "dev", getName());
 		}
 	}
 	
 	private void removeFirewall() throws IOException {
 		if(OsUtil.doesCommandExist("nft")) {
 			StringBuilder nftcmd = new StringBuilder();
-			for(String table : commands.privileged().withOutput("nft", "list", "tables")) {
+			for(String table : commands.privileged().output("nft", "list", "tables")) {
 				if(table.contains(TABLE_PREFIX)) {
 					nftcmd.append(String.format("%s\n", table));
 				}	
@@ -347,7 +347,7 @@ public class LinuxIP extends AbstractVirtualInetAddress<LinuxPlatformServiceImpl
 			for(String iptables : new String[] {"iptables", "ip6tables"}) {
 				StringBuilder restore = new StringBuilder();
 				boolean found = false;
-				for(String line : commands.privileged().withOutput(iptables + "-save")) {
+				for(String line : commands.privileged().output(iptables + "-save")) {
 					if(line.startsWith("*") || line.equals("COMMIT") || line.matches("-A .*-m comment --comment \"LogonBoxVPN rule for " + getName() + ".*"))
 						continue;
 					if(line.startsWith("-A"))
@@ -364,7 +364,7 @@ public class LinuxIP extends AbstractVirtualInetAddress<LinuxPlatformServiceImpl
 	}
 
 	private int getIndexForName() throws IOException {
-		for (String line : commands.withOutput("ip", "addr")) {
+		for (String line : commands.output("ip", "addr")) {
 			line = line.trim();
 			String[] args = line.split(":");
 			if (args.length > 1) {
@@ -381,7 +381,7 @@ public class LinuxIP extends AbstractVirtualInetAddress<LinuxPlatformServiceImpl
 	
 	private int getFWMark(String table) {
 		try {
-			Collection<String> lines = commands.privileged().withOutput(getPlatform().getWGCommand(), "show", getName(), "fwmark");
+			Collection<String> lines = commands.privileged().output(getPlatform().getWGCommand(), "show", getName(), "fwmark");
 			if(lines.isEmpty())
 				throw new IOException();
 			else {
@@ -401,11 +401,11 @@ public class LinuxIP extends AbstractVirtualInetAddress<LinuxPlatformServiceImpl
 		int table = getFWMark("table");
 		if(table == -1) {
 			table = 51820;
-			while(!commands.privileged().withOutput("ip", "-4", "route", "show", "table", String.valueOf(table)).isEmpty() ||
-					   !commands.privileged().withOutput("ip", "-6", "route", "show", "table", String.valueOf(table)).isEmpty()) {
+			while(!commands.privileged().output("ip", "-4", "route", "show", "table", String.valueOf(table)).isEmpty() ||
+					   !commands.privileged().output("ip", "-6", "route", "show", "table", String.valueOf(table)).isEmpty()) {
 				table++;
 			}
-			commands.privileged().withResult(getPlatform().getWGCommand(), "set", getName(), "fwmark", String.valueOf(table));
+			commands.privileged().result(getPlatform().getWGCommand(), "set", getName(), "fwmark", String.valueOf(table));
 		}
 		String proto = "-4";
 		String iptables = "iptables";
@@ -417,9 +417,9 @@ public class LinuxIP extends AbstractVirtualInetAddress<LinuxPlatformServiceImpl
 			pf = "ip6";
 		}
 
-		commands.privileged().withResult("ip", proto, "route", "add", route, "dev", getName(), "table", String.valueOf(table));
-		commands.privileged().withResult("ip", proto, "rule", "add", "not", "fwmark", String.valueOf("table"), "table", String.valueOf(table));
-		commands.privileged().withResult("ip", proto, "rule", "add", "table", "main", "suppress_prefixlength", "0");
+		commands.privileged().result("ip", proto, "route", "add", route, "dev", getName(), "table", String.valueOf(table));
+		commands.privileged().result("ip", proto, "rule", "add", "not", "fwmark", String.valueOf("table"), "table", String.valueOf(table));
+		commands.privileged().result("ip", proto, "rule", "add", "table", "main", "suppress_prefixlength", "0");
 		
 		String marker = String.format("-m comment --comment \"LogonBoxVPN rule for %s\"", getName());
 		String restore = "*raw\n";
@@ -432,7 +432,7 @@ public class LinuxIP extends AbstractVirtualInetAddress<LinuxPlatformServiceImpl
 		nftcmd.append(String.format("add chain %s %s postmangle { type filter hook postrouting priority -150; }\n", pf, nftable));
 		
 		Pattern pattern = Pattern.compile(".*inet6?\\ ([0-9a-f:.]+)/[0-9]+.*");
-		for(String line : commands.privileged().withOutput("ip", "-o", proto, "addr", "show", "dev", getName())) {
+		for(String line : commands.privileged().output("ip", "-o", proto, "addr", "show", "dev", getName())) {
 			Matcher m = pattern.matcher(line); 
 			if(!m.matches()) {
 				continue;
@@ -448,7 +448,7 @@ public class LinuxIP extends AbstractVirtualInetAddress<LinuxPlatformServiceImpl
 		nftcmd.append(String.format("add rule %s %s premangle meta l4proto udp meta mark set ct mark \n", pf, nftable));
 		
 		if(proto.equals("-4")) {
-		    commands.privileged().withResult("sysctl", "-q", "net.ipv4.conf.all.src_valid_mark=1");
+		    commands.privileged().result("sysctl", "-q", "net.ipv4.conf.all.src_valid_mark=1");
 		}
 		
 		if(OsUtil.doesCommandExist("nft")) {
@@ -469,12 +469,12 @@ public class LinuxIP extends AbstractVirtualInetAddress<LinuxPlatformServiceImpl
 		if (TABLE_OFF.equals(getTable()))
 			return;
 		if (!TABLE_AUTO.equals(getTable())) {
-		    commands.privileged().withResult("ip", proto, "route", "add", route, "dev", getName(), "table", getTable());
+		    commands.privileged().result("ip", proto, "route", "add", route, "dev", getName(), "table", getTable());
 		} else if (route.endsWith("/0")) {
 			addDefault(route);
 		} else {
 			try {
-				String res = commands.privileged().withOutput("ip", proto, "route", "show", "dev", getName(), "match", route)
+				String res = commands.privileged().output("ip", proto, "route", "show", "dev", getName(), "match", route)
 						.iterator().next();
 				if (StringUtils.isNotBlank(res)) {
 					// Already have
@@ -483,7 +483,7 @@ public class LinuxIP extends AbstractVirtualInetAddress<LinuxPlatformServiceImpl
 			} catch (Exception e) {
 			}
 			LOG.info(String.format("Adding route %s to %s for %s", route, getName(), proto));
-			commands.privileged().withResult("ip", proto, "route", "add", route, "dev", getName());
+			commands.privileged().result("ip", proto, "route", "add", route, "dev", getName());
 		}
 	}
 
@@ -497,7 +497,7 @@ public class LinuxIP extends AbstractVirtualInetAddress<LinuxPlatformServiceImpl
 					updateNetworkManager(null);
 					break;
 				case RESOLVCONF:
-				    commands.privileged().withResult("resolvconf", "-d", getPlatform().resolvconfIfacePrefix() + getName(), "-f");
+				    commands.privileged().result("resolvconf", "-d", getPlatform().resolvconfIfacePrefix() + getName(), "-f");
 					break;
 				case SYSTEMD:
 					updateSystemd(null);

@@ -43,29 +43,9 @@
             <version>5.12.1</version>
         </dependency>
         <dependency>
-            <groupId>com.sshtools</groupId>
-            <artifactId>forker-services</artifactId>
-            <version>1.8-SNAPSHOT</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>com.github.hypfvieh</groupId>
-                    <artifactId>dbus-java-core</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.github.hypfvieh</groupId>
-                    <artifactId>dbus-java-transport-tcp</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.github.hypfvieh</groupId>
-                    <artifactId>dbus-java-transport-native-unixsocket</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.github.hypfvieh</groupId>
-                    <artifactId>
-                        dbus-java-transport-jnr-unixsocket
-                    </artifactId>
-                </exclusion>
-            </exclusions>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna-platform</artifactId>
+            <version>5.12.1</version>
         </dependency>
     </dependencies>
 </project>

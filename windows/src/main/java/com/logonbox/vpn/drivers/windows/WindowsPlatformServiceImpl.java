@@ -27,17 +27,13 @@ import com.logonbox.vpn.drivers.lib.StatusDetail;
 import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.WireguardConfiguration;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
-import com.logonbox.vpn.drivers.windows.service.NetworkConfigurationService;
-import com.sshtools.forker.client.impl.jna.win32.Kernel32;
-import com.sshtools.forker.common.XAdvapi32;
-import com.sshtools.forker.common.XWinsvc;
-import com.sshtools.forker.services.Service;
-import com.sshtools.forker.services.Service.Status;
-import com.sshtools.forker.services.Services;
-import com.sshtools.forker.services.impl.Win32ServiceService;
+import com.logonbox.vpn.drivers.windows.WindowsSystemServices.Service.Status;
+import com.logonbox.vpn.drivers.windows.WindowsSystemServices.XAdvapi32;
+import com.logonbox.vpn.drivers.windows.WindowsSystemServices.XWinsvc;
 import com.sun.jna.Native;
 import com.sun.jna.platform.win32.Advapi32;
 import com.sun.jna.platform.win32.Advapi32Util;
+import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.Kernel32Util;
 import com.sun.jna.platform.win32.WinDef.DWORD;
 import com.sun.jna.platform.win32.WinNT;
@@ -56,18 +52,12 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.Writer;
-import java.net.MalformedURLException;
 import java.net.NetworkInterface;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -133,9 +123,15 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
 	}
 
 	private File wgFile;
+    private final WindowsSystemServices services;
 
 	public WindowsPlatformServiceImpl() {
 		super(INTERFACE_PREFIX);
+		services = new WindowsSystemServices(this);
+	}
+	
+	WindowsSystemServices services() {
+	    return services;
 	}
 
     @Override
@@ -155,7 +151,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
 
 		/* netsh first */
 		try {
-			for(String line : commands().privileged().withOutput("netsh", "interface", "ip", "show", "interfaces")) {
+			for(String line : commands().privileged().output("netsh", "interface", "ip", "show", "interfaces")) {
 				line = line.trim();
 				if(line.equals("") || line.startsWith("Idx") || line.startsWith("---"))
 					continue;
@@ -194,7 +190,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
 			 * active WireGuard interfaces for some reason, so use ipconfig /all to 
 			 * create a merged list. 
 			 */
-			for(String line :commands().privileged().withOutput("ipconfig", "/all")) {
+			for(String line :commands().privileged().output("ipconfig", "/all")) {
 				line = line.trim();
 				if(line.startsWith("Unknown adapter")) {
 					String[] args = line.split("\\s+");
@@ -241,7 +237,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
 	@Override
 	protected String getDefaultGateway() throws IOException {
 		String gw = null;
-		for(String line : commands().privileged().withOutput("ipconfig")) {
+		for(String line : commands().privileged().output("ipconfig")) {
 			if(gw == null) {
 				line = line.trim();
 				if(line.startsWith("Default Gateway ")) {
@@ -428,7 +424,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
 
 		/* Install service for the network interface */
 		boolean install = false;
-		if (!Services.get().hasService(TUNNEL_SERVICE_NAME_PREFIX + "$" + ip.getName())) {
+		if (!services.hasService(TUNNEL_SERVICE_NAME_PREFIX + "$" + ip.getName())) {
 			install = true;
 			installService(ip.getName(), cwd);
 		} else
@@ -437,7 +433,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
 		/* The service may take a short while to appear */
 		int i = 0;
 		for (; i < SERVICE_INSTALL_TIMEOUT; i++) {
-			if (Services.get().hasService(TUNNEL_SERVICE_NAME_PREFIX + "$" + ip.getName()))
+			if (services.hasService(TUNNEL_SERVICE_NAME_PREFIX + "$" + ip.getName()))
 				break;
 			try {
 				Thread.sleep(1000);
@@ -510,7 +506,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
 		/* Check for an remove any wireguard interface services that are stopped (they should
 		 * either be running or not exist */
 		try {
-			for(Service service : Services.get().getServices()) {
+			for(var service : services.getServices()) {
 				if(service.getNativeName().startsWith(TUNNEL_SERVICE_NAME_PREFIX) && ( service.getStatus() == Status.STOPPED || service.getStatus() == Status.PAUSED || service.getStatus() == Status.UNKNOWN)) {
 					try {
 						uninstall(service.getNativeName());
@@ -546,7 +542,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
 		XWinsvc.SERVICE_DESCRIPTION desc = new XWinsvc.SERVICE_DESCRIPTION();
 		desc.lpDescription = description;
 
-		SC_HANDLE serviceManager = Win32ServiceService.getManager(null, Winsvc.SC_MANAGER_ALL_ACCESS);
+		SC_HANDLE serviceManager = WindowsSystemServices.getManager(null, Winsvc.SC_MANAGER_ALL_ACCESS);
 		try {
 
 			int dwServiceType = WinNT.SERVICE_WIN32_OWN_PROCESS;
@@ -630,17 +626,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
 			cmd.append('"');
 		}
 		else {
-			LOG.info("Using interpreted network configuration service");
-			cmd.append('"');
-			cmd.append(System.getProperty("java.home") + "\\bin\\java.exe");
-			cmd.append('"');
-			cmd.append(' ');
-			cmd.append("-cp");
-			cmd.append(' ');
-			cmd.append(reconstructClassPath());
-			cmd.append(' ');
-			// cmd.append(WindowsTunneler.class.getName());
-			cmd.append(NetworkConfigurationService.class.getName());
+		    throw new IOException("No network configuration service executable found for this platform.");
 		}
 		cmd.append(' ');
 		cmd.append("/service");
@@ -704,82 +690,10 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
 			return "/win32-x86-64/wg.exe";
 	}
 
-	private String reconstructClassPath() {
-
-		Set<URL> urls = new LinkedHashSet<>();
-
-		/*
-		 * Get all of the locations on java.class.path and turn them into URL's
-		 */
-		for (String path : System.getProperty("java.class.path").split(File.pathSeparator)) {
-			try {
-				urls.add(new File(path).toURI().toURL());
-			} catch (MalformedURLException e) {
-			}
-		}
-
-		/*
-		 * Traverse the class loader heirarchy looking for URLClassLoader and adding
-		 * those as well
-		 */
-		reconstructFromClassLoader(WindowsPlatformServiceImpl.class.getClassLoader(), urls);
-		if (Thread.currentThread().getContextClassLoader() != null)
-			reconstructFromClassLoader(Thread.currentThread().getContextClassLoader(), urls);
-
-		/* Sort so that directories come first - helps with development */
-		List<URL> sortedUrls = new ArrayList<>(urls);
-		Collections.sort(sortedUrls, (o1, o2) -> {
-			int i1 = o1.getPath().indexOf("/target/classes") != -1 ? 1 : 0;
-			int i2 = o2.getPath().indexOf("/target/classes") != -1 ? 1 : 0;
-			if (i1 == i2) {
-				return o1.getPath().compareTo(o2.getPath());
-			} else {
-				return i1 > i2 ? -1 : 1;
-			}
-		});
-		urls.clear();
-		urls.addAll(sortedUrls);
-
-		/* Only include the jars we need for this tool */
-		StringBuilder path = new StringBuilder();
-		for (URL url : urls) {
-			try {
-				String fullPath = new File(url.toURI()).getAbsolutePath();
-				{
-					if (fullPath.matches(".*client-logonbox-vpn-service.*") 
-							|| fullPath.matches(".*jna.*")
-							|| fullPath.matches(".*forker-common.*") 
-							|| fullPath.matches(".*forker-client.*")
-							|| fullPath.matches(".*commons-io.*")
-							|| fullPath.matches(".*slf4j.*")) {
-						if (path.length() > 0)
-							path.append(File.pathSeparator);
-						path.append('"');
-						path.append(fullPath);
-						path.append('"');
-					}
-				}
-			} catch (URISyntaxException e) {
-			}
-
-		}
-
-		return path.toString();
-	}
-
-	private void reconstructFromClassLoader(ClassLoader classLoader, Set<URL> urls) {
-		if (classLoader instanceof URLClassLoader) {
-			URLClassLoader ucl = (URLClassLoader) classLoader;
-			urls.addAll(Arrays.asList(ucl.getURLs()));
-		}
-		if (classLoader.getParent() != null)
-			reconstructFromClassLoader(classLoader.getParent(), urls);
-	}
-
 	public void uninstall(String serviceName) throws IOException {
 		XAdvapi32 advapi32 = XAdvapi32.INSTANCE;
 		SC_HANDLE serviceManager, service;
-		serviceManager = Win32ServiceService.getManager(null, WinNT.GENERIC_ALL);
+		serviceManager = WindowsSystemServices.getManager(null, WinNT.GENERIC_ALL);
 		try {
 			service = advapi32.OpenService(serviceManager, serviceName, WinNT.GENERIC_ALL);
 			if (service != null) {

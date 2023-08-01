@@ -20,13 +20,13 @@ public interface SystemCommands {
             }
 
             @Override
-            public int withResult(String... args) throws IOException {
-                return delegate.withResult(args);
+            public int result(String... args) throws IOException {
+                return delegate.result(args);
             }
             
             @Override
-            public Collection<String> withOutput(String... args) throws IOException {
-                return delegate.withOutput(args);
+            public Collection<String> output(String... args) throws IOException {
+                return delegate.output(args);
             }
             
             @Override
@@ -77,9 +77,9 @@ public interface SystemCommands {
 
     void run(String... args) throws IOException;
 
-    Collection<String> withOutput(String... args) throws IOException;
+    Collection<String> output(String... args) throws IOException;
 
-    int withResult(String... args) throws IOException;
+    int result(String... args) throws IOException;
     
     void pipeTo(String content, String... args) throws IOException;
 
