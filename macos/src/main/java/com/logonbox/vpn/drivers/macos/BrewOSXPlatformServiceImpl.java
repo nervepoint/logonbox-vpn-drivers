@@ -24,12 +24,13 @@ import static com.logonbox.vpn.drivers.lib.util.OsUtil.getPathOfCommandInPath;
 import static com.logonbox.vpn.drivers.lib.util.OsUtil.is64bit;
 import static com.logonbox.vpn.drivers.lib.util.OsUtil.isAarch64;
 
-import com.logonbox.vpn.drivers.lib.AbstractDesktopPlatformServiceImpl;
+import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
 import com.logonbox.vpn.drivers.lib.ActiveSession;
 import com.logonbox.vpn.drivers.lib.DNSIntegrationMethod;
-import com.logonbox.vpn.drivers.lib.StatusDetail;
 import com.logonbox.vpn.drivers.lib.SystemContext;
-import com.logonbox.vpn.drivers.lib.WireguardConfiguration;
+import com.logonbox.vpn.drivers.lib.VpnConfiguration;
+import com.logonbox.vpn.drivers.lib.VpnInterfaceInformation;
+import com.logonbox.vpn.drivers.lib.VpnPeer;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
 import com.logonbox.vpn.drivers.macos.OSXNetworksetupDNS.InterfaceDNS;
 
@@ -46,17 +47,18 @@ import java.net.InterfaceAddress;
 import java.net.NetworkInterface;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class BrewOSXPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl<BrewOSXIP> {
+public class BrewOSXPlatformServiceImpl extends AbstractUnixDesktopPlatformService<BrewOSXIP> {
 
 	static Logger log = LoggerFactory.getLogger(BrewOSXPlatformServiceImpl.class);
 
@@ -75,22 +77,6 @@ public class BrewOSXPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
 	public BrewOSXPlatformServiceImpl() {
 		super(INTERFACE_PREFIX);
 	}
-
-	@Override
-    protected void addRouteAll(WireguardConfiguration connection) throws IOException {
-        LOG.info("Routing traffic all through VPN");
-        String gw = getDefaultGateway();
-        LOG.info(String.join(" ", Arrays.asList("route", "add", connection.getEndpointAddress(), "gw", gw)));
-        commands().privileged().run("route", "add", connection.getEndpointAddress(), "gw", gw);
-    }
-
-    @Override
-    protected void removeRouteAll(ActiveSession<BrewOSXIP> session) throws IOException {
-        LOG.info("Removing routing of all traffic through VPN");
-        String gw = getDefaultGateway();
-        LOG.info(String.join(" ", Arrays.asList("route", "del", session.connection().getEndpointAddress(), "gw", gw)));
-        commands().privileged().run("route", "del", session.connection().getEndpointAddress(), "gw", gw);
-    }
 
     @Override
 	protected void beforeStart(SystemContext ctx) {
@@ -155,47 +141,13 @@ public class BrewOSXPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
 		else
 			return gw;
 	}
-
-	@Override
-	public long getLatestHandshake(String iface, String publicKey) throws IOException {
-		checkWGCommand();
-		for (String line : commands().privileged() .output(getWGCommand(), "show", iface, "latest-handshakes")) {
-			String[] args = line.trim().split("\\s+");
-			if (args.length == 2) {
-				if (args[0].equals(publicKey)) {
-					return Long.parseLong(args[1]) * 1000;
-				}
-			}
-		}
-		return 0;
-	}
-
-	@Override
-	protected String getPublicKey(String interfaceName) throws IOException {
-		try {
-			checkWGCommand();
-			String pk = commands().privileged().output(getWGCommand(), "show", interfaceName, "public-key")
-					.iterator().next().trim();
-			if (pk.equals("(none)") || pk.equals(""))
-				return null;
-			else
-				return pk;
-
-		} catch (IOException ioe) {
-			if (ioe.getMessage() != null &&
-					( ioe.getMessage().indexOf("The system cannot find the file specified") != -1 ||
-					ioe.getMessage().indexOf("Unable to access interface: No such file or directory") != -1))
-				return null;
-			else
-				throw ioe;
-		}
-	}
 	
 	@Override
 	public String getWGCommand() {
 		return wgCommandPath == null ? null : wgCommandPath.toString();
 	}
 	
+	@Override
 	protected void checkWGCommand() {
 		/* It is possible the temp directory these are stored gets cleaned out
 		 * by OS at some point. Re-extract if this appears to happen.
@@ -301,45 +253,6 @@ public class BrewOSXPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
 		return new String[0];
 	}
 
-	@Override
-	public StatusDetail status(String iface) throws IOException {
-		/* TODO replace this with WireguardPipe and use a domain socket (JDK 16) */
-		checkWGCommand();
-		Collection<String> hs = commands().privileged().output(getWGCommand(), "show", iface,
-				"latest-handshakes");
-		long lastHandshake = hs.isEmpty() ? 0 : Long.parseLong(hs.iterator().next().split("\\s+")[1]) * 1000;
-		hs = commands().privileged() .output(getWGCommand(), "show", iface, "transfer");
-		long rx = hs.isEmpty() ? 0 : Long.parseLong(hs.iterator().next().split("\\s+")[1]);
-		long tx = hs.isEmpty() ? 0 : Long.parseLong(hs.iterator().next().split("\\s+")[2]);
-		return new StatusDetail() {
-
-			@Override
-			public long getTx() {
-				return tx;
-			}
-
-			@Override
-			public long getRx() {
-				return rx;
-			}
-
-			@Override
-			public long getLastHandshake() {
-				return lastHandshake;
-			}
-
-			@Override
-			public String getInterfaceName() {
-				return iface;
-			}
-
-			@Override
-			public String getError() {
-				return "";
-			}
-		};
-	}
-
 	boolean doesCommandExist(String command) {
 		for (String dir : System.getenv("PATH").split(File.pathSeparator)) {
 			File wg = new File(dir, command);
@@ -359,31 +272,31 @@ public class BrewOSXPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
 	}
 
 	@Override
-	protected ActiveSession<BrewOSXIP> configureExistingSession(SystemContext context, WireguardConfiguration connection, BrewOSXIP ip) {
+	protected ActiveSession<BrewOSXIP> configureExistingSession(SystemContext context, VpnConfiguration connection, BrewOSXIP ip, Optional<VpnPeer> peer) {
 		switch(ip.calcDnsMethod()) {
 		case SCUTIL_COMPATIBLE:
 			/* Should still be in correct state. State is also lost at reboot (good thing!) */
 			break;
 		case NETWORKSETUP:
-			OSXNetworksetupDNS.get().configure(new InterfaceDNS(ip.getName(), connection.getDns().toArray(new String[0])));
+			OSXNetworksetupDNS.get().configure(new InterfaceDNS(ip.getName(), connection.dns().toArray(new String[0])));
 			break;
 		default:
 			// Should not happen
 			throw new UnsupportedOperationException();
 		}
-		return super.configureExistingSession(context, connection, ip);
+		return super.configureExistingSession(context, connection, ip, peer);
 	}
 
 	@Override
-	protected Collection<ActiveSession<BrewOSXIP>> onStart(SystemContext ctx, List<ActiveSession<BrewOSXIP>> sessions) {
+	protected Collection<ActiveSession<BrewOSXIP>> onInit(SystemContext ctx, List<ActiveSession<BrewOSXIP>> sessions) {
 		OSXNetworksetupDNS.get().start(ctx, commands());
-		return super.onStart(ctx, sessions);
+		return super.onInit(ctx, sessions);
 	}
 
 	@Override
-	protected BrewOSXIP onConnect(ActiveSession<BrewOSXIP> session) throws IOException {
+	protected void onStart(ActiveSession<BrewOSXIP> session) throws IOException {
 		BrewOSXIP ip = null;
-		var connection = session.connection();
+		var connection = session.configuration();
 
 		/*
 		 * Look for wireguard interfaces that are available but not connected. If we
@@ -404,7 +317,7 @@ public class BrewOSXPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
 					ip = find(name, ips);
 					maxIface = i;
 					break;
-				} else if (publicKey != null && publicKey.equals(connection.getUserPublicKey())) {
+				} else if (publicKey != null && publicKey.equals(connection.publicKey())) {
 					throw new IllegalStateException(
 							String.format("Peer with public key %s on %s is already active.", publicKey, name));
 				} else {
@@ -422,7 +335,7 @@ public class BrewOSXPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
 		if (ip == null) {
 			String name = getInterfacePrefix() + maxIface;
 			log.info(String.format("No existing unused interfaces, creating new one (%s) for public key .", name,
-					connection.getUserPublicKey()));
+					connection.publicKey()));
 			ip = add(name, "wireguard");
 			if (ip == null) 
 				throw new IOException("Failed to create virtual IP address.");
@@ -447,24 +360,29 @@ public class BrewOSXPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
 		 * About to start connection. The "last handshake" should be this value or later
 		 * if we get a valid connection
 		 */
-		long connectionStarted = ((System.currentTimeMillis() / 1000l) - 1) * 1000l;
+        var connectionStarted = Instant.ofEpochMilli(((System.currentTimeMillis() / 1000l) - 1) * 1000l);
 
 		/* Set the address reserved */
-		log.info(String.format("Setting address %s on %s", connection.getAddress(), ip.getName()));
-		ip.setAddresses(connection.getAddress());
+		if(connection.addresses().size() > 0) {
+		    var addr = connection.addresses().get(0);
+    		log.info(String.format("Setting address %s on %s", addr, ip.getName()));
+    		ip.setAddresses(addr);
+		}
 
 		/* Bring up the interface (will set the given MTU) */
-		ip.setMtu(connection.getMtu() == 0 ? context.configuration().defaultMTU() : connection.getMtu());
+		ip.setMtu(connection.mtu().or(() -> context.configuration().defaultMTU()).orElse(0));
 		log.info(String.format("Bringing up %s", ip.getName()));
 		ip.up();
+		session.attachToInterface(ip);
 
 		/*
 		 * Wait for the first handshake. As soon as we have it, we are 'connected'. If
 		 * we don't get a handshake in that time, then consider this a failed
 		 * connection. We don't know WHY, just it has failed
 		 */
-		log.info(String.format("Waiting for first handshake on %s (starts at %d)", ip.getName(), connectionStarted));
-		BrewOSXIP ok = waitForFirstHandshake(connection, ip, connectionStarted);
+		if(context.configuration().connectTimeout().isPresent()) {
+            waitForFirstHandshake(session, connectionStarted, context.configuration().connectTimeout().get());
+        }
 
 		/* Set the routes */
 		try {
@@ -500,7 +418,6 @@ public class BrewOSXPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
 //		monitor_daemon
 //		execute_hooks "${POST_UP[@]}"
 
-		return ok;
 	}
 
 	void setRoutes(ActiveSession<BrewOSXIP> session, BrewOSXIP ip) throws IOException {
@@ -537,14 +454,8 @@ public class BrewOSXPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
 	}
 
 	@Override
-	public BrewOSXIP getByPublicKey(String publicKey) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("TODO");
-	}
-
-	@Override
-	public void runHook(ActiveSession<BrewOSXIP> session, String hookScript) throws IOException {
-		runHookViaPipeToShell(session, OsUtil.getPathOfCommandInPathOrFail("bash").toString(), "-c", hookScript);
+	public void runHook(ActiveSession<BrewOSXIP> session, String... hookScript) throws IOException {
+		runHookViaPipeToShell(session, OsUtil.getPathOfCommandInPathOrFail("bash").toString(), "-c", String.join(" ; ",  hookScript).trim());
 	}
 
 	@Override
@@ -555,5 +466,15 @@ public class BrewOSXPlatformServiceImpl extends AbstractDesktopPlatformServiceIm
     @Override
     protected void runCommand(List<String> commands) throws IOException {
         commands().privileged().run(commands.toArray(new String[0]));
+    }
+
+    @Override
+    public VpnInterfaceInformation information(BrewOSXIP iface) throws IOException {
+        return super.information(iface);
+    }
+
+    @Override
+    public VpnConfiguration configuration(BrewOSXIP iface) throws IOException {
+        return super.configuration(iface);
     }
 }

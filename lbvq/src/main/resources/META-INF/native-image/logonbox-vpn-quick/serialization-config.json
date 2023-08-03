@@ -1,0 +1,20 @@
+[
+  {
+    "name":"com.logonbox.vpn.drivers.lib.impl.ElevatableSystemCommands$Output"
+  },
+  {
+    "name":"com.logonbox.vpn.drivers.lib.impl.ElevatableSystemCommands$WithResult"
+  },
+  {
+    "name":"java.lang.Integer"
+  },
+  {
+    "name":"java.lang.Number"
+  },
+  {
+    "name":"java.lang.String"
+  },
+  {
+    "name":"java.util.Collections$EmptyMap"
+  }
+]

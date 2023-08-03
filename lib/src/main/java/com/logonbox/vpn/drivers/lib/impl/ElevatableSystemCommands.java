@@ -1,5 +1,6 @@
-package com.logonbox.vpn.drivers.lib;
+package com.logonbox.vpn.drivers.lib.impl;
 
+import com.logonbox.vpn.drivers.lib.SystemCommands;
 import com.sshtools.liftlib.ElevatedClosure;
 import com.sshtools.liftlib.Elevator;
 import com.sshtools.liftlib.Elevator.ReauthorizationPolicy;
@@ -23,7 +24,9 @@ public class ElevatableSystemCommands implements SystemCommands {
     private final Elevator elevator;
     
     public ElevatableSystemCommands() {
-        elevator = new Elevator.ElevatorBuilder().withReauthorizationPolicy(ReauthorizationPolicy.NEVER).build();
+        elevator = new Elevator.ElevatorBuilder().
+                withReauthorizationPolicy(ReauthorizationPolicy.NEVER).
+                build();
     }
 
     @Override

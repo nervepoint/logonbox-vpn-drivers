@@ -21,14 +21,54 @@
 package com.logonbox.vpn.drivers.lib;
 
 import java.time.Duration;
+import java.util.Optional;
 
 public interface SystemConfiguration {
+    
+    Duration HANDSHAKE_TIMEOUT = Duration.ofSeconds(Integer.parseInt(System.getProperty("logonbox.vpn.handshakeTimeout", "180")));
+    Duration SERVICE_WAIT_TIMEOUT = Duration.ofSeconds(Integer.parseInt(System.getProperty("logonbox.vpn.serviceWaitTimeout", "2")));
+    Duration CONNECT_TIMEOUT = Duration.ofSeconds(Integer.parseInt(System.getProperty("logonbox.vpn.connectTimeout", "12")));
+    
+    public static SystemConfiguration defaultConfiguration() {
+        return new SystemConfiguration() {
+            
+            @Override
+            public Duration serviceWait() {
+                return SERVICE_WAIT_TIMEOUT;
+            }
+            
+            @Override
+            public boolean ignoreLocalRoutes() {
+                return true;
+            }
+            
+            @Override
+            public Duration handshakeTimeout() {
+                return HANDSHAKE_TIMEOUT;
+            }
+            
+            @Override
+            public Optional<Integer> defaultMTU() {
+                return Optional.empty();
+            }
+            
+            @Override
+            public Optional<Duration> connectTimeout() {
+                return Optional.of(CONNECT_TIMEOUT);
+            }
 
-    int defaultMTU();
+            @Override
+            public DNSIntegrationMethod dnsIntegrationMethod() {
+                return DNSIntegrationMethod.AUTO;
+            }
+        };
+    }
+
+    Optional<Integer> defaultMTU();
 
     Duration serviceWait();
 
-    Duration connectTimeout();
+    Optional<Duration> connectTimeout();
 
     boolean ignoreLocalRoutes();
 

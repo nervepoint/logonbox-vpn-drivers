@@ -22,14 +22,13 @@ package com.logonbox.vpn.drivers.macos;
 
 import com.logonbox.vpn.drivers.lib.PlatformService;
 import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
-
-import org.apache.commons.lang3.SystemUtils;
+import com.sshtools.liftlib.OS;
 
 public class MacOsPlatformServiceFactory implements PlatformServiceFactory {
 
     @Override
     public boolean isSupported() {
-        return SystemUtils.IS_OS_MAC_OSX;
+        return OS.isMacOs();
     }
 
     @Override

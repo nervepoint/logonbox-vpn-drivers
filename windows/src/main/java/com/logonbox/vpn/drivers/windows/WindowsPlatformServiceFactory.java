@@ -22,14 +22,13 @@ package com.logonbox.vpn.drivers.windows;
 
 import com.logonbox.vpn.drivers.lib.PlatformService;
 import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
-
-import org.apache.commons.lang3.SystemUtils;
+import com.sshtools.liftlib.OS;
 
 public class WindowsPlatformServiceFactory implements PlatformServiceFactory {
 
     @Override
     public boolean isSupported() {
-        return SystemUtils.IS_OS_WINDOWS;
+        return OS.isWindows();
     }
 
     @Override

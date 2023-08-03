@@ -23,13 +23,15 @@ package com.logonbox.vpn.drivers.windows;
 import com.logonbox.vpn.drivers.lib.AbstractVirtualInetAddress;
 import com.logonbox.vpn.drivers.lib.DNSIntegrationMethod;
 import com.logonbox.vpn.drivers.lib.SystemCommands;
+import com.logonbox.vpn.drivers.lib.VpnConfiguration;
+import com.logonbox.vpn.drivers.lib.VpnInterfaceInformation;
 import com.logonbox.vpn.drivers.lib.util.IpUtil;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
+import com.logonbox.vpn.drivers.lib.util.Util;
 import com.logonbox.vpn.drivers.windows.WindowsSystemServices.Service;
 import com.sun.jna.platform.win32.Advapi32Util;
 import com.sun.jna.platform.win32.WinReg;
 
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,6 +71,16 @@ public class WindowsIP extends AbstractVirtualInetAddress<WindowsPlatformService
 	}
 
 	@Override
+    public VpnInterfaceInformation information() throws IOException {
+        return getPlatform().information(this.getName());
+    }
+
+    @Override
+    public VpnConfiguration configuration() throws IOException {
+        return getPlatform().configuration(this);
+    }
+
+    @Override
 	public void down() throws IOException {
 		synchronized (lock) {
 			try {
@@ -207,7 +219,7 @@ public class WindowsIP extends AbstractVirtualInetAddress<WindowsPlatformService
 					catch(Exception e) {
 						//
 					}
-					Set<String> newDomainList = new LinkedHashSet<>(StringUtils.isBlank(currentDomains) ? Collections.emptySet() : Arrays.asList(currentDomains.split(",")));
+					Set<String> newDomainList = new LinkedHashSet<>(Util.isBlank(currentDomains) ? Collections.emptySet() : Arrays.asList(currentDomains.split(",")));
 					for(String dnsName : dnsNames) {
 						if(!newDomainList.contains(dnsName)) {
 							LOG.info(String.format("Adding domain %s to search", dnsName));
@@ -241,7 +253,7 @@ public class WindowsIP extends AbstractVirtualInetAddress<WindowsPlatformService
 		String currentDomains = Advapi32Util.registryGetStringValue
                 (WinReg.HKEY_LOCAL_MACHINE,
                         "System\\CurrentControlSet\\Services\\TCPIP\\Parameters", "SearchList");
-		Set<String> currentDomainList = new LinkedHashSet<>(StringUtils.isBlank(currentDomains) ? Collections.emptySet() : Arrays.asList(currentDomains));
+		Set<String> currentDomainList = new LinkedHashSet<>(Util.isBlank(currentDomains) ? Collections.emptySet() : Arrays.asList(currentDomains));
 		for(String dnsName : domainsAdded) {
 			LOG.info(String.format("Removing domain %s from search", dnsName));
 			currentDomainList.remove(dnsName);

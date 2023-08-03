@@ -25,6 +25,8 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.List;
 
+import org.freedesktop.dbus.DBusPath;
+import org.freedesktop.dbus.ObjectPath;
 import org.freedesktop.dbus.Struct;
 import org.freedesktop.dbus.annotations.DBusInterfaceName;
 import org.freedesktop.dbus.annotations.Position;
@@ -156,4 +158,6 @@ public interface Resolve1Manager extends DBusInterface {
 	 *  Flush caches
 	 */
 	void FlushCaches();
+	
+	DBusPath GetLink(int index);
 }

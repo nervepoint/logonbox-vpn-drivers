@@ -20,18 +20,20 @@
  */
 package com.logonbox.vpn.drivers.lib.util;
 
+import com.sshtools.liftlib.OS;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
-
-import org.apache.commons.lang3.SystemUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class OsUtil {
 	public final static Logger LOG = LoggerFactory.getLogger(OsUtil.class);
@@ -49,7 +51,7 @@ public class OsUtil {
 	
 	public static Path getPathOfCommandInPath(String command) {
 		Set<String> path = new LinkedHashSet<>(Arrays.asList(System.getenv("PATH").split(File.pathSeparator)));
-		if (SystemUtils.IS_OS_MAC_OSX) {
+		if (OS.isMacOs()) {
 			/* Hack for brew */
 			path.add("/usr/local/bin");
 		}
@@ -70,11 +72,11 @@ public class OsUtil {
     private static final boolean IS_AARCH64 = isAarch640();
 
     public static String getOS() {
-    	if (SystemUtils.IS_OS_WINDOWS) {
+    	if (OS.isWindows()) {
     		return "windows";
-    	} else if (SystemUtils.IS_OS_LINUX) {
+    	} else if (OS.isLinux()) {
     		return "linux";
-    	} else if (SystemUtils.IS_OS_MAC_OSX) {
+    	} else if (OS.isMacOs()) {
     		return "osx";
     	} else {
     		return "other";
@@ -88,9 +90,13 @@ public class OsUtil {
     public static boolean isAarch64() {
     	return IS_AARCH64;
     }
+    
+    public static String getHostName() {
+        return OS.isWindows() ? System.getenv("COMPUTERNAME") : System.getenv("HOSTNAME");
+    }
 
     public static boolean isAdministrator() {
-    	if (SystemUtils.IS_OS_WINDOWS) {
+    	if (OS.isWindows()) {
     		try {
     			String programFiles = System.getenv("ProgramFiles");
     			if (programFiles == null) {
@@ -104,7 +110,7 @@ public class OsUtil {
     			return false;
     		}
     	}
-    	if (SystemUtils.IS_OS_UNIX) {
+    	if (OS.isUnixLike()) {
     		return System.getProperty("forker.administratorUsername", System.getProperty("vm.rootUser", "root"))
     				.equals(System.getProperty("user.name"));
     	}
@@ -126,5 +132,17 @@ public class OsUtil {
 
     private static boolean isAarch640() {
     	return "aarch64".equals(System.getProperty("os.arch"));
+    }
+
+    public static InetSocketAddress parseInetSocketAddress(String addr) {
+        return parseInetSocketAddress(addr, 0);
+    }
+
+    public static InetSocketAddress parseInetSocketAddress(String addr, int defaultPort) {
+        var idx = addr.indexOf(':');
+        if(idx == -1)
+            return new InetSocketAddress(addr, defaultPort);
+        else
+            return new InetSocketAddress(addr.substring(0, idx), Integer.parseInt(addr.substring(idx + 1)));
     }
 }

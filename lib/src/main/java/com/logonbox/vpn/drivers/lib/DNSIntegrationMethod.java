@@ -20,10 +20,10 @@
  */
 package com.logonbox.vpn.drivers.lib;
 
+import com.sshtools.liftlib.OS;
+
 import java.util.ArrayList;
 import java.util.List;
-
-import org.apache.commons.lang3.SystemUtils;
 
 public enum DNSIntegrationMethod {
 	AUTO, NETSH, NETWORK_MANAGER, SYSTEMD, RESOLVCONF, RAW, NETWORKSETUP, SCUTIL_COMPATIBLE, SCUTIL_SPLIT, NONE;
@@ -33,14 +33,14 @@ public enum DNSIntegrationMethod {
 		case NETWORKSETUP:
 		case SCUTIL_COMPATIBLE:
 		case SCUTIL_SPLIT:
-			return SystemUtils.IS_OS_MAC_OSX;
+			return OS.isMacOs();
 		case NETWORK_MANAGER:
 		case SYSTEMD:
 		case RAW:
 		case RESOLVCONF:
-			return SystemUtils.IS_OS_LINUX;
+			return OS.isLinux();
 		case NETSH:
-			return SystemUtils.IS_OS_WINDOWS;
+			return OS.isWindows();
 		case AUTO:
 		case NONE:
 			return true;

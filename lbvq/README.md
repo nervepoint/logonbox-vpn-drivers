@@ -1,29 +1,27 @@
-# dft-tcp
+# logonbox-vpn-quick
 
-[Back To DFT](../README.md)
+[Back To LogonBox VPN Drivers](../README.md)
 
-This module servers serves as a reference implementation and example for *DFT*. It may also
-be a useful tool in its own right, allowing rapid file transfer between two hosts.
-
-It uses a simple binary protocol over TCP. 
+This module servers serves as a reference implementation and example for *LogonBox VPN Drivers*. It may also
+be a useful tool in its own right, providing clones of the official Wireguard tools..
 
 ## Building 
 
 You will need .. 
 
- * [Java 11 or later](https://adoptium.net/),
+ * [Java 17 or later](https://adoptium.net/),
  * [Apache Maven](https://maven.apache.org/)
 
 ```
 mvn clean package -P shaded
 ```
 
-This will produce a "shaded" executable Jar `tcp/target/dft-tcp-[version]-launcher.jar`, which
+This will produce a "shaded" executable Jar `tcp/target/logonbox-vpn-quick-[version]-launcher.jar`, which
 contains both the send and receive tools.
 
 ## Usage
 
-
+TODO
 
 ## Graal Native Image
 

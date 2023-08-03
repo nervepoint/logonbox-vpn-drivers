@@ -29,7 +29,7 @@ public interface SystemContext {
     
     SystemConfiguration configuration();
 
-    WireguardConfiguration configurationForPublicKey(String publicKey);
+    VpnConfiguration configurationForPublicKey(String publicKey);
 
     void addScriptEnvironmentVariables(ActiveSession<?> connection, Map<String, String> env);
 }

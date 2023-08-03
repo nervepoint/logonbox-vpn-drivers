@@ -22,11 +22,13 @@ package com.logonbox.vpn.drivers.macos;
 
 import com.logonbox.vpn.drivers.lib.AbstractVirtualInetAddress;
 import com.logonbox.vpn.drivers.lib.DNSIntegrationMethod;
+import com.logonbox.vpn.drivers.lib.VpnConfiguration;
+import com.logonbox.vpn.drivers.lib.VpnInterfaceInformation;
 import com.logonbox.vpn.drivers.lib.util.IpUtil;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
+import com.logonbox.vpn.drivers.lib.util.Util;
 import com.logonbox.vpn.drivers.macos.OSXNetworksetupDNS.InterfaceDNS;
 
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,7 +66,7 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 	public void addAddress(String address) throws IOException {
 		if (addresses.contains(address))
 			throw new IllegalStateException(String.format("Interface %s already has address %s", getName(), address));
-		if (addresses.size() > 0 && StringUtils.isNotBlank(getPeer()))
+		if (addresses.size() > 0 && Util.isNotBlank(getPeer()))
 			throw new IllegalStateException(String.format(
 					"Interface %s is configured to have a single peer %s, so cannot add a second address %s", getName(),
 					getPeer(), address));
@@ -85,6 +87,16 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 	protected File getSocketFile() {
 		return new File("/var/run/wireguard/" + getName() + ".sock");
 	}
+
+    @Override
+    public VpnInterfaceInformation information() throws IOException {
+        return getPlatform().information(this);
+    }
+
+    @Override
+    public VpnConfiguration configuration() throws IOException {
+        return getPlatform().configuration(this); 
+    }
 
 	public void dns(String[] dns) throws IOException {
 		if (dns == null || dns.length == 0) {
@@ -188,7 +200,7 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 	public void removeAddress(String address) throws IOException {
 		if (!addresses.contains(address))
 			throw new IllegalStateException(String.format("Interface %s not not have address %s", getName(), address));
-		if (addresses.size() > 0 && StringUtils.isNotBlank(getPeer()))
+		if (addresses.size() > 0 && Util.isNotBlank(getPeer()))
 			throw new IllegalStateException(String.format(
 					"Interface %s is configured to have a single peer %s, so cannot add a second address %s", getName(),
 					getPeer(), address));
@@ -237,7 +249,7 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 	@Override
 	public void setPeer(String peer) {
 		if (!Objects.equals(peer, this.getPeer())) {
-			if (StringUtils.isNotBlank(peer) && addresses.size() > 1)
+			if (Util.isNotBlank(peer) && addresses.size() > 1)
 				throw new IllegalStateException(String.format(
 						"Interface %s is already configured to have multiple addresses, so cannot have a single peer %s",
 						getName(), peer));
@@ -316,7 +328,7 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 					break;
 				}
 			}
-			if (StringUtils.isBlank(defaultIf))
+			if (Util.isBlank(defaultIf))
 				LOG.warn("Could not determine default interface to get MTU from.");
 			else {
 				for (String line : commands.output(OsUtil.debugCommandArgs("ifconfig", defaultIf))) {
@@ -353,7 +365,7 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 		if (TABLE_OFF.equals(getTable()))
 			return;
 
-		if (route.endsWith("/0") && (StringUtils.isBlank(getTable()) || TABLE_AUTO.equals(getTable()))) {
+		if (route.endsWith("/0") && (Util.isBlank(getTable()) || TABLE_AUTO.equals(getTable()))) {
 			if (route.matches(".*:.*")) {
 				autoRoute6 = true;
 				commands.privileged().result(OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-inet6", "::/1:",
@@ -368,7 +380,7 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 						"-interface", getName()));
 			}
 		} else {
-			if (!TABLE_MAIN.equals(getTable()) && !TABLE_AUTO.equals(getTable()) && !StringUtils.isBlank(getTable())) {
+			if (!TABLE_MAIN.equals(getTable()) && !TABLE_AUTO.equals(getTable()) && !Util.isBlank(getTable())) {
 				throw new IOException("Darwin only supports TABLE=auto|main|off");
 			}
 

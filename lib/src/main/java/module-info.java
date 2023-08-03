@@ -23,10 +23,10 @@ import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
 module com.logonbox.vpn.drivers.lib {
     exports com.logonbox.vpn.drivers.lib;
     exports com.logonbox.vpn.drivers.lib.util;
-    requires org.apache.commons.lang3;
     requires transitive org.slf4j;
     requires commons.ip.math;
     requires com.sshtools.liftlib;
+    requires com.sshtools.jini;
     
     uses PlatformServiceFactory;
 }

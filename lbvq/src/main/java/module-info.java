@@ -22,4 +22,6 @@ open module com.logonbox.vpn.quick {
     requires transitive com.logonbox.vpn.drivers.os;
 	requires info.picocli;
     requires com.logonbox.vpn.drivers.lib;
+    requires java.logging;
+    requires transitive com.sshtools.porter;
 }

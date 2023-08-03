@@ -22,7 +22,7 @@ package com.logonbox.vpn.drivers.lib;
 
 import java.util.Objects;
 
-public abstract class AbstractVirtualInetAddress<P extends PlatformService<?>> implements VirtualInetAddress<P> {
+public abstract class AbstractVirtualInetAddress<P extends PlatformService<?>> implements VpnInterface<P> {
 
 	public final static String TABLE_AUTO = "auto";
 	public final static String TABLE_OFF = "off";
@@ -128,7 +128,7 @@ public abstract class AbstractVirtualInetAddress<P extends PlatformService<?>> i
 	}
 
 	@Override
-	public final VirtualInetAddress<P> method(DNSIntegrationMethod method) {
+	public final VpnInterface<P> method(DNSIntegrationMethod method) {
 		this.method = method;
 		return this;
 	}

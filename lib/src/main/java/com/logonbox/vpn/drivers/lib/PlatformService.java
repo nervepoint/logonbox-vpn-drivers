@@ -22,17 +22,19 @@ package com.logonbox.vpn.drivers.lib;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
-public interface PlatformService<I extends VirtualInetAddress<?>> {
+public interface PlatformService<I extends VpnInterface<?>> {
     
     /**
      * Create a default instance.
      * 
      * @return instance
      */
-    public static PlatformService<? extends VirtualInetAddress<?>> create() {
+    public static PlatformService<? extends VpnInterface<?>> create() {
         return PlatformServiceFactory.get().createPlatformService();
     }
 
@@ -68,16 +70,8 @@ public interface PlatformService<I extends VirtualInetAddress<?>> {
 	 */
 	String[] getMissingPackages();
 
-	/**
-	 * Get a public key given it's private key.
-	 * 
-	 * @param privateKey private key
-	 * @return public key
-	 */
-	String pubkey(String privateKey);
-
     /**
-     * Get the system context that called {@link #start(SystemContext)}.
+     * Get the system context that called {@link #init(SystemContext)}.
      * {@link IllegalStateException} will be thrown if not started.
      * 
      * @return context
@@ -90,17 +84,17 @@ public interface PlatformService<I extends VirtualInetAddress<?>> {
 	 * @param ctx context
 	 * @return any sessions that are already active.
 	 */
-	Collection<ActiveSession<I>> start(SystemContext ctx);
+	Collection<ActiveSession<I>> init(SystemContext ctx);
 
 	/**
-	 * Connect.
+	 * Connect, optionally waiting for the first handshake from the given peer.
 	 * 
-	 * @param logonBoxVPNSession the session
-	 * @param configuration      the configuration
-	 * @return the virtual interface
+	 * @param configuration the configuration
+	 * @param peer peer from which to wait for the first handshake from
+	 * @return the session that can be used to control the interface
 	 * @throws IOException on any error
 	 */
-	ActiveSession<I> connect(WireguardConfiguration configuration) throws IOException;
+	ActiveSession<I> start(VpnConfiguration configuration, Optional<VpnPeer> peer) throws IOException;
 
 	/**
 	 * Get an interface that is using this public key, or <code>null</code> if no
@@ -119,22 +113,13 @@ public interface PlatformService<I extends VirtualInetAddress<?>> {
 	List<I> ips(boolean wireguardOnly);
 
 	/**
-	 * Get the detailed status of the named interface.
-	 * 
-	 * @param interfaceName interface name
-	 * @return detailed status
-	 * @throws IOException on error
-	 */
-	StatusDetail status(String interfaceName) throws IOException;
-
-	/**
 	 * Run a hook script appropriate for the platform. Ideally, this should
 	 * be run as a script fragment.
 	 *  
 	 * @param session session
-	 * @param hookScript
+	 * @param hookScript script
 	 */
-	void runHook(ActiveSession<I> session, String hookScript) throws IOException;
+	void runHook(ActiveSession<I> session, String... hookScript) throws IOException;
 	
 	/**
 	 * Get the default DNS integration method. Will NOT return {@link DNSIntegrationMethod#AUTO}.
@@ -142,15 +127,6 @@ public interface PlatformService<I extends VirtualInetAddress<?>> {
 	 * @return method
 	 */
 	DNSIntegrationMethod dnsMethod();
-
-    /**
-     * Get the instant of the last handshake for a given peer on the specified interface.
-     * 
-     * @param ipName interface name
-     * @param publicKey public key of peer
-     * @return instant 
-     */
-    long getLatestHandshake(String ipName, String publicKey) throws IOException;
     
     /**
      * Get an instance of {@link SystemCommands}, used to execute system commands.
@@ -158,5 +134,58 @@ public interface PlatformService<I extends VirtualInetAddress<?>> {
      * @param args
      */
     SystemCommands commands();
+    
+    /**
+     * Get whether or not a particular peer is being used as the default gateway,
+     * or {@link Optional#isEmpty()} will be <code>true</code> if the default
+     * gateway is not currently a peer on this VPN.
+     * 
+     * @return default gateway peer
+     */
+    Optional<VpnPeer> defaultGateway();
+    
+    /**
+     * Set the peer to be used as the default gateway. This is a syterm wide
+     * setting. If the is disconnected, this will be reset.
+     * 
+     * @param peer peer to use as default gateway
+     * @throws IOException on error
+     */
+    void defaultGateway(VpnPeer peer) throws IOException;
+    
+    /**
+     * Stop using any currently selected peer as the default gateway.
+     * @throws IOException on error
+     */
+    void resetDefaulGateway() throws IOException;
+
+    /**
+     * Get an interface given its short name. Avoid call this too often, it
+     * may be slower on some platforms. Instead you should access the 
+     * reference of {@link ActiveSession#ip()}.
+     * 
+     * @param name name
+     * @return interface
+     */
+    I get(String name);
+
+    /**
+     * Get the latest handshake given an interface name and public key.
+     * By default this will delegate to {@link VpnInterface#latestHandshake(String)},
+     * but certain platforms may provide a optimised version of this call.
+     * <p>
+     * It is preferable when monitoring handshakes to use this call.
+     * 
+     * @param iface interface name
+     * @param publicKey public key
+     * @return last handshake
+     * @throws IOException
+     */
+    default Instant getLatestHandshake(String iface, String publicKey) throws IOException {
+        return get(iface).latestHandshake(publicKey);
+    }
+ 
+    
+    
 
 }

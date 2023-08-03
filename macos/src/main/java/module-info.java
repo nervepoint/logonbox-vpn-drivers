@@ -24,7 +24,7 @@ import com.logonbox.vpn.drivers.macos.MacOsPlatformServiceFactory;
 module com.logonbox.vpn.drivers.os {
     exports com.logonbox.vpn.drivers.macos;
     requires transitive com.logonbox.vpn.drivers.lib;
-    requires org.apache.commons.lang3;
     requires org.slf4j;
+    requires com.sshtools.liftlib;
     provides PlatformServiceFactory with MacOsPlatformServiceFactory;
 }

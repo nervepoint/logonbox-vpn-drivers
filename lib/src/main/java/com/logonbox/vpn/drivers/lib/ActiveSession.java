@@ -20,37 +20,55 @@
  */
 package com.logonbox.vpn.drivers.lib;
 
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class ActiveSession<I extends VirtualInetAddress<?>> implements Closeable {
+public final class ActiveSession<I extends VpnInterface<?>> implements Closeable {
     final static Logger LOG = LoggerFactory.getLogger(ActiveSession.class);
 
-    private final WireguardConfiguration connection;
+    private final VpnConfiguration configuration;
     private final List<String> allows = new ArrayList<>();
     private final PlatformService<I> service;
+    private final Optional<VpnPeer> peer;
     private Optional<I> ip;
 
-    ActiveSession(WireguardConfiguration connection, PlatformService<I> service) {
-        this(connection, service, Optional.empty());
+    ActiveSession(VpnConfiguration configuration, PlatformService<I> service, Optional<VpnPeer> peer) {
+        this(configuration, service, Optional.empty(), peer);
     }
 
-    ActiveSession(WireguardConfiguration connection, PlatformService<I> service, Optional<I> ip) {
-        this.connection = connection;
+    ActiveSession(VpnConfiguration configuration, PlatformService<I> service, Optional<I> ip, Optional<VpnPeer> peer) {
+        this.configuration = configuration;
         this.service = service;
         this.ip = ip;
+        this.peer = peer;
     }
 
+    /**
+     * Get the {@link VpnConfiguration} as it was when this session was 
+     * created. Note, the configuration may have been externally changed.
+     * To get the live configuration, use {@link VpnInterface#configuration()}.
+     * 
+     * @param <C> type
+     * @return configurations
+     */
     @SuppressWarnings("unchecked")
-    public <C extends WireguardConfiguration> C connection() {
-        return (C)connection;
+    public <C extends VpnConfiguration> C configuration() {
+        return (C)configuration;
+    }
+
+    public VpnInterfaceInformation information() throws IOException {
+        return ip.get().information();
+    }
+
+    public Optional<VpnPeer> peer() {
+        return peer;
     }
 
     public Optional<I> ip() {
@@ -61,33 +79,39 @@ public class ActiveSession<I extends VirtualInetAddress<?>> implements Closeable
         return allows;
     }
 
-    void attach(I vpn) {
+    public void attachToInterface(I vpn) {
         this.ip = Optional.of(vpn);
     }
 
     /**
-     * Get if a session is actually an active connect (handshake has occurred and
+     * Get if a session is actually an active connect. If this is acting as a server,
+     * then just the interface need be up for this to return <code>true</code>, other
+     * wise active {@link  (handshake has occurred and
      * has not timed out).
      * 
      * @return up
      */
     public boolean alive() {
-        try {
-            var ipName = ip.map(VirtualInetAddress::getName).get();
-            var lastHandshake = service.getLatestHandshake(ipName, connection.getPublicKey());
-            var now = System.currentTimeMillis();
-            var alive = lastHandshake >= now - (service.context().configuration().handshakeTimeout().toMillis());
-            if (LOG.isDebugEnabled()) {
-                LOG.debug(
-                        "Checking if {} ({}) is still alive. Now is {}, Latest Handshake is {}, Timeout secs is {}, Alive is {}",
-                        ipName, connection.getPublicKey(), now, lastHandshake,
-                        service.context().configuration().handshakeTimeout(), alive);
+        if(peer.isPresent()) {
+            try {
+                var ipName = ip.map(VpnInterface::getName).get();
+                var lastHandshake = service.getLatestHandshake(ip.get().getName(), peer.get().publicKey());
+                var now = Instant.now();
+                var alive = !lastHandshake.isBefore(now.minus(service.context().configuration().handshakeTimeout()));
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug(
+                            "Checking if {} ({}) is still alive. Now is {}, Latest Handshake is {}, Timeout secs is {}, Alive is {}",
+                            ipName, peer.get().publicKey(), now, lastHandshake,
+                            service.context().configuration().handshakeTimeout().toSeconds(), alive);
+                }
+                return alive;
+            } catch (Exception e) {
+                LOG.debug("Failed to test if alive, assuming not.", e);
+                return false;
             }
-            return alive;
-        } catch (Exception e) {
-            LOG.debug("Failed to test if alive, assuming not.", e);
-            return false;
         }
+        else
+            return ip.isPresent() && ip.get().isUp();
 
     }
 
@@ -100,11 +124,12 @@ public class ActiveSession<I extends VirtualInetAddress<?>> implements Closeable
 
                 LOG.info(String.format("Closing VPN session for %s", ipVal.getName()));
 
-                if (StringUtils.isNotBlank(connection.getPreDown())) {
-                    LOG.info("Running pre-down commands.", connection.getPreDown());
-                    service.runHook(this, connection.getPreDown());
+                if(configuration.preDown().length > 0) {
+                    var p = configuration.preDown();
+                    LOG.info("Running pre-down commands.", String.join(" ; ", p).trim());
+                    service.runHook(this, p);
                 }
-
+                
                 try {
                     ipVal.down();
                 } finally {
@@ -115,9 +140,10 @@ public class ActiveSession<I extends VirtualInetAddress<?>> implements Closeable
             try {
                 service.cleanUp(this);
             } finally {
-                if (StringUtils.isNotBlank(connection.getPostDown())) {
-                    LOG.info("Running post-down commands.", connection.getPostDown());
-                    service.runHook(this, connection.getPostDown());
+                if(configuration.postDown().length > 0) {
+                    var p = configuration.postDown();
+                    LOG.info("Running post-down commands.", String.join(" ; ", p).trim());
+                    service.runHook(this, p);
                 }
             }
         }

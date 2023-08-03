@@ -20,8 +20,8 @@
  */
 package com.logonbox.vpn.drivers.lib.util;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.SystemUtils;
+import com.sshtools.liftlib.OS;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +35,20 @@ import java.util.List;
 
 public class Util {
     static Logger log = LoggerFactory.getLogger(Util.class);
+    
+    public static byte[] toArray(List<Byte> bytes) {
+        var b = new byte[bytes.size()];
+        for(int i = 0 ; i < bytes.size(); i++)
+            b[i] = bytes.get(i);
+        return b;
+    }
+    
+    public static boolean isBlank(String str) {
+        return str == null || str.isBlank();
+    }
+    public static boolean isNotBlank(String str) {
+        return !isBlank(str);
+    }
 
 	public static String getBasename(String name) {
 		int idx = name.indexOf('.');
@@ -73,8 +87,8 @@ public class Util {
 	}
 	
 	public static String getDeviceName() {
-		String hostname = SystemUtils.getHostName();
-		if (StringUtils.isBlank(hostname)) {
+		String hostname = OsUtil.getHostName();
+		if (isBlank(hostname)) {
 			try {
 				hostname = InetAddress.getLocalHost().getHostName();
 			} catch (Exception e) {
@@ -82,11 +96,11 @@ public class Util {
 			}
 		}
 		String os = System.getProperty("os.name");
-		if (SystemUtils.IS_OS_WINDOWS) {
+		if (OS.isWindows()) {
 			os = "Windows";
-		} else if (SystemUtils.IS_OS_LINUX) {
+		} else if (OS.isLinux()) {
 			os = "Linux";
-		} else if (SystemUtils.IS_OS_MAC_OSX) {
+		} else if (OS.isMacOs()) {
 			os = "Mac OSX";
 		}
 		return os + " " + hostname;

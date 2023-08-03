@@ -1,0 +1,471 @@
+/**
+ * Copyright © 2023 LogonBox Limited (support@logonbox.com)
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this
+ * software and associated documentation files (the “Software”), to deal in the Software
+ * without restriction, including without limitation the rights to use, copy, modify,
+ * merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to the following
+ * conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies
+ * or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+ * INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+ * PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+ * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+package com.logonbox.vpn.drivers.lib;
+
+import com.github.jgonian.ipmath.AbstractIp;
+import com.github.jgonian.ipmath.Ipv4;
+import com.github.jgonian.ipmath.Ipv4Range;
+import com.github.jgonian.ipmath.Ipv6;
+import com.github.jgonian.ipmath.Ipv6Range;
+import com.logonbox.vpn.drivers.lib.impl.ElevatableSystemCommands;
+import com.logonbox.vpn.drivers.lib.util.IpUtil;
+import com.logonbox.vpn.drivers.lib.util.Util;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.io.Writer;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+public abstract class AbstractDesktopPlatformService<I extends VpnInterface<?>> extends AbstractPlatformService<I> {
+
+	final static Logger LOG = LoggerFactory.getLogger(AbstractDesktopPlatformService.class);
+	
+	protected Path tempCommandDir;
+
+    private final SystemCommands commands;
+	
+	protected AbstractDesktopPlatformService(String interfacePrefix) {
+		super(interfacePrefix);
+		
+		commands = new ElevatableSystemCommands();
+	}
+
+	protected Path extractCommand(String platform, String arch, String name) throws IOException {
+		LOG.info(String.format("Extracting command %s for platform %s on arch %s", name, platform, arch));
+		try(InputStream in = getClass().getResource("/" + platform + "-" + arch + "/" + name).openStream()) {
+			Path path = getTempCommandDir().resolve(name);
+			try(OutputStream out = Files.newOutputStream(path)) {
+				in.transferTo(out);
+			}
+			path.toFile().deleteOnExit();
+			Files.setPosixFilePermissions(path, new LinkedHashSet<>(Arrays.asList(PosixFilePermission.OWNER_EXECUTE, PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)));
+			LOG.info(String.format("Extracted command %s for platform %s on arch %s to %s", name, platform, arch, path));
+			return path;
+		}
+	}
+
+	protected Path getTempCommandDir() throws IOException {
+		if(tempCommandDir == null)
+			tempCommandDir = Files.createTempDirectory("vpn");
+		return tempCommandDir;
+	}
+
+	@Override
+	public final ActiveSession<I> start(VpnConfiguration configuration, Optional<VpnPeer> peer) throws IOException {		
+	    
+	    var session = new ActiveSession<I>(configuration, this, peer);
+
+        if(configuration.preUp().length > 0)  {
+            var p = configuration.preUp();
+            LOG.info("Running pre-up commands.", String.join("; ", p).trim());
+            runHook(session, p);
+        };
+	    
+        onStart(session);
+    
+        var gw = defaultGateway();
+        if(gw.isPresent() && configuration.peers().contains(gw.get())) {
+			try {
+				onSetDefaultGateway(gw.get());
+			}
+			catch(Exception e) { 
+				LOG.error("Failed to setup routing.", e);
+			}
+		}
+
+        if(configuration.postUp().length > 0)  {
+		    var p = configuration.postUp();
+            LOG.info("Running post-up commands.", String.join("; ", p).trim());
+            runHook(session, p);
+		};
+		
+		return session;
+	}
+
+	@Override
+	public final void cleanUp(ActiveSession<I> session) {
+		if(defaultGateway().isPresent() && session.configuration().peers().contains(defaultGateway().get())) {
+			try {
+			    resetDefaulGateway();
+			}
+			catch(Exception e) { 
+				LOG.error("Failed to tear down routing.", e);
+			}
+		}
+	}
+
+	@Override
+	public I getByPublicKey(String publicKey) {
+		try {
+			for (I ip : ips(true)) {
+				if (publicKey.equals(getPublicKey(ip.getName()))) {
+					return ip;
+				}
+			}
+		} catch (IOException ioe) {
+			throw new IllegalStateException("Failed to list interface names.", ioe);
+		}
+		return null;
+	}
+
+	@Override
+	public List<I> ips(boolean wireguardInterface) {
+		List<I> ips = new ArrayList<>();
+		try {
+			for (Enumeration<NetworkInterface> nifEn = NetworkInterface.getNetworkInterfaces(); nifEn
+					.hasMoreElements();) {
+				NetworkInterface nif = nifEn.nextElement();
+				if ((wireguardInterface && isWireGuardInterface(nif)) || (!wireguardInterface && isMatchesPrefix(nif))) {
+					I vaddr = createVirtualInetAddress(nif);
+					configureVirtualAddress(vaddr);
+					if (vaddr != null)
+						ips.add(vaddr);
+				}
+			}
+		} catch (Exception e) {
+			throw new IllegalStateException("Failed to get interfaces.", e);
+		}
+		return ips;
+	}
+
+	protected void configureVirtualAddress(I vaddr) {
+		try {
+			vaddr.method(context.configuration().dnsIntegrationMethod());
+		}
+		catch(Exception e) {
+			LOG.error("Failed to set DNS integeration method, reverting to AUTO.", e);
+			vaddr.method(DNSIntegrationMethod.AUTO);
+		}
+	}
+
+	protected abstract I createVirtualInetAddress(NetworkInterface nif) throws IOException;
+
+	protected void dns(VpnConfiguration configuration, I ip) throws IOException {
+		if(configuration.dns().isEmpty()) {
+		    var gw = defaultGateway();
+			if(gw.isPresent() && configuration.peers().contains(gw.get()))
+				LOG.warn("No DNS servers configured for this connection and all traffic is being routed through the VPN. DNS is unlikely to work.");
+			else  
+				LOG.info("No DNS servers configured for this connection.");
+		}
+		else {
+			LOG.info(String.format("Configuring DNS servers for %s as %s", ip.getName(), configuration.dns()));
+		}
+		ip.dns(configuration.dns().toArray(new String[0]));
+		
+	}
+
+	protected abstract String getDefaultGateway() throws IOException;
+
+	protected abstract String getPublicKey(String interfaceName) throws IOException;
+	
+	public String getWGCommand() {
+		return "wg";
+	}
+
+	protected boolean isMatchesPrefix(NetworkInterface nif) {
+		return nif.getName().startsWith(getInterfacePrefix());
+	}
+	
+	protected boolean isWireGuardInterface(NetworkInterface nif) {
+		return isMatchesPrefix(nif);
+	}
+
+	protected abstract void onStart(ActiveSession<I> logonBoxVPNSession) throws IOException;
+	
+	protected void waitForFirstHandshake(ActiveSession<I> session, Instant connectionStarted, Duration timeout)
+			throws IOException {
+	    if(session.configuration().peers().size() != 1) {
+	        LOG.info("Not waiting for handshake, there are either no or multiple peers.");
+	        return;
+	    }
+
+        
+	    var ip = session.ip().orElseThrow(() -> new IllegalStateException("Session not attached to interface."));
+	    var peer = session.peer().orElseThrow(() -> new IllegalStateException("Session not attached to peer."));
+	    
+	    if(peer.endpointAddress().isEmpty()) {
+            LOG.info("Not waiting for handshake, the peer has no endpoint.");
+            return;
+	    }
+        
+        LOG.info(String.format("Waiting for handshake for %d seconds. Hand shake should be after %d", timeout.toSeconds(), connectionStarted.toEpochMilli()));
+        
+		for(int i = 0 ; i < timeout.toSeconds() ; i++) {
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				throw new IOException(String.format("Interrupted connecting to %s", ip.getName()));
+			}
+			try {
+				var lastHandshake = ip.latestHandshake(peer.publicKey());
+				if(lastHandshake.equals(connectionStarted) || lastHandshake.isAfter(connectionStarted)) {
+					/* Ready ! */
+					return;
+				}
+			}
+			catch(RuntimeException iae) {
+				try {
+					ip.down();
+				}
+				catch(Exception e) {
+					LOG.error("Failed to stop after error.", e);
+				}
+				finally {
+				    ip.delete();
+				}
+				throw iae;
+			}
+		}
+
+		/* Failed to connect in the given time. Clean up and report an exception */
+		try {
+			ip.down();
+		}
+		catch(Exception e) {
+			LOG.error("Failed to stop after timeout.", e);
+		} finally {
+		    ip.delete();
+		}
+		
+		var endpointAddress = peer.endpointAddress().orElseThrow(() -> new IllegalStateException("No endpoint address."));
+		var endpointName = peer.endpointAddress().map(a -> {
+		    try {
+	            return InetAddress.getByName(a).getHostName();
+	        }
+	        catch(Exception e) {
+	            return endpointAddress;
+	        }   
+		}).orElse(endpointAddress);
+		throw new NoHandshakeException(String.format("No handshake received from %s (%s) for %s within %d seconds.", endpointAddress, endpointName, ip.getName(), timeout.toSeconds()));
+	}
+	
+	protected void write(VpnConfiguration configuration, Writer writer) {
+		var pw = new PrintWriter(writer, true);
+        var gw = defaultGateway();
+        
+		pw.println("[Interface]");
+		pw.println(String.format("PrivateKey = %s", configuration.privateKey()));
+		writeInterface(configuration, writer);
+		for(var peer : configuration.peers()) {
+    		pw.println();
+    		pw.println("[Peer]");
+    		pw.println(String.format("PublicKey = %s", peer.publicKey()));
+    		peer.endpointAddress().ifPresent(addr -> {
+    		    peer.endpointPort().ifPresentOrElse(port -> pw.format("Endpoint = %s:%d%n", addr, port), () -> pw.format("Endpoint = %s%n", addr));
+    		});
+    		peer.persistentKeepalive().ifPresent(ka ->pw.format("PersistentKeepalive = %d%n", ka) );
+    		var allowedIps = new ArrayList<>(peer.allowedIps());
+    		if(gw.isPresent() && peer.equals(gw.get())) {
+    			pw.println("AllowedIPs = 0.0.0.0/0");
+    		}	
+    		else {
+    			if(context.configuration().ignoreLocalRoutes()) {
+    				/* Filter out any routes that would cover the addresses of any interfaces
+    				 * we already have
+    				 */
+    				Set<AbstractIp<?, ?>> localAddresses = new HashSet<>();
+    				try {
+    					for(Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
+    						NetworkInterface ni = en.nextElement();
+    						if(!ni.isLoopback() && ni.isUp()) { 
+    							for(Enumeration<InetAddress> addrEn = ni.getInetAddresses(); addrEn.hasMoreElements(); ) {
+    								InetAddress addr = addrEn.nextElement();
+    								try {
+    									localAddresses.add(IpUtil.parse(addr.getHostAddress()));
+    								}
+    								catch(IllegalArgumentException iae) {
+    									// Ignore
+    								}
+    							}
+    						}
+    					}
+    				}
+    				catch(SocketException se) {
+    					//
+    				}
+    
+    				for(String route : new ArrayList<>(allowedIps)) {
+    					try {
+    						try {
+    							Ipv4Range range = Ipv4Range.parseCidr(route);
+    							for(AbstractIp<?, ?> laddr : localAddresses) {
+    								if(laddr instanceof Ipv4 && range.contains((Ipv4)laddr)) {
+    									// Covered by route. 
+    									LOG.info(String.format("Filtering out route %s as it covers an existing local interface address.", route));
+    									allowedIps.remove(route);
+    									break;
+    								}
+    							}
+    						}
+    						catch(IllegalArgumentException iae) {
+    							/* Single ipv4 address? */
+    							Ipv4 routeIpv4 = Ipv4.of(route);
+    							if(localAddresses.contains(routeIpv4)) {
+    								// Covered by route. 
+    								LOG.info(String.format("Filtering out route %s as it covers an existing local interface address.", route));
+    								allowedIps.remove(route);
+    								break;
+    							}
+    						}
+    					}
+    					catch(IllegalArgumentException iae) {
+    						try {
+    							Ipv6Range range = Ipv6Range.parseCidr(route);
+    							for(AbstractIp<?, ?> laddr : localAddresses) {
+    								if(laddr instanceof Ipv6 && range.contains((Ipv6)laddr)) {
+    									// Covered by route. 
+    									LOG.info(String.format("Filtering out route %s as it covers an existing local interface address.", route));
+    									allowedIps.remove(route);
+    									break;
+    								}
+    							}
+    						}
+    						catch(IllegalArgumentException iae2) {
+    							/* Single ipv6 address? */
+    							Ipv6 routeIpv6 = Ipv6.of(route);
+    							if(localAddresses.contains(routeIpv6)) {
+    								// Covered by route. 
+    								LOG.info(String.format("Filtering out route %s as it covers an existing local interface address.", route));
+    								allowedIps.remove(route);
+    								break;
+    							}
+    						}
+    					}
+    				}
+    			}
+    			
+    			String ignoreAddresses = System.getProperty("logonbox.vpn.ignoreAddresses", "");
+    			if(ignoreAddresses.length() > 0) {
+    				for(String ignoreAddress : ignoreAddresses.split(",")) {
+    					allowedIps.remove(ignoreAddress);
+    				}
+    			}
+    			if (!allowedIps.isEmpty())
+    				pw.println(String.format("AllowedIPs = %s", String.join(", ", allowedIps)));
+    		}
+    		writePeer(configuration, peer, writer);
+		}
+	}
+	
+	protected void writeInterface(VpnConfiguration configuration, Writer writer) {
+	}
+
+	protected void writePeer(VpnConfiguration configuration, VpnPeer peer, Writer writer) {
+	}
+
+	protected void runHookViaPipeToShell(ActiveSession<I> session, String... args) throws IOException {
+		if(LOG.isDebugEnabled()) {
+			LOG.debug("Executing hook");
+			for(String arg : args) {
+				LOG.debug(String.format("    %s", arg));
+			}
+		}
+		VpnConfiguration connection = session.configuration();
+		Map<String, String> env = new HashMap<String, String>();
+		if(connection != null) {
+		    env.put("LBVPN_ADDRESS", String.join(",", connection.addresses()));
+			env.put("LBVPN_USER_PUBLIC_KEY", connection.publicKey());
+			env.put("LBVPN_DNS", String.join(" ", connection.dns()));
+			env.put("LBVPN_MTU", String.valueOf(connection.mtu().orElse(0)));
+			var idx = 1;
+			for(var peer : connection.peers()) {
+			    if(peer.endpointAddress().isPresent()) {
+    	            env.put("LBVPN_ENDPOINT_ADDRESS_" + idx, peer.endpointAddress().get());
+    	            env.put("LBVPN_ENDPOINT_PORT_"+ idx, String.valueOf(peer.endpointPort().orElse(0)));
+    	            env.put("LBVPN_PEER_PUBLIC_KEY_"+ idx, peer.publicKey());
+    	            idx++;
+			    }
+			}
+		}
+		context.addScriptEnvironmentVariables(session, env);
+		
+		session.ip().ifPresent(addr -> {
+            env.put("LBVPN_IP_MAC", addr.getMac());
+            env.put("LBVPN_IP_NAME", addr.getName());
+            env.put("LBVPN_IP_DISPLAY_NAME", addr.getDisplayName());
+            env.put("LBVPN_IP_PEER", addr.getPeer());
+            env.put("LBVPN_IP_TABLE", addr.getTable());
+		});
+		if(LOG.isDebugEnabled()) {
+			LOG.debug("Environment:-");
+			for(Map.Entry<String, String> en : env.entrySet()) {
+				LOG.debug("    %s = %s", en.getKey(), en.getValue());
+			}
+		}
+
+        LOG.debug("Command Output: ");
+        var errorMessage = new StringBuffer();
+		int ret = commands().privileged().env(env).consume((line) -> {
+            LOG.debug(String.format("    %s", line));
+            if(line.startsWith("[ERROR] ")) {
+                errorMessage.setLength(0); // TODO really only keep last error message. I'd like to change this, but may break any users of this (we know there is at least one)
+                errorMessage.append(line.substring(8));
+            }
+		}, args);
+		
+		LOG.debug(String.format("Exit: %d", ret));
+		if(ret != 0) {
+			if(errorMessage.length() == 0)
+				throw new IOException(String.format("Hook exited with non-zero status of %d.", ret));
+			else
+				throw new IOException(errorMessage.toString());
+		}
+		
+	}
+
+	@Override
+	public void runHook(ActiveSession<I> session, String... hookScript) throws IOException {
+		for(String cmd : hookScript) {
+		    runCommand(Util.parseQuotedString(cmd));
+		}
+	}
+	
+	@Override
+    public final SystemCommands commands() {
+        return commands;
+    }
+
+	protected abstract void runCommand(List<String> commands) throws IOException;
+	
+}

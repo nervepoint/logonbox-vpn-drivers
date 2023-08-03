@@ -22,13 +22,15 @@ import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
 import com.logonbox.vpn.drivers.linux.LinuxPlatformServiceFactory;
 
 module com.logonbox.vpn.drivers.os {
+    opens com.logonbox.vpn.drivers.linux.dbus to org.freedesktop.dbus;
+    
     exports com.logonbox.vpn.drivers.linux;
-    requires com.logonbox.vpn.drivers.lib; 
+    requires transitive com.logonbox.vpn.drivers.lib;
     
     requires commons.ip.math;
     requires org.slf4j;
-    requires org.apache.commons.lang3;
     requires org.freedesktop.dbus;
+    requires com.sshtools.liftlib;
     
     provides PlatformServiceFactory with LinuxPlatformServiceFactory;
 }

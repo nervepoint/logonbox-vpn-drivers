@@ -28,7 +28,6 @@ module com.logonbox.vpn.drivers.os {
     requires com.sshtools.liftlib;
     requires transitive com.sun.jna.platform;
     requires transitive java.prefs;
-    requires org.apache.commons.lang3;
     requires transitive com.sun.jna;
     
     provides PlatformServiceFactory with WindowsPlatformServiceFactory;

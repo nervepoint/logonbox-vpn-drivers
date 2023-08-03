@@ -20,71 +20,62 @@
  */
 package com.logonbox.vpn.drivers.lib;
 
-import java.util.List;
+import java.net.InetSocketAddress;
+import java.time.Instant;
+import java.util.Optional;
 
-public interface WireguardConfiguration {
+public interface VpnPeerInformation {
+
+	VpnPeerInformation EMPTY = new VpnPeerInformation() {
+
+		@Override
+		public long rx() {
+			return 0;
+		}
+
+		@Override
+		public long tx() {
+			return 0;
+		}
+
+		@Override
+		public Instant lastHandshake() {
+			return Instant.ofEpochMilli(0);
+		}
+
+		@Override
+		public Optional<String> error() {
+			return Optional.empty();
+		}
+
+        @Override
+        public String publicKey() {
+            return "";
+        }
+
+        @Override
+        public Optional<InetSocketAddress> remoteAddress() {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<String> presharedKey() {
+            return Optional.empty();
+        }
+
+	};
 	
-	String getUserPrivateKey();
-
-	void setUserPrivateKey(String privateKey);
-
-	String getUserPublicKey();
-
-	void setUserPublicKey(String publicKey);
-
-	String getPublicKey();
-
-	void setPublicKey(String Key);
-
-	void setEndpointAddress(String endpointAddress);
-
-	void setEndpointPort(int endpoingPort);
-
-	String getEndpointAddress();
-
-	int getEndpointPort();
-
-	int getMtu();
-
-	void setMtu(int mtu);
-
-	String getAddress();
-
-	void setAddress(String address);
-
-	List<String> getDns();
-
-	void setDns(List<String> dns);
-
-	int getPersistentKeepalive();
-
-	void setPeristentKeepalive(int peristentKeepalive);
-
-	List<String> getAllowedIps();
-
-	void setAllowedIps(List<String> allowedIps);
-
-	String getPreUp();
+	Optional<InetSocketAddress> remoteAddress();
 	
-	String getPostUp();
-	
-	String getPreDown();
-	
-	String getPostDown();
-	
-	boolean isRouteAll();
+	String publicKey();
+    
+    Optional<String> presharedKey();
 
-	void setPreUp(String preUp);
+	long tx();
 
-	void setPostUp(String postUp);
+	long rx();
 
-	void setPreDown(String preDown);
+	Instant lastHandshake();
 
-	void setPostDown(String postDown);
-
-	void setError(String error);
-	
-	String getError();
-
-
+	Optional<String> error();
 }

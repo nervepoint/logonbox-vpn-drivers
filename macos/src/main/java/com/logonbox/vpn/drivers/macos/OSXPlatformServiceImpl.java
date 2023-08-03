@@ -20,20 +20,20 @@
  */
 package com.logonbox.vpn.drivers.macos;
 
-import com.logonbox.vpn.drivers.lib.AbstractDesktopPlatformServiceImpl;
+import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
 import com.logonbox.vpn.drivers.lib.ActiveSession;
 import com.logonbox.vpn.drivers.lib.DNSIntegrationMethod;
-import com.logonbox.vpn.drivers.lib.WireguardConfiguration;
+import com.logonbox.vpn.drivers.lib.VpnConfiguration;
+import com.logonbox.vpn.drivers.lib.VpnInterfaceInformation;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.NetworkInterface;
-import java.util.Arrays;
 import java.util.List;
 
-public class OSXPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl<OSXIP> {
+public class OSXPlatformServiceImpl extends AbstractUnixDesktopPlatformService<OSXIP> {
 
 	final static Logger LOG = LoggerFactory.getLogger(OSXPlatformServiceImpl.class);
 
@@ -47,22 +47,6 @@ public class OSXPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl<O
 	public String[] getMissingPackages() {
 		return new String[0];
 	}
-
-    @Override
-    protected void addRouteAll(WireguardConfiguration connection) throws IOException {
-        LOG.info("Routing traffic all through VPN");
-        String gw = getDefaultGateway();
-        LOG.info(String.join(" ", Arrays.asList("route", "add", connection.getEndpointAddress(), "gw", gw)));
-        commands().privileged().run("route", "add", connection.getEndpointAddress(), "gw", gw);
-    }
-
-    @Override
-    protected void removeRouteAll(ActiveSession<OSXIP> session) throws IOException {
-        LOG.info("Removing routing of all traffic through VPN");
-        String gw = getDefaultGateway();
-        LOG.info(String.join(" ", Arrays.asList("route", "del", session.connection().getEndpointAddress(), "gw", gw)));
-        commands().privileged().run("route", "del", session.connection().getEndpointAddress(), "gw", gw);
-    }
 
 	@Override
 	protected String getDefaultGateway() throws IOException {
@@ -83,7 +67,7 @@ public class OSXPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl<O
 	}
 
 	@Override
-	protected OSXIP onConnect(ActiveSession<OSXIP> logonBoxVPNSession)
+	protected void onStart(ActiveSession<OSXIP> logonBoxVPNSession)
 			throws IOException {
 		throw new UnsupportedOperationException("TODO");
 	}
@@ -96,6 +80,16 @@ public class OSXPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl<O
     @Override
     protected void runCommand(List<String> commands) throws IOException {
         commands().privileged().run(commands.toArray(new String[0]));
+    }
+
+    @Override
+    public VpnInterfaceInformation information(OSXIP iface) throws IOException {
+        return super.information(iface);
+    }
+
+    @Override
+    public VpnConfiguration configuration(OSXIP iface) throws IOException {
+        return super.configuration(iface);
     }
 
 }

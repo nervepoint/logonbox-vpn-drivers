@@ -31,5 +31,5 @@ public interface PlatformServiceFactory {
     
     boolean isSupported();
 
-	PlatformService<? extends VirtualInetAddress<?>> createPlatformService();
+	PlatformService<? extends VpnInterface<?>> createPlatformService();
 }

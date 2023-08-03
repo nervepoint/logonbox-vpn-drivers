@@ -23,7 +23,8 @@ package com.logonbox.vpn.drivers.linux;
 import com.github.jgonian.ipmath.Ipv4;
 import com.logonbox.vpn.drivers.lib.AbstractVirtualInetAddress;
 import com.logonbox.vpn.drivers.lib.DNSIntegrationMethod;
-import com.logonbox.vpn.drivers.lib.SystemCommands;
+import com.logonbox.vpn.drivers.lib.VpnConfiguration;
+import com.logonbox.vpn.drivers.lib.VpnInterfaceInformation;
 import com.logonbox.vpn.drivers.lib.util.IpUtil;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
 import com.logonbox.vpn.drivers.lib.util.Util;
@@ -31,7 +32,6 @@ import com.logonbox.vpn.drivers.linux.dbus.NetworkManager;
 import com.logonbox.vpn.drivers.linux.dbus.NetworkManager.Ipv6Address;
 import com.logonbox.vpn.drivers.linux.dbus.Resolve1Manager;
 
-import org.apache.commons.lang3.StringUtils;
 import org.freedesktop.dbus.DBusPath;
 import org.freedesktop.dbus.connections.impl.DBusConnection;
 import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder;
@@ -43,12 +43,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -66,658 +68,785 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class LinuxIP extends AbstractVirtualInetAddress<LinuxPlatformServiceImpl> {
-	private static final String TABLE_PREFIX = "logonbox-vpn-";
-	private static final String NETWORK_MANAGER_BUS_NAME = "org.freedesktop.NetworkManager";
+    private static final String RESOLVE1_BUS_NAME = "org.freedesktop.resolve1";
+    private static final String TABLE_PREFIX = "logonbox-vpn-";
+    private static final String NETWORK_MANAGER_BUS_NAME = "org.freedesktop.NetworkManager";
 
-	enum IpAddressState {
-		HEADER, IP, MAC
-	}
+    enum IpAddressState {
+        HEADER, IP, MAC
+    }
 
-	public final static String TABLE_AUTO = "auto";
-	public final static String TABLE_OFF = "off";
+    public final static String TABLE_AUTO = "auto";
+    public final static String TABLE_OFF = "off";
 
-	final static Logger LOG = LoggerFactory.getLogger(LinuxIP.class);
+    final static Logger LOG = LoggerFactory.getLogger(LinuxIP.class);
 
-	private static final String END_HYPERSOCKET_WIREGUARD_RESOLVCONF = "###### END-HYPERSOCKET-WIREGUARD ######";
-	private static final String START_HYPERSOCKET_WIREGUARD_RESOLVECONF = "###### START-HYPERSOCKET-WIREGUARD ######";
+    private static final String END_HYPERSOCKET_WIREGUARD_RESOLVCONF = "###### END-HYPERSOCKET-WIREGUARD ######";
+    private static final String START_HYPERSOCKET_WIREGUARD_RESOLVECONF = "###### START-HYPERSOCKET-WIREGUARD ######";
 
-	private Set<String> addresses = new LinkedHashSet<>();
-	private boolean haveSetFirewall;
-	private boolean dnsSet;
+    private Set<String> addresses = new LinkedHashSet<>();
+    private boolean haveSetFirewall;
+    private boolean dnsSet;
 
-	public LinuxIP(String name, LinuxPlatformServiceImpl platform) {
-		super(platform, name);
-	}
+    public LinuxIP(String name, LinuxPlatformServiceImpl platform) {
+        super(platform, name);
+        initialDnsState();
+    }
 
-	public void addAddress(String address) throws IOException {
-		if (addresses.contains(address))
-			throw new IllegalStateException(String.format("Interface %s already has address %s", getName(), address));
-		if (addresses.size() > 0 && StringUtils.isNotBlank(getPeer()))
-			throw new IllegalStateException(String.format(
-					"Interface %s is configured to have a single peer %s, so cannot add a second address %s", getName(),
-					getPeer(), address));
+    public void addAddress(String address) throws IOException {
+        if (addresses.contains(address))
+            throw new IllegalStateException(String.format("Interface %s already has address %s", getName(), address));
+        if (addresses.size() > 0 && Util.isNotBlank(getPeer()))
+            throw new IllegalStateException(String.format(
+                    "Interface %s is configured to have a single peer %s, so cannot add a second address %s", getName(),
+                    getPeer(), address));
 
-		if (StringUtils.isNotBlank(getPeer())) {
+        if (Util.isNotBlank(getPeer())) {
             commands.privileged().result("ip", "address", "add", "dev", getName(), address, "peer", getPeer());
         } else
             commands.privileged().result("ip", "address", "add", "dev", getName(), address);
-		addresses.add(address);
-	}
+        addresses.add(address);
+    }
 
-	@Override
-	public void delete() throws IOException {
-		if(dnsSet) {
-			unsetDns();
-		}
-		if(haveSetFirewall) {
-			removeFirewall();
-		}
-		String table = getTable();
-		int fwmark = getFWMark("table");
-		if((StringUtils.isBlank(table) || table.equals(TABLE_AUTO)) && fwmark > -1 /* && [[ $(wg show "$INTERFACE" allowed-ips) =~ /0(\ |$'\n'|$) ]] */) {
-			while(commandOutputMatches(".*lookup " + fwmark + ".*", "ip", "-4", "rule", "show")) {
-				commands.privileged().result("ip", "-4", "rule", "delete", "table", String.valueOf(fwmark));
-			}
-			while(commandOutputMatches(".*from all lookup main suppress_prefixlength 0.*", "ip", "-4", "rule", "show")) {
-			    commands.privileged().result("ip", "-4", "rule", "delete", "table", "main", "suppress_prefixlength", "0");
-			}
-			while(commandOutputMatches(".*lookup " + fwmark + ".*", "ip", "-6", "rule", "show")) {
-			    commands.privileged().result("ip", "-6", "rule", "delete", "table", String.valueOf(fwmark));
-			}
-			while(commandOutputMatches(".*from all lookup main suppress_prefixlength 0.*", "ip", "-6", "rule", "show")) {
-			    commands.privileged().result("ip", "-6", "rule", "delete", "table", "main", "suppress_prefixlength", "0");
-			}	
-		}
+    @Override
+    public VpnInterfaceInformation information() throws IOException {
+        return getPlatform().information(this);
+    }
 
-		commands.privileged().result("ip", "link", "del", "dev", getName());
-	}
-	
-	private boolean commandOutputMatches(String pattern, String... args) throws IOException {
-		for(String line : commands.privileged().output(args)) {
-			if(line.matches(pattern))
-				return true;
-		}
-		return false;
-	}
+    @Override
+    public VpnConfiguration configuration() throws IOException {
+        return getPlatform().configuration(this);
+    }
 
-	public void dns(String[] dns) throws IOException {
-		if (dns == null || dns.length == 0) {
-			if (dnsSet)
-				unsetDns();
-		} else {
-			DNSIntegrationMethod method = calcDnsMethod();
-			LOG.info(String.format("Setting DNS for %s (iface prefix %s) to %s using %s", getName(),
-					getPlatform().resolvconfIfacePrefix(), String.join(", ", dns), method));
-			switch (method) {
-			case NETWORK_MANAGER:
-				updateNetworkManager(dns);
-				break;
-			case RESOLVCONF:
-				updateResolvConf(dns);
-				break;
-			case SYSTEMD:
-				updateSystemd(dns);
-				break;
-			case RAW:
-				updateResolvDotConf(dns);
-				break;
-			case NONE:
-				break;
-			default:
-				/* TODO */
-				throw new UnsupportedOperationException();
-			}
+    @Override
+    public void delete() throws IOException {
+        if (dnsSet) {
+            unsetDns();
+        }
+        if (haveSetFirewall) {
+            removeFirewall();
+        }
+        String table = getTable();
+        int fwmark = getFWMark("table");
+        if ((Util.isBlank(table) || table.equals(TABLE_AUTO))
+                && fwmark > -1 /* && [[ $(wg show "$INTERFACE" allowed-ips) =~ /0(\ |$'\n'|$) ]] */) {
+            while (commandOutputMatches(".*lookup " + fwmark + ".*", "ip", "-4", "rule", "show")) {
+                commands.privileged().result("ip", "-4", "rule", "delete", "table", String.valueOf(fwmark));
+            }
+            while (commandOutputMatches(".*from all lookup main suppress_prefixlength 0.*", "ip", "-4", "rule",
+                    "show")) {
+                commands.privileged().result("ip", "-4", "rule", "delete", "table", "main", "suppress_prefixlength",
+                        "0");
+            }
+            while (commandOutputMatches(".*lookup " + fwmark + ".*", "ip", "-6", "rule", "show")) {
+                commands.privileged().result("ip", "-6", "rule", "delete", "table", String.valueOf(fwmark));
+            }
+            while (commandOutputMatches(".*from all lookup main suppress_prefixlength 0.*", "ip", "-6", "rule",
+                    "show")) {
+                commands.privileged().result("ip", "-6", "rule", "delete", "table", "main", "suppress_prefixlength",
+                        "0");
+            }
+        }
 
-			dnsSet = true;
-		}
-	}
+        commands.privileged().result("ip", "link", "del", "dev", getName());
+    }
 
-	@Override
-	public void down() throws IOException {
-		if (dnsSet) {
-			unsetDns();
-		}
-		
-		if(haveSetFirewall) {
-			removeFirewall();
-		}
+    private boolean commandOutputMatches(String pattern, String... args) throws IOException {
+        for (String line : commands.privileged().output(args)) {
+            if (line.matches(pattern))
+                return true;
+        }
+        return false;
+    }
 
-		setRoutes(new ArrayList<>());
-	}
+    public void dns(String[] dns) throws IOException {
+        if (dns == null || dns.length == 0) {
+            if (dnsSet)
+                unsetDns();
+        } else {
+            DNSIntegrationMethod method = calcDnsMethod();
+            LOG.info(String.format("Setting DNS for %s (iface prefix %s) to %s using %s", getName(),
+                    getPlatform().resolvconfIfacePrefix(), String.join(", ", dns), method));
+            switch (method) {
+            case NETWORK_MANAGER:
+                updateNetworkManager(dns);
+                break;
+            case RESOLVCONF:
+                updateResolvConf(dns);
+                break;
+            case SYSTEMD:
+                updateSystemd(dns);
+                break;
+            case RAW:
+                updateResolvDotConf(dns);
+                break;
+            case NONE:
+                break;
+            default:
+                /* TODO */
+                throw new UnsupportedOperationException();
+            }
 
-	public boolean hasAddress(String address) {
-		return addresses.contains(address);
-	}
+            dnsSet = true;
+        }
+    }
 
-	@Override
-	public boolean isUp() {
-		return true;
-	}
+    @Override
+    public void down() throws IOException {
+        if (dnsSet) {
+            unsetDns();
+        }
 
-	public void removeAddress(String address) throws IOException {
-		if (!addresses.contains(address))
-			throw new IllegalStateException(String.format("Interface %s not not have address %s", getName(), address));
-		if (addresses.size() > 0 && StringUtils.isNotBlank(getPeer()))
-			throw new IllegalStateException(String.format(
-					"Interface %s is configured to have a single peer %s, so cannot add a second address %s", getName(),
-					getPeer(), address));
+        if (haveSetFirewall) {
+            removeFirewall();
+        }
 
-		commands.privileged().result("ip", "address", "del", address, "dev", getName());
-		addresses.remove(address);
-	}
+        setRoutes(new ArrayList<>());
+    }
 
-	public void setAddresses(String... addresses) {
-		List<String> addr = Arrays.asList(addresses);
-		List<Exception> exceptions = new ArrayList<>();
-		for (String a : addresses) {
-			if (!hasAddress(a)) {
-				try {
-					addAddress(a);
-				} catch (Exception e) {
-					exceptions.add(e);
-				}
-			}
-		}
+    public boolean hasAddress(String address) {
+        return addresses.contains(address);
+    }
 
-		for (String a : new ArrayList<>(this.addresses)) {
-			if (!addr.contains(a)) {
-				try {
-					removeAddress(a);
-				} catch (Exception e) {
-					exceptions.add(e);
-				}
-			}
-		}
+    @Override
+    public boolean isUp() {
+        return true;
+    }
 
-		if (!exceptions.isEmpty()) {
-			Exception e = exceptions.get(0);
-			if (e instanceof RuntimeException)
-				throw (RuntimeException) e;
-			else
-				throw new IllegalArgumentException("Failed to set addresses.", e);
-		}
-	}
+    public void removeAddress(String address) throws IOException {
+        if (!addresses.contains(address))
+            throw new IllegalStateException(String.format("Interface %s not not have address %s", getName(), address));
+        if (addresses.size() > 0 && Util.isNotBlank(getPeer()))
+            throw new IllegalStateException(String.format(
+                    "Interface %s is configured to have a single peer %s, so cannot add a second address %s", getName(),
+                    getPeer(), address));
 
-	@Override
-	public void setPeer(String peer) {
-		if (!Objects.equals(peer, this.getPeer())) {
-			if (StringUtils.isNotBlank(peer) && addresses.size() > 1)
-				throw new IllegalStateException(String.format(
-						"Interface %s is already configured to have multiple addresses, so cannot have a single peer %s",
-						getName(), peer));
-			super.setPeer(peer);
-		}
-	}
+        commands.privileged().result("ip", "address", "del", address, "dev", getName());
+        addresses.remove(address);
+    }
 
-	public void setRoutes(Collection<String> allows) throws IOException {
+    public void setAddresses(String... addresses) {
+        List<String> addr = Arrays.asList(addresses);
+        List<Exception> exceptions = new ArrayList<>();
+        for (String a : addresses) {
+            if (!hasAddress(a)) {
+                try {
+                    addAddress(a);
+                } catch (Exception e) {
+                    exceptions.add(e);
+                }
+            }
+        }
 
-		/* Remove all the current routes for this interface */
-		var have = new HashSet<>();
-		for (String row : commands.privileged().output("ip", "route", "show", "dev", getName())) {
-			String[] l = row.split("\\s+");
-			if (l.length > 0) {
-				have.add(l[0]);
-				if(!allows.contains(l[0])) {
-					LOG.info(String.format("Removing route %s for %s", l[0], getName()));
-					commands.privileged().result("ip", "route", "del", l[0], "dev", getName());
-				}
-			}
-		}
+        for (String a : new ArrayList<>(this.addresses)) {
+            if (!addr.contains(a)) {
+                try {
+                    removeAddress(a);
+                } catch (Exception e) {
+                    exceptions.add(e);
+                }
+            }
+        }
 
-		for (String route : allows) {
-			if(!have.contains(route))
-				addRoute(route);
-		}
-	}
+        if (!exceptions.isEmpty()) {
+            Exception e = exceptions.get(0);
+            if (e instanceof RuntimeException)
+                throw (RuntimeException) e;
+            else
+                throw new IllegalArgumentException("Failed to set addresses.", e);
+        }
+    }
 
-	@Override
-	public String toString() {
-		return "Ip [name=" + getName() + ", addresses=" + addresses + ", peer=" + getPeer() + "]";
-	}
+    @Override
+    public void setPeer(String peer) {
+        if (!Objects.equals(peer, this.getPeer())) {
+            if (Util.isNotBlank(peer) && addresses.size() > 1)
+                throw new IllegalStateException(String.format(
+                        "Interface %s is already configured to have multiple addresses, so cannot have a single peer %s",
+                        getName(), peer));
+            super.setPeer(peer);
+        }
+    }
 
-	@Override
-	public void up() throws IOException {
-		if (getMtu() > 0) {
-		    commands.privileged().result("ip", "link", "set", "mtu", String.valueOf(getMtu()), "up", "dev", getName());
-		} else {
-			/*
-			 * First detect MTU, then bring up. First try from existing Wireguard
-			 * connections?
-			 */
-			int tmtu = 0;
-			// TODO
+    public void setRoutes(Collection<String> allows) throws IOException {
+
+        /* Remove all the current routes for this interface */
+        var have = new HashSet<>();
+        for (String row : commands.privileged().output("ip", "route", "show", "dev", getName())) {
+            String[] l = row.split("\\s+");
+            if (l.length > 0) {
+                have.add(l[0]);
+                if (!allows.contains(l[0])) {
+                    LOG.info(String.format("Removing route %s for %s", l[0], getName()));
+                    commands.privileged().result("ip", "route", "del", l[0], "dev", getName());
+                }
+            }
+        }
+
+        for (String route : allows) {
+            if (!have.contains(route))
+                addRoute(route);
+        }
+    }
+
+    @Override
+    public String toString() {
+        return "Ip [name=" + getName() + ", addresses=" + addresses + ", peer=" + getPeer() + "]";
+    }
+
+    @Override
+    public void up() throws IOException {
+        if (getMtu() > 0) {
+            commands.privileged().result("ip", "link", "set", "mtu", String.valueOf(getMtu()), "up", "dev", getName());
+        } else {
+            /*
+             * First detect MTU, then bring up. First try from existing Wireguard
+             * connections?
+             */
+            int tmtu = 0;
+            // TODO
 //				for (String line : OSCommand.runCommandAndCaptureOutput("wg", "show", name, "endpoints")) {
 //				 [[ $endpoint =~ ^\[?([a-z0-9:.]+)\]?:[0-9]+$ ]] || continue
 //	                output="$(ip route get "${BASH_REMATCH[1]}" || true)"
 //	                [[ ( $output =~ mtu\ ([0-9]+) || ( $output =~ dev\ ([^ ]+) && $(ip link show dev "${BASH_REMATCH[1]}") =~ mtu\ ([0-9]+) ) ) && ${BASH_REMATCH[1]} -gt $mtu ]] && mtu="${BASH_REMATCH[1]}"
-			// TODO
+            // TODO
 //				}
 
-			if (tmtu == 0) {
-				/* Not found, try the default route */
-				for (String line : commands.privileged().output("ip", "route", "show", "default")) {
-					StringTokenizer t = new StringTokenizer(line);
-					while (t.hasMoreTokens()) {
-						String tk = t.nextToken();
-						if (tk.equals("dev")) {
-							for (String iline : commands.privileged().output("ip", "link", "show", "dev",
-									t.nextToken())) {
-								StringTokenizer it = new StringTokenizer(iline);
-								while (it.hasMoreTokens()) {
-									String itk = it.nextToken();
-									if (itk.equals("mtu")) {
-										tmtu = Integer.parseInt(it.nextToken());
-										break;
-									}
-								}
-								break;
-							}
-							break;
-						}
-					}
-					break;
-				}
-			}
+            if (tmtu == 0) {
+                /* Not found, try the default route */
+                for (String line : commands.privileged().output("ip", "route", "show", "default")) {
+                    StringTokenizer t = new StringTokenizer(line);
+                    while (t.hasMoreTokens()) {
+                        String tk = t.nextToken();
+                        if (tk.equals("dev")) {
+                            for (String iline : commands.privileged().output("ip", "link", "show", "dev",
+                                    t.nextToken())) {
+                                StringTokenizer it = new StringTokenizer(iline);
+                                while (it.hasMoreTokens()) {
+                                    String itk = it.nextToken();
+                                    if (itk.equals("mtu")) {
+                                        tmtu = Integer.parseInt(it.nextToken());
+                                        break;
+                                    }
+                                }
+                                break;
+                            }
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
 
-			/* Still not found, use generic default */
-			if (tmtu == 0)
-				tmtu = 1500;
+            /* Still not found, use generic default */
+            if (tmtu == 0)
+                tmtu = 1500;
 
-			/* Subtract 80, because .. */
-			tmtu -= 80;
+            /* Subtract 80, because .. */
+            tmtu -= 80;
 
-			/* Bring it up! */
-			commands.privileged().result("ip", "link", "set", "mtu", String.valueOf(tmtu), "up", "dev", getName());
-		}
-	}
-	
-	private void removeFirewall() throws IOException {
-		if(OsUtil.doesCommandExist("nft")) {
-			StringBuilder nftcmd = new StringBuilder();
-			for(String table : commands.privileged().output("nft", "list", "tables")) {
-				if(table.contains(TABLE_PREFIX)) {
-					nftcmd.append(String.format("%s\n", table));
-				}	
-			}
-			if(nftcmd.length() > 0) {
-			    commands.privileged().pipeTo(nftcmd.toString(), "nft", "-f");
-			}
-		}
-		if(OsUtil.doesCommandExist("iptables")) {
-			for(String iptables : new String[] {"iptables", "ip6tables"}) {
-				StringBuilder restore = new StringBuilder();
-				boolean found = false;
-				for(String line : commands.privileged().output(iptables + "-save")) {
-					if(line.startsWith("*") || line.equals("COMMIT") || line.matches("-A .*-m comment --comment \"LogonBoxVPN rule for " + getName() + ".*"))
-						continue;
-					if(line.startsWith("-A"))
-						found = true;
-					restore.append(String.format("%s\n", line.replace("#-A", "-D"))); // TODO is this really #-A?
-				}
-				if(found) {
-				    commands.privileged().pipeTo(restore.toString(), iptables + "-restore", "-n");
-				}
-			}
-		}
+            /* Bring it up! */
+            commands.privileged().result("ip", "link", "set", "mtu", String.valueOf(tmtu), "up", "dev", getName());
+        }
+    }
 
-		
-	}
+    private void removeFirewall() throws IOException {
+        if (OsUtil.doesCommandExist("nft")) {
+            StringBuilder nftcmd = new StringBuilder();
+            for (String table : commands.privileged().output("nft", "list", "tables")) {
+                if (table.contains(TABLE_PREFIX)) {
+                    nftcmd.append(String.format("%s\n", table));
+                }
+            }
+            if (nftcmd.length() > 0) {
+                commands.privileged().pipeTo(nftcmd.toString(), "nft", "-f");
+            }
+        }
+        if (OsUtil.doesCommandExist("iptables")) {
+            for (String iptables : new String[] { "iptables", "ip6tables" }) {
+                StringBuilder restore = new StringBuilder();
+                boolean found = false;
+                for (String line : commands.privileged().output(iptables + "-save")) {
+                    if (line.startsWith("*") || line.equals("COMMIT")
+                            || line.matches("-A .*-m comment --comment \"LogonBoxVPN rule for " + getName() + ".*"))
+                        continue;
+                    if (line.startsWith("-A"))
+                        found = true;
+                    restore.append(String.format("%s\n", line.replace("#-A", "-D"))); // TODO is this really #-A?
+                }
+                if (found) {
+                    commands.privileged().pipeTo(restore.toString(), iptables + "-restore", "-n");
+                }
+            }
+        }
 
-	private int getIndexForName() throws IOException {
-		for (String line : commands.output("ip", "addr")) {
-			line = line.trim();
-			String[] args = line.split(":");
-			if (args.length > 1) {
-				try {
-					int idx = Integer.parseInt(args[0].trim());
-					if (args[1].trim().equals(getName()))
-						return idx;
-				} catch (Exception e) {
-				}
-			}
-		}
-		throw new IOException(String.format("Could not find interface index for %s", getName()));
-	}
-	
-	private int getFWMark(String table) {
-		try {
-			Collection<String> lines = commands.privileged().output(getPlatform().getWGCommand(), "show", getName(), "fwmark");
-			if(lines.isEmpty())
-				throw new IOException();
-			else {
-				String fwmark = lines.iterator().next();
-				if(fwmark.length() > 0 && !fwmark.equals("off"))
-					return -1;
-				fwmark = fwmark.substring(2); // 0x...
-				return Integer.parseInt(fwmark, 16);
-			}
-		}
-		catch(IOException ioe) {
-			return -1;
-		}
-	}
+    }
 
-	private void addDefault(String route) throws IOException {
-		int table = getFWMark("table");
-		if(table == -1) {
-			table = 51820;
-			while(!commands.privileged().output("ip", "-4", "route", "show", "table", String.valueOf(table)).isEmpty() ||
-					   !commands.privileged().output("ip", "-6", "route", "show", "table", String.valueOf(table)).isEmpty()) {
-				table++;
-			}
-			commands.privileged().result(getPlatform().getWGCommand(), "set", getName(), "fwmark", String.valueOf(table));
-		}
-		String proto = "-4";
-		String iptables = "iptables";
-		String pf = "ip";
+    private int getIndexForName() throws IOException {
+        for (String line : commands.output("ip", "addr")) {
+            line = line.trim();
+            String[] args = line.split(":");
+            if (args.length > 1) {
+                try {
+                    int idx = Integer.parseInt(args[0].trim());
+                    if (args[1].trim().equals(getName()))
+                        return idx;
+                } catch (Exception e) {
+                }
+            }
+        }
+        throw new IOException(String.format("Could not find interface index for %s", getName()));
+    }
 
-		if (route.matches(".*:.*")) {
-			proto = "-6";
-			iptables = "ip6tables";
-			pf = "ip6";
-		}
+    private int getFWMark(String table) {
+        try {
+            Collection<String> lines = commands.privileged().output(getPlatform().getWGCommand(), "show", getName(),
+                    "fwmark");
+            if (lines.isEmpty())
+                throw new IOException();
+            else {
+                String fwmark = lines.iterator().next();
+                if (fwmark.length() > 0 && !fwmark.equals("off"))
+                    return -1;
+                fwmark = fwmark.substring(2); // 0x...
+                return Integer.parseInt(fwmark, 16);
+            }
+        } catch (IOException ioe) {
+            return -1;
+        }
+    }
 
-		commands.privileged().result("ip", proto, "route", "add", route, "dev", getName(), "table", String.valueOf(table));
-		commands.privileged().result("ip", proto, "rule", "add", "not", "fwmark", String.valueOf("table"), "table", String.valueOf(table));
-		commands.privileged().result("ip", proto, "rule", "add", "table", "main", "suppress_prefixlength", "0");
-		
-		String marker = String.format("-m comment --comment \"LogonBoxVPN rule for %s\"", getName());
-		String restore = "*raw\n";
-		String nftable = TABLE_PREFIX + getName();
-		
-		StringBuilder nftcmd = new StringBuilder();
-		nftcmd.append(String.format("add table %s %s\n", pf, nftable));
-		nftcmd.append(String.format("add chain %s %s preraw { type filter hook prerouting priority -300; }\n", pf, nftable));
-		nftcmd.append(String.format("add chain %s %s premangle { type filter hook prerouting priority -150; }\n", pf, nftable));
-		nftcmd.append(String.format("add chain %s %s postmangle { type filter hook postrouting priority -150; }\n", pf, nftable));
-		
-		Pattern pattern = Pattern.compile(".*inet6?\\ ([0-9a-f:.]+)/[0-9]+.*");
-		for(String line : commands.privileged().output("ip", "-o", proto, "addr", "show", "dev", getName())) {
-			Matcher m = pattern.matcher(line); 
-			if(!m.matches()) {
-				continue;
-			}
-			
-			restore += String.format("-I PREROUTING ! -i %s -d %s -m addrtype ! --src-type LOCAL -j DROP %s\n", getName(), m.group(1), marker);
-			nftcmd.append(String.format("add rule %s %s postmangle meta l4proto udp mark %s ct mark set mark \n", pf, nftable, getName(), pf, m.group(1)));
-		}
+    private void addDefault(String route) throws IOException {
+        int table = getFWMark("table");
+        if (table == -1) {
+            table = 51820;
+            while (!commands.privileged().output("ip", "-4", "route", "show", "table", String.valueOf(table)).isEmpty()
+                    || !commands.privileged().output("ip", "-6", "route", "show", "table", String.valueOf(table))
+                            .isEmpty()) {
+                table++;
+            }
+            commands.privileged().result(getPlatform().getWGCommand(), "set", getName(), "fwmark",
+                    String.valueOf(table));
+        }
+        String proto = "-4";
+        String iptables = "iptables";
+        String pf = "ip";
 
-		
-		restore += String.format("COMMIT\n*mangle\n-I POSTROUTING -m mark --mark %d -p udp -j CONNMARK --save-mark %s\n-I PREROUTING -p udp -j CONNMARK --restore-mark %s\nCOMMIT\n", table, marker, marker);
-		nftcmd.append(String.format("add rule %s %s postmangle meta l4proto udp mark %d ct mark set mark \n", pf, nftable, table));
-		nftcmd.append(String.format("add rule %s %s premangle meta l4proto udp meta mark set ct mark \n", pf, nftable));
-		
-		if(proto.equals("-4")) {
-		    commands.privileged().result("sysctl", "-q", "net.ipv4.conf.all.src_valid_mark=1");
-		}
-		
-		if(OsUtil.doesCommandExist("nft")) {
-			LOG.info("Updating firewall: " + nftcmd.toString());
-			commands.privileged().pipeTo(nftcmd.toString(), "nft", "-f");
-		}
-		else {
-			LOG.info("Updating firewall: " + restore);
-			commands.privileged().pipeTo(restore, iptables + "-restore", "-n");
-		}
-		haveSetFirewall = true;
-	}
-	
-	private void addRoute(String route) throws IOException {
-		String proto = "-4";
-		if (route.matches(".*:.*"))
-			proto = "-6";
-		if (TABLE_OFF.equals(getTable()))
-			return;
-		if (!TABLE_AUTO.equals(getTable())) {
-		    commands.privileged().result("ip", proto, "route", "add", route, "dev", getName(), "table", getTable());
-		} else if (route.endsWith("/0")) {
-			addDefault(route);
-		} else {
-			try {
-				String res = commands.privileged().output("ip", proto, "route", "show", "dev", getName(), "match", route)
-						.iterator().next();
-				if (StringUtils.isNotBlank(res)) {
-					// Already have
-					return;
-				}
-			} catch (Exception e) {
-			}
-			LOG.info(String.format("Adding route %s to %s for %s", route, getName(), proto));
-			commands.privileged().result("ip", proto, "route", "add", route, "dev", getName());
-		}
-	}
+        if (route.matches(".*:.*")) {
+            proto = "-6";
+            iptables = "ip6tables";
+            pf = "ip6";
+        }
 
-	private void unsetDns() throws IOException {
-		try {
-			if (dnsSet) {
-				LOG.info(String.format("unsetting DNS for %s (iface prefix %s)", getName(),
-						getPlatform().resolvconfIfacePrefix()));
-				switch (calcDnsMethod()) {
-				case NETWORK_MANAGER:
-					updateNetworkManager(null);
-					break;
-				case RESOLVCONF:
-				    commands.privileged().result("resolvconf", "-d", getPlatform().resolvconfIfacePrefix() + getName(), "-f");
-					break;
-				case SYSTEMD:
-					updateSystemd(null);
-					break;
-				case RAW:
-					updateResolvDotConf(null);
-					break;
-				case NONE:
-					break;
-				default:
-					throw new UnsupportedOperationException();
-				}
-			}
-		} finally {
-			dnsSet = false;
-		}
-	}
+        commands.privileged().result("ip", proto, "route", "add", route, "dev", getName(), "table",
+                String.valueOf(table));
+        commands.privileged().result("ip", proto, "rule", "add", "not", "fwmark", String.valueOf("table"), "table",
+                String.valueOf(table));
+        commands.privileged().result("ip", proto, "rule", "add", "table", "main", "suppress_prefixlength", "0");
 
-	private void updateNetworkManager(String[] dns) throws IOException {
-		
-		/* This will be using split DNS if the backend is systemd or dnsmasq, or
-		 * compatible for default backend.
-		 * 
-		 * TODO we need to check the backend in use if NetworkManager is chosen
-		 * to know if we can do split DNS. 
-		 * 
-		 * https://wiki.gnome.org/Projects/NetworkManager/DNS
-		 */
-		try (DBusConnection conn = DBusConnectionBuilder.forSystemBus().build()) {
-			LOG.info("Updating DNS via NetworkManager");
-			NetworkManager mgr = conn.getRemoteObject(NETWORK_MANAGER_BUS_NAME, "/org/freedesktop/NetworkManager",
-					NetworkManager.class);
-			DBusPath path = mgr.GetDeviceByIpIface(getName());
-			if (path == null)
-				throw new IOException(String.format("No interface %s", getName()));
+        String marker = String.format("-m comment --comment \"LogonBoxVPN rule for %s\"", getName());
+        String restore = "*raw\n";
+        String nftable = TABLE_PREFIX + getName();
 
-			LOG.info(String.format("DBus device path is %s", path.getPath()));
+        StringBuilder nftcmd = new StringBuilder();
+        nftcmd.append(String.format("add table %s %s\n", pf, nftable));
+        nftcmd.append(
+                String.format("add chain %s %s preraw { type filter hook prerouting priority -300; }\n", pf, nftable));
+        nftcmd.append(String.format("add chain %s %s premangle { type filter hook prerouting priority -150; }\n", pf,
+                nftable));
+        nftcmd.append(String.format("add chain %s %s postmangle { type filter hook postrouting priority -150; }\n", pf,
+                nftable));
 
-			Properties props = conn.getRemoteObject(NETWORK_MANAGER_BUS_NAME, path.getPath(), Properties.class);
-			Map<String, Variant<?>> propsMap = props.GetAll("org.freedesktop.NetworkManager.Device");
-			@SuppressWarnings("unchecked")
-			List<DBusPath> availableConnections = (List<DBusPath>) propsMap.get("AvailableConnections").getValue();
-			for (DBusPath availableConnectionPath : availableConnections) {
-				NetworkManager.Settings.Connection settings = conn.getRemoteObject(NETWORK_MANAGER_BUS_NAME,
-						availableConnectionPath.getPath(), NetworkManager.Settings.Connection.class);
-				Map<String, Map<String, Variant<?>>> settingsMap = settings.GetSettings();
+        Pattern pattern = Pattern.compile(".*inet6?\\ ([0-9a-f:.]+)/[0-9]+.*");
+        for (String line : commands.privileged().output("ip", "-o", proto, "addr", "show", "dev", getName())) {
+            Matcher m = pattern.matcher(line);
+            if (!m.matches()) {
+                continue;
+            }
 
-				if(LOG.isDebugEnabled()) {
-					for (Map.Entry<String, Map<String, Variant<?>>> en : settingsMap.entrySet()) {
-						LOG.debug("  " + en.getKey());
-						for (Map.Entry<String, Variant<?>> en2 : en.getValue().entrySet()) {
-							LOG.debug("    " + en2.getKey() + " = " + en2.getValue().getValue());
-						}
-					}
-				}
-				
-				Map<String, Map<String, Variant<?>>> newSettingsMap = new HashMap<>(settingsMap);
+            restore += String.format("-I PREROUTING ! -i %s -d %s -m addrtype ! --src-type LOCAL -j DROP %s\n",
+                    getName(), m.group(1), marker);
+            nftcmd.append(String.format("add rule %s %s postmangle meta l4proto udp mark %s ct mark set mark \n", pf,
+                    nftable, getName(), pf, m.group(1)));
+        }
 
-				if (settingsMap.containsKey("ipv4")
-						&& "manual".equals(settingsMap.get("ipv4").get("method").getValue())) {
-					Map<String, Variant<?>> ipv4Map = new HashMap<>(settingsMap.get("ipv4"));
-					ipv4Map.put("dns-search", new Variant<String[]>(IpUtil.filterNames(dns)));
-					ipv4Map.put("dns",
-							new Variant<UInt32[]>(Arrays.asList(IpUtil.filterIpV4Addresses(dns)).stream()
-									.map((addr) -> ipv4AddressToUInt32(addr)).collect(Collectors.toList())
-									.toArray(new UInt32[0])));
-					newSettingsMap.put("ipv4", ipv4Map);
-				}
-				if (settingsMap.containsKey("ipv6")
-						&& "manual".equals(settingsMap.get("ipv6").get("method").getValue())) {
-					Map<String, Variant<?>> ipv6Map = new HashMap<>(settingsMap.get("ipv6"));
-					ipv6Map.put("dns-search", new Variant<String[]>(IpUtil.filterNames(dns)));
-					ipv6Map.put("dns",
-							new Variant<Ipv6Address[]>(Arrays.asList(IpUtil.filterIpV6Addresses(dns)).stream()
-									.map((addr) -> ipv6AddressToStruct(addr)).collect(Collectors.toList())
-									.toArray(new Ipv6Address[0])));
-					newSettingsMap.put("ipv6", ipv6Map);
-				}
+        restore += String.format(
+                "COMMIT\n*mangle\n-I POSTROUTING -m mark --mark %d -p udp -j CONNMARK --save-mark %s\n-I PREROUTING -p udp -j CONNMARK --restore-mark %s\nCOMMIT\n",
+                table, marker, marker);
+        nftcmd.append(String.format("add rule %s %s postmangle meta l4proto udp mark %d ct mark set mark \n", pf,
+                nftable, table));
+        nftcmd.append(String.format("add rule %s %s premangle meta l4proto udp meta mark set ct mark \n", pf, nftable));
 
-				settings.Update(newSettingsMap);
-				settings.Save();
-			}
-		} catch (DBusException dbe) {
-			throw new IOException("Failed to connect to system bus.", dbe);
-		}
-	}
+        if (proto.equals("-4")) {
+            commands.privileged().result("sysctl", "-q", "net.ipv4.conf.all.src_valid_mark=1");
+        }
 
-	private UInt32 ipv4AddressToUInt32(String address) {
-		Ipv4 ipv4 = Ipv4.of(address);
-		int ipv4val = ipv4.asBigInteger().intValue();
-		return new UInt32(Util.byteSwap(ipv4val));
-	}
+        if (OsUtil.doesCommandExist("nft")) {
+            LOG.info("Updating firewall: " + nftcmd.toString());
+            commands.privileged().pipeTo(nftcmd.toString(), "nft", "-f");
+        } else {
+            LOG.info("Updating firewall: " + restore);
+            commands.privileged().pipeTo(restore, iptables + "-restore", "-n");
+        }
+        haveSetFirewall = true;
+    }
 
-	private Ipv6Address ipv6AddressToStruct(String address) {
-		/* TODO */
-		throw new UnsupportedOperationException("TODO");
-	}
+    private void addRoute(String route) throws IOException {
+        String proto = "-4";
+        if (route.matches(".*:.*"))
+            proto = "-6";
+        if (TABLE_OFF.equals(getTable()))
+            return;
+        if (!TABLE_AUTO.equals(getTable())) {
+            commands.privileged().result("ip", proto, "route", "add", route, "dev", getName(), "table", getTable());
+        } else if (route.endsWith("/0")) {
+            addDefault(route);
+        } else {
+            try {
+                String res = commands.privileged()
+                        .output("ip", proto, "route", "show", "dev", getName(), "match", route).iterator().next();
+                if (Util.isNotBlank(res)) {
+                    // Already have
+                    return;
+                }
+            } catch (Exception e) {
+            }
+            LOG.info(String.format("Adding route %s to %s for %s", route, getName(), proto));
+            commands.privileged().result("ip", proto, "route", "add", route, "dev", getName());
+        }
+    }
 
-	private void updateSystemd(String[] dns) throws IOException {
-		try (DBusConnection conn = DBusConnectionBuilder.forSystemBus().build()) {
-			Resolve1Manager mgr = conn.getRemoteObject("org.freedesktop.resolve1", "/org/freedesktop/resolve1",
-					Resolve1Manager.class);
-			int index = getIndexForName(); // TODO
-			if (dns == null) {
-				LOG.info(String.format("Reverting DNS via SystemD. Index is %d", index));
-				mgr.RevertLink(index);
-			} else {
-				LOG.info(String.format("Setting DNS via SystemD. Index is %d", index));
-				mgr.SetLinkDNS(index, Arrays.asList(IpUtil.filterAddresses(dns)).stream()
-						.map((addr) -> new Resolve1Manager.SetLinkDNSStruct(addr)).collect(Collectors.toList()));
-				mgr.SetLinkDomains(index,
-						Arrays.asList(IpUtil.filterNames(dns)).stream()
-								.map((addr) -> new Resolve1Manager.SetLinkDomainsStruct(addr, false))
-								.collect(Collectors.toList()));
-			}
+    private void unsetDns() throws IOException {
+        try {
+            if (dnsSet) {
+                LOG.info(String.format("unsetting DNS for %s (iface prefix %s)", getName(),
+                        getPlatform().resolvconfIfacePrefix()));
+                switch (calcDnsMethod()) {
+                case NETWORK_MANAGER:
+                    updateNetworkManager(null);
+                    break;
+                case RESOLVCONF:
+                    commands.privileged().result("resolvconf", "-d", getPlatform().resolvconfIfacePrefix() + getName(),
+                            "-f");
+                    break;
+                case SYSTEMD:
+                    updateSystemd(null);
+                    break;
+                case RAW:
+                    updateResolvDotConf(null);
+                    break;
+                case NONE:
+                    break;
+                default:
+                    throw new UnsupportedOperationException();
+                }
+            }
+        } finally {
+            dnsSet = false;
+        }
+    }
 
-		} catch (DBusException dbe) {
-			throw new IOException("Failed to connect to system bus.", dbe);
-		}
-	}
+    private void updateNetworkManager(String[] dns) throws IOException {
 
-	private void updateResolvConf(String[] dns) throws IOException {
+        /*
+         * This will be using split DNS if the backend is systemd or dnsmasq, or
+         * compatible for default backend.
+         * 
+         * TODO we need to check the backend in use if NetworkManager is chosen to know
+         * if we can do split DNS.
+         * 
+         * https://wiki.gnome.org/Projects/NetworkManager/DNS
+         */
+        try (DBusConnection conn = DBusConnectionBuilder.forSystemBus().build()) {
+            LOG.info("Updating DNS via NetworkManager");
+            NetworkManager mgr = conn.getRemoteObject(NETWORK_MANAGER_BUS_NAME, "/org/freedesktop/NetworkManager",
+                    NetworkManager.class);
+            DBusPath path = mgr.GetDeviceByIpIface(getName());
+            if (path == null)
+                throw new IOException(String.format("No interface %s", getName()));
 
-	    var sw =  new StringWriter();
+            LOG.info(String.format("DBus device path is %s", path.getPath()));
+
+            Properties props = conn.getRemoteObject(NETWORK_MANAGER_BUS_NAME, path.getPath(), Properties.class);
+            Map<String, Variant<?>> propsMap = props.GetAll("org.freedesktop.NetworkManager.Device");
+            @SuppressWarnings("unchecked")
+            List<DBusPath> availableConnections = (List<DBusPath>) propsMap.get("AvailableConnections").getValue();
+            for (DBusPath availableConnectionPath : availableConnections) {
+                NetworkManager.Settings.Connection settings = conn.getRemoteObject(NETWORK_MANAGER_BUS_NAME,
+                        availableConnectionPath.getPath(), NetworkManager.Settings.Connection.class);
+                Map<String, Map<String, Variant<?>>> settingsMap = settings.GetSettings();
+
+                if (LOG.isDebugEnabled()) {
+                    for (Map.Entry<String, Map<String, Variant<?>>> en : settingsMap.entrySet()) {
+                        LOG.debug("  " + en.getKey());
+                        for (Map.Entry<String, Variant<?>> en2 : en.getValue().entrySet()) {
+                            LOG.debug("    " + en2.getKey() + " = " + en2.getValue().getValue());
+                        }
+                    }
+                }
+
+                Map<String, Map<String, Variant<?>>> newSettingsMap = new HashMap<>(settingsMap);
+
+                if (settingsMap.containsKey("ipv4")
+                        && "manual".equals(settingsMap.get("ipv4").get("method").getValue())) {
+                    Map<String, Variant<?>> ipv4Map = new HashMap<>(settingsMap.get("ipv4"));
+                    ipv4Map.put("dns-search", new Variant<String[]>(IpUtil.filterNames(dns)));
+                    ipv4Map.put("dns",
+                            new Variant<UInt32[]>(Arrays.asList(IpUtil.filterIpV4Addresses(dns)).stream()
+                                    .map((addr) -> ipv4AddressToUInt32(addr)).collect(Collectors.toList())
+                                    .toArray(new UInt32[0])));
+                    newSettingsMap.put("ipv4", ipv4Map);
+                }
+                if (settingsMap.containsKey("ipv6")
+                        && "manual".equals(settingsMap.get("ipv6").get("method").getValue())) {
+                    Map<String, Variant<?>> ipv6Map = new HashMap<>(settingsMap.get("ipv6"));
+                    ipv6Map.put("dns-search", new Variant<String[]>(IpUtil.filterNames(dns)));
+                    ipv6Map.put("dns",
+                            new Variant<Ipv6Address[]>(Arrays.asList(IpUtil.filterIpV6Addresses(dns)).stream()
+                                    .map((addr) -> ipv6AddressToStruct(addr)).collect(Collectors.toList())
+                                    .toArray(new Ipv6Address[0])));
+                    newSettingsMap.put("ipv6", ipv6Map);
+                }
+
+                settings.Update(newSettingsMap);
+                settings.Save();
+            }
+        } catch (DBusException dbe) {
+            throw new IOException("Failed to connect to system bus.", dbe);
+        }
+    }
+
+    private UInt32 ipv4AddressToUInt32(String address) {
+        Ipv4 ipv4 = Ipv4.of(address);
+        int ipv4val = ipv4.asBigInteger().intValue();
+        return new UInt32(Util.byteSwap(ipv4val));
+    }
+
+    private Ipv6Address ipv6AddressToStruct(String address) {
+        /* TODO */
+        throw new UnsupportedOperationException("TODO");
+    }
+
+    private void updateSystemd(String[] dns) throws IOException {
+        try (DBusConnection conn = DBusConnectionBuilder.forSystemBus().build()) {
+            Resolve1Manager mgr = conn.getRemoteObject(RESOLVE1_BUS_NAME, "/org/freedesktop/resolve1",
+                    Resolve1Manager.class);
+            int index = getIndexForName(); // TODO
+            if (dns == null) {
+                LOG.info(String.format("Reverting DNS via SystemD. Index is %d", index));
+                mgr.RevertLink(index);
+            } else {
+                LOG.info(String.format("Setting DNS via SystemD. Index is %d", index));
+                mgr.SetLinkDNS(index, Arrays.asList(IpUtil.filterAddresses(dns)).stream()
+                        .map((addr) -> new Resolve1Manager.SetLinkDNSStruct(addr)).collect(Collectors.toList()));
+                mgr.SetLinkDomains(index,
+                        Arrays.asList(IpUtil.filterNames(dns)).stream()
+                                .map((addr) -> new Resolve1Manager.SetLinkDomainsStruct(addr, false))
+                                .collect(Collectors.toList()));
+            }
+
+        } catch (DBusException dbe) {
+            throw new IOException("Failed to connect to system bus.", dbe);
+        }
+    }
+
+    private void updateResolvConf(String[] dns) throws IOException {
+
+        var sw = new StringWriter();
         try (var pw = new PrintWriter(sw)) {
             pw.println(String.format("nameserver %s", String.join(" ", dns)));
         }
-	    commands.privileged().pipeTo(sw.toString(), "resolvconf", "-a", getPlatform().resolvconfIfacePrefix() + getName(), "-m",
-                "0", "-x");
-	}
+        commands.privileged().pipeTo(sw.toString(), "resolvconf", "-a",
+                getPlatform().resolvconfIfacePrefix() + getName(), "-m", "0", "-x");
+    }
 
-	private void updateResolvDotConf(String[] dns) {
-		synchronized (LinuxPlatformServiceImpl.lock) {
-			List<String> headlines = new ArrayList<>();
-			List<String> bodylines = new ArrayList<>();
-			List<String> taillines = new ArrayList<>();
-			List<String> dnslist = new ArrayList<>();
-			File file = new File("/etc/resolv.conf");
-			String line;
-			int sidx = -1;
-			int eidx = -1;
-			Set<String> rowdns = new HashSet<>();
-			try (BufferedReader r = new BufferedReader(new FileReader(file))) {
-				int lineNo = 0;
-				while ((line = r.readLine()) != null) {
-					if (line.startsWith(START_HYPERSOCKET_WIREGUARD_RESOLVECONF)) {
-						sidx = lineNo;
-					} else if (line.startsWith(END_HYPERSOCKET_WIREGUARD_RESOLVCONF)) {
-						eidx = lineNo;
-					} else {
-						line = line.trim();
-						if (line.startsWith("nameserver")) {
-							List<String> l = Arrays.asList(line.split("\\s+"));
-							rowdns.addAll(l.subList(1, l.size()));
-						}
-						dnslist.addAll(rowdns);
-						if (sidx != -1 && eidx == -1)
-							bodylines.add(line);
-						else {
-							if (sidx == -1 && eidx == -1)
-								headlines.add(line);
-							else
-								taillines.add(line);
-						}
-					}
-					lineNo++;
-				}
-			} catch (IOException ioe) {
-				throw new IllegalStateException("Failed to read resolv.conf", ioe);
-			}
+    private void updateResolvDotConf(String[] dns) {
+        synchronized (LinuxPlatformServiceImpl.lock) {
+            List<String> headlines = new ArrayList<>();
+            List<String> bodylines = new ArrayList<>();
+            List<String> taillines = new ArrayList<>();
+            List<String> dnslist = new ArrayList<>();
+            File file = new File("/etc/resolv.conf");
+            String line;
+            int sidx = -1;
+            int eidx = -1;
+            Set<String> rowdns = new HashSet<>();
+            try (BufferedReader r = new BufferedReader(new FileReader(file))) {
+                int lineNo = 0;
+                while ((line = r.readLine()) != null) {
+                    if (line.startsWith(START_HYPERSOCKET_WIREGUARD_RESOLVECONF)) {
+                        sidx = lineNo;
+                    } else if (line.startsWith(END_HYPERSOCKET_WIREGUARD_RESOLVCONF)) {
+                        eidx = lineNo;
+                    } else {
+                        line = line.trim();
+                        if (line.startsWith("nameserver")) {
+                            List<String> l = Arrays.asList(line.split("\\s+"));
+                            rowdns.addAll(l.subList(1, l.size()));
+                        }
+                        dnslist.addAll(rowdns);
+                        if (sidx != -1 && eidx == -1)
+                            bodylines.add(line);
+                        else {
+                            if (sidx == -1 && eidx == -1)
+                                headlines.add(line);
+                            else
+                                taillines.add(line);
+                        }
+                    }
+                    lineNo++;
+                }
+            } catch (IOException ioe) {
+                throw new IllegalStateException("Failed to read resolv.conf", ioe);
+            }
 
-			File oldfile = new File("/etc/resolv.conf");
-			oldfile.delete();
+            File oldfile = new File("/etc/resolv.conf");
+            oldfile.delete();
 
-			if (file.renameTo(oldfile)) {
-				LOG.info(String.format("Failed to backup resolv.conf by moving %s to %s", file, oldfile));
-			}
+            if (file.renameTo(oldfile)) {
+                LOG.info(String.format("Failed to backup resolv.conf by moving %s to %s", file, oldfile));
+            }
 
-			try (PrintWriter pw = new PrintWriter(new FileWriter(file, true))) {
-				for (String l : headlines) {
-					pw.println(l);
-				}
-				if (dns != null && dns.length > 0) {
-					pw.println(START_HYPERSOCKET_WIREGUARD_RESOLVECONF);
-					for (String d : dns) {
-						if (!rowdns.contains(d))
-							pw.println(String.format("nameserver %s", d));
-					}
-					pw.println(END_HYPERSOCKET_WIREGUARD_RESOLVCONF);
-				}
-				for (String l : taillines) {
-					pw.println(l);
-				}
-			} catch (IOException ioe) {
-				throw new IllegalStateException("Failed to write resolv.conf", ioe);
-			}
-		}
-	}
+            try (PrintWriter pw = new PrintWriter(new FileWriter(file, true))) {
+                for (String l : headlines) {
+                    pw.println(l);
+                }
+                if (dns != null && dns.length > 0) {
+                    pw.println(START_HYPERSOCKET_WIREGUARD_RESOLVECONF);
+                    for (String d : dns) {
+                        if (!rowdns.contains(d))
+                            pw.println(String.format("nameserver %s", d));
+                    }
+                    pw.println(END_HYPERSOCKET_WIREGUARD_RESOLVCONF);
+                }
+                for (String l : taillines) {
+                    pw.println(l);
+                }
+            } catch (IOException ioe) {
+                throw new IllegalStateException("Failed to write resolv.conf", ioe);
+            }
+        }
+    }
 
-	@Override
-	public String getMac() {
-		try {
-			NetworkInterface iface = getByName(getName());
-			return iface == null ? null : IpUtil.toIEEE802(iface.getHardwareAddress());
-		} catch (IOException ioe) {
-			return null;
-		}
-	}
+    @Override
+    public String getMac() {
+        try {
+            NetworkInterface iface = getByName(getName());
+            return iface == null ? null : IpUtil.toIEEE802(iface.getHardwareAddress());
+        } catch (IOException ioe) {
+            return null;
+        }
+    }
 
-	@Override
-	public String getDisplayName() {
-		try {
-			NetworkInterface iface = getByName(getName());
-			return iface == null ? "Unknown" : iface.getDisplayName();
-		} catch (IOException ioe) {
-			return "Unknown";
-		}
-	}
+    @Override
+    public String getDisplayName() {
+        try {
+            NetworkInterface iface = getByName(getName());
+            return iface == null ? "Unknown" : iface.getDisplayName();
+        } catch (IOException ioe) {
+            return "Unknown";
+        }
+    }
 
-	public Set<String> getAddresses() {
-		return addresses;
-	}
+    public Set<String> getAddresses() {
+        return addresses;
+    }
+
+    private void initialDnsState() {
+        var method = calcDnsMethod();
+        switch (method) {
+        case NETWORK_MANAGER:
+            try (var conn = DBusConnectionBuilder.forSystemBus().build()) {
+                var mgr = conn.getRemoteObject(NETWORK_MANAGER_BUS_NAME, "/org/freedesktop/NetworkManager",
+                        NetworkManager.class);
+                var path = mgr.GetDeviceByIpIface(getName());
+                if (path == null)
+                    throw new IOException(String.format("No interface %s", getName()));
+
+                var props = conn.getRemoteObject(NETWORK_MANAGER_BUS_NAME, path.getPath(), Properties.class);
+                var propsMap = props.GetAll("org.freedesktop.NetworkManager.Device");
+                @SuppressWarnings("unchecked")
+                var availableConnections = (List<DBusPath>) propsMap.get("AvailableConnections").getValue();
+                for (var availableConnectionPath : availableConnections) {
+                    var settings = conn.getRemoteObject(NETWORK_MANAGER_BUS_NAME,
+                            availableConnectionPath.getPath(), NetworkManager.Settings.Connection.class);
+                    var settingsMap = settings.GetSettings();
+
+//                    if (LOG.isDebugEnabled()) {
+//                        for (var en : settingsMap.entrySet()) {
+//                            LOG.debug("  " + en.getKey());
+//                            for (Map.Entry<String, Variant<?>> en2 : en.getValue().entrySet()) {
+//                                LOG.debug("    " + en2.getKey() + " = " + en2.getValue().getValue());
+//                            }
+//                        }
+//                    }
+//
+//                    var newSettingsMap = new HashMap<>(settingsMap);
+//
+//                    if (settingsMap.containsKey("ipv4")
+//                            && "manual".equals(settingsMap.get("ipv4").get("method").getValue())) {
+//                        var ipv4Map = new HashMap<>(settingsMap.get("ipv4"));
+//                        ipv4Map.put("dns-search", new Variant<String[]>(IpUtil.filterNames(dns)));
+//                        ipv4Map.put("dns",
+//                                new Variant<UInt32[]>(Arrays.asList(IpUtil.filterIpV4Addresses(dns)).stream()
+//                                        .map((addr) -> ipv4AddressToUInt32(addr)).collect(Collectors.toList())
+//                                        .toArray(new UInt32[0])));
+//                        newSettingsMap.put("ipv4", ipv4Map);
+//                    }
+//                    if (settingsMap.containsKey("ipv6")
+//                            && "manual".equals(settingsMap.get("ipv6").get("method").getValue())) {
+//                        var ipv6Map = new HashMap<>(settingsMap.get("ipv6"));
+//                        ipv6Map.put("dns-search", new Variant<String[]>(IpUtil.filterNames(dns)));
+//                        ipv6Map.put("dns",
+//                                new Variant<Ipv6Address[]>(Arrays.asList(IpUtil.filterIpV6Addresses(dns)).stream()
+//                                        .map((addr) -> ipv6AddressToStruct(addr)).collect(Collectors.toList())
+//                                        .toArray(new Ipv6Address[0])));
+//                        newSettingsMap.put("ipv6", ipv6Map);
+//                    }
+//
+//                    settings.Update(newSettingsMap);
+//                    settings.Save();
+                }
+            } catch (IOException | DBusException dbe) {
+            }
+            break;
+        case RESOLVCONF:
+//            updateResolvConf(dns);
+            break;
+        case SYSTEMD:
+            try (var conn = DBusConnectionBuilder.forSystemBus().build()) {
+                var index = getIndexForName(); // TODO
+                var path = conn.getRemoteObject(RESOLVE1_BUS_NAME, "/org/freedesktop/resolve1", Resolve1Manager.class).GetLink(index);
+                var propsMap = conn.getRemoteObject(RESOLVE1_BUS_NAME, path.getPath(), Properties.class).GetAll("org.freedesktop.resolve1.Link");
+                InetAddress.getByAddress(
+                        Util.toArray((ArrayList<Byte>) ((Object[]) propsMap.get("CurrentDNSServer").getValue())[1]));
+                dnsSet = true;
+            } catch (IOException | DBusException dbe) {
+            }
+            break;
+        case RAW:
+            var file = new File("/etc/resolv.conf");
+            /*
+             * TODO ... what if there are multiple interfaces .. we dont handle this welll
+             */
+            if (file.exists()) {
+                try (var r = new BufferedReader(new FileReader(file))) {
+                    String line;
+                    while ((line = r.readLine()) != null) {
+                        if (line.startsWith(START_HYPERSOCKET_WIREGUARD_RESOLVECONF)) {
+                            dnsSet = true;
+                            break;
+                        }
+                    }
+                } catch (IOException ioe) {
+                }
+            }
+            break;
+        case NONE:
+            break;
+        default:
+            /* TODO */
+            throw new UnsupportedOperationException();
+        }
+    }
 }

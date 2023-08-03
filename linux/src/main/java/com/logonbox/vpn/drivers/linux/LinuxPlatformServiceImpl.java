@@ -20,11 +20,11 @@
  */
 package com.logonbox.vpn.drivers.linux;
 
-import com.logonbox.vpn.drivers.lib.AbstractDesktopPlatformServiceImpl;
+import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
 import com.logonbox.vpn.drivers.lib.ActiveSession;
 import com.logonbox.vpn.drivers.lib.DNSIntegrationMethod;
-import com.logonbox.vpn.drivers.lib.StatusDetail;
-import com.logonbox.vpn.drivers.lib.WireguardConfiguration;
+import com.logonbox.vpn.drivers.lib.VpnConfiguration;
+import com.logonbox.vpn.drivers.lib.VpnInterfaceInformation;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
 
 import org.slf4j.Logger;
@@ -39,9 +39,10 @@ import java.net.InterfaceAddress;
 import java.net.NetworkInterface;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.text.ParseException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -51,7 +52,7 @@ import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class LinuxPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl<LinuxIP> {
+public class LinuxPlatformServiceImpl extends AbstractUnixDesktopPlatformService<LinuxIP> {
 
     static Logger log = LoggerFactory.getLogger(LinuxPlatformServiceImpl.class);
 
@@ -66,22 +67,6 @@ public class LinuxPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl
 
     public LinuxPlatformServiceImpl() {
         super(INTERFACE_PREFIX);
-    }
-
-    @Override
-    protected void addRouteAll(WireguardConfiguration connection) throws IOException {
-        LOG.info("Routing traffic all through VPN");
-        String gw = getDefaultGateway();
-        LOG.info(String.join(" ", Arrays.asList("route", "add", connection.getEndpointAddress(), "gw", gw)));
-        commands().privileged().run("route", "add", connection.getEndpointAddress(), "gw", gw);
-    }
-
-    @Override
-    protected void removeRouteAll(ActiveSession<LinuxIP> session) throws IOException {
-        LOG.info("Removing routing of all traffic through VPN");
-        String gw = getDefaultGateway();
-        LOG.info(String.join(" ", Arrays.asList("route", "del", session.connection().getEndpointAddress(), "gw", gw)));
-        commands().privileged().run("route", "del", session.connection().getEndpointAddress(), "gw", gw);
     }
 
     protected LinuxIP add(String name, String type) throws IOException {
@@ -103,37 +88,6 @@ public class LinuxPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl
             throw new IOException("Could not get default gateway.");
         else
             return gw;
-    }
-
-    @Override
-    public long getLatestHandshake(String iface, String publicKey) throws IOException {
-        for (String line : commands().privileged().output(getWGCommand(), "show", iface, "latest-handshakes")) {
-            String[] args = line.trim().split("\\s+");
-            if (args.length == 2) {
-                if (args[0].equals(publicKey)) {
-                    return Long.parseLong(args[1]) * 1000;
-                }
-            }
-        }
-        return 0;
-    }
-
-    @Override
-    protected String getPublicKey(String interfaceName) throws IOException {
-        try {
-            String pk = commands().privileged().output(getWGCommand(), "show", interfaceName, "public-key")
-                    .iterator().next().trim();
-            if (pk.equals("(none)") || pk.equals(""))
-                return null;
-            else
-                return pk;
-
-        } catch (IOException ioe) {
-            if (ioe.getMessage() != null && ioe.getMessage().indexOf("The system cannot find the file specified") != -1)
-                return null;
-            else
-                throw ioe;
-        }
     }
 
     @Override
@@ -217,43 +171,6 @@ public class LinuxPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl
     }
 
     @Override
-    public StatusDetail status(String iface) throws IOException {
-        Collection<String> hs = commands().privileged().output(getWGCommand(), "show", iface,
-                "latest-handshakes");
-        long lastHandshake = hs.isEmpty() ? 0 : Long.parseLong(hs.iterator().next().split("\\s+")[1]) * 1000;
-        hs = commands().privileged().output(getWGCommand(), "show", iface, "transfer");
-        long rx = hs.isEmpty() ? 0 : Long.parseLong(hs.iterator().next().split("\\s+")[1]);
-        long tx = hs.isEmpty() ? 0 : Long.parseLong(hs.iterator().next().split("\\s+")[2]);
-        return new StatusDetail() {
-
-            @Override
-            public long getTx() {
-                return tx;
-            }
-
-            @Override
-            public long getRx() {
-                return rx;
-            }
-
-            @Override
-            public long getLastHandshake() {
-                return lastHandshake;
-            }
-
-            @Override
-            public String getInterfaceName() {
-                return iface;
-            }
-
-            @Override
-            public String getError() {
-                return "";
-            }
-        };
-    }
-
-    @Override
     protected LinuxIP createVirtualInetAddress(NetworkInterface nif) throws IOException {
         LinuxIP ip = new LinuxIP(nif.getName(), this);
         for (InterfaceAddress addr : nif.getInterfaceAddresses()) {
@@ -263,9 +180,9 @@ public class LinuxPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl
     }
 
     @Override
-    protected LinuxIP onConnect(ActiveSession<LinuxIP> session) throws IOException {
+    protected void onStart(ActiveSession<LinuxIP> session) throws IOException {
         LinuxIP ip = null;
-        var connection = session.connection();
+        var connection = session.configuration();
 
         /*
          * Look for wireguard interfaces that are available but not connected. If we
@@ -284,7 +201,7 @@ public class LinuxPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl
                     ip = get(name);
                     maxIface = i;
                     break;
-                } else if (publicKey.equals(connection.getUserPublicKey())) {
+                } else if (publicKey.equals(connection.publicKey())) {
                     throw new IllegalStateException(
                             String.format("Peer with public key %s on %s is already active.", publicKey, name));
                 } else {
@@ -302,7 +219,7 @@ public class LinuxPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl
         if (ip == null) {
             String name = getInterfacePrefix() + maxIface;
             log.info(String.format("No existing unused interfaces, creating new one (%s) for public key .", name,
-                    connection.getUserPublicKey()));
+                    connection.publicKey()));
             ip = add(name, "wireguard");
             if (ip == null)
                 throw new IOException("Failed to create virtual IP address.");
@@ -311,9 +228,10 @@ public class LinuxPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl
             log.info(String.format("Using %s", ip.getName()));
 
         /* Set the address reserved */
-        ip.setAddresses(connection.getAddress());
+        if(connection.addresses().size() > 0)
+            ip.setAddresses(connection.addresses().get(0));
 
-        Path tempFile = Files.createTempFile(getWGCommand(), "cfg");
+        Path tempFile = Files.createTempFile(getWGCommand(), ".cfg");
         try {
             try (Writer writer = Files.newBufferedWriter(tempFile)) {
                 write(connection, writer);
@@ -329,20 +247,22 @@ public class LinuxPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl
          * About to start connection. The "last handshake" should be this value or later
          * if we get a valid connection
          */
-        long connectionStarted = ((System.currentTimeMillis() / 1000l) - 1) * 1000l;
+        var connectionStarted = Instant.ofEpochMilli(((System.currentTimeMillis() / 1000l) - 1) * 1000l);
 
         /* Bring up the interface (will set the given MTU) */
-        ip.setMtu(connection.getMtu() == 0 ? context.configuration().defaultMTU() : connection.getMtu());
+        ip.setMtu(connection.mtu().or(() -> context.configuration().defaultMTU()).orElse(0));
         log.info(String.format("Bringing up %s", ip.getName()));
         ip.up();
+        session.attachToInterface(ip);
 
         /*
          * Wait for the first handshake. As soon as we have it, we are 'connected'. If
          * we don't get a handshake in that time, then consider this a failed
          * connection. We don't know WHY, just it has failed
          */
-        log.info(String.format("Waiting for first handshake on %s", ip.getName()));
-        LinuxIP ok = waitForFirstHandshake(connection, ip, connectionStarted);
+        if(context.configuration().connectTimeout().isPresent()) {
+            waitForFirstHandshake(session, connectionStarted, context.configuration().connectTimeout().get());
+        }
 
         /* DNS */
         try {
@@ -367,12 +287,11 @@ public class LinuxPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl
             throw ioe;
         }
 
-        return ok;
     }
 
     void setRoutes(ActiveSession<LinuxIP> session, LinuxIP ip) throws IOException {
 
-        /* Set routes from the known allowed-ips supplies by Wireguard. */
+        /* Set routes from the known allowed-ips supplied by Wireguard. */
         rebuildAllows(session, ip);
 
         /*
@@ -412,14 +331,8 @@ public class LinuxPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl
     }
 
     @Override
-    public LinuxIP getByPublicKey(String publicKey) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("TODO");
-    }
-
-    @Override
-    public void runHook(ActiveSession<LinuxIP> session, String hookScript) throws IOException {
-        runHookViaPipeToShell(session, OsUtil.getPathOfCommandInPathOrFail("bash").toString(), "-c", hookScript);
+    public void runHook(ActiveSession<LinuxIP> session, String... hookScript) throws IOException {
+        runHookViaPipeToShell(session, OsUtil.getPathOfCommandInPathOrFail("bash").toString(), "-c", String.join(" ; ", hookScript).trim());
     }
 
     @Override
@@ -444,5 +357,19 @@ public class LinuxPlatformServiceImpl extends AbstractDesktopPlatformServiceImpl
     @Override
     protected void runCommand(List<String> commands) throws IOException {
         commands().privileged().run(commands.toArray(new String[0]));
+    }
+
+    @Override
+    public VpnInterfaceInformation information(LinuxIP iface) throws IOException {
+        return super.information(iface);
+    }
+
+    @Override
+    public VpnConfiguration configuration(LinuxIP linuxIP) throws IOException {
+        try {
+            return new VpnConfiguration.Builder().fromFileContent(String.join(System.lineSeparator(), commands().privileged().output(getWGCommand(), "showconf", linuxIP.getName()))).build();
+        } catch (ParseException e) {
+            throw new IOException("Failed to parse configuration.", e);
+        }
     }
 }

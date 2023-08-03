@@ -20,13 +20,15 @@
  */
 package com.logonbox.vpn.drivers.lib;
 
-import org.apache.commons.lang3.SystemUtils;
+import com.sshtools.liftlib.OS;
 
 import java.io.IOException;
 import java.net.NetworkInterface;
+import java.text.MessageFormat;
+import java.time.Instant;
 import java.util.Enumeration;
 
-public interface VirtualInetAddress<P extends PlatformService<?>> {
+public interface VpnInterface<P extends PlatformService<?>> {
 
 	boolean isUp();
 
@@ -38,14 +40,55 @@ public interface VirtualInetAddress<P extends PlatformService<?>> {
 	void down() throws IOException;
 
 	String getMac();
+	
+	VpnConfiguration configuration() throws IOException;
+    
+    VpnInterfaceInformation information() throws IOException;
 
+
+    /**
+     * Get the detailed status of a peer with the given public key in the named interface .
+     * 
+     * @param interfaceName interface name
+     * @param publicKey public key of peer
+     * @return detailed status
+     * @throws IOException on error
+     * @throws IllegalArgumentException if no such public key
+     */
+    default VpnPeerInformation information(String publicKey) throws IOException {
+        for(var peer : information().peers()) {
+            if(peer.publicKey().equals(publicKey))
+                return peer;
+        }
+        throw new IllegalArgumentException(MessageFormat.format("No such peer {0} on interface {1}", publicKey, getName()));
+    }
+
+    /**
+     * Get the instant of the last handshake for any peer on the specified interface.
+     * 
+     * @return instant 
+     */
+    default Instant latestHandshake() throws IOException {
+        return information().lastHandshake();
+    }
+
+    /**
+     * Get the instant of the last handshake for a given peer on the specified interface.
+     * 
+     * @param publicKey public key of peer
+     * @return instant 
+     */
+    default Instant latestHandshake(String publicKey) throws IOException {
+        return information(publicKey).lastHandshake();
+    }
+	
 	default NetworkInterface getByName(String name) throws IOException {
 		/* NOTE: This is pretty much useless  to lookup the network by the 
 		 * name we know it as on Windows, as for some bizarre reason,
 		 * net8 for example (as would show ip "ipconfig /all") comes back 
 		 * here as net7!
 		 */
-		if(SystemUtils.IS_OS_WINDOWS)
+		if(OS.isWindows())
 			throw new UnsupportedOperationException("Do not use this on Windows.");
 		
 		for(Enumeration<NetworkInterface> nifEnum = NetworkInterface.getNetworkInterfaces(); nifEnum.hasMoreElements(); ) {
@@ -78,7 +121,7 @@ public interface VirtualInetAddress<P extends PlatformService<?>> {
 	
 	void dns(String[] dns) throws IOException;
 
-	VirtualInetAddress<P> method(DNSIntegrationMethod method);
+	VpnInterface<P> method(DNSIntegrationMethod method);
 
 	DNSIntegrationMethod method();
 

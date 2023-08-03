@@ -20,7 +20,7 @@ and request a virtual network.
  * If appropriate, needed system services are created, managed and removed when finished with.  
  
  
-## Usage
+## Installation
 
 You just need to add the appropriate driver library, and that will pull in required 
 dependencies (it is suggested you use profiles to activate the appropriate dependency).
@@ -40,3 +40,17 @@ For example,
     
 ```
 
+## Usage
+
+### Creating a Wireguard Connection Using An INI file
+
+The simplest usage is to create a working VPN tunnel given a standard Wireguard configuration file.
+
+```java
+/* TODO */ 
+``` 
+
+## Full Example Application And Tools
+
+See [lbvq/README.md](lbvq/README.md) for a complete example application and usable tools.
+ 

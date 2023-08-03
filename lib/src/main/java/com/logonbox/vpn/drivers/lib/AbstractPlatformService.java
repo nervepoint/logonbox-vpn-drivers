@@ -20,8 +20,6 @@
  */
 package com.logonbox.vpn.drivers.lib;
 
-import com.logonbox.vpn.drivers.lib.util.Keys;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,13 +35,15 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-public abstract class AbstractPlatformService<I extends VirtualInetAddress<?>> implements PlatformService<I> {
+public abstract class AbstractPlatformService<I extends VpnInterface<?>> implements PlatformService<I> {
 	final static Logger LOG = LoggerFactory.getLogger(AbstractPlatformService.class);
 	protected static final int MAX_INTERFACES = Integer.parseInt(System.getProperty("logonbox.vpn.maxInterfaces", "250"));
 
 
 	protected SystemContext context;
 	private final String interfacePrefix;
+	
+	private Optional<VpnPeer> defaultGateway = Optional.empty();
 	
 	protected AbstractPlatformService(String interfacePrefix) {
 		this.interfacePrefix = interfacePrefix;
@@ -52,7 +52,7 @@ public abstract class AbstractPlatformService<I extends VirtualInetAddress<?>> i
 	protected void beforeStart(SystemContext ctx) {
 	}
 	
-	protected Collection<ActiveSession<I>> onStart(SystemContext ctx, List<ActiveSession<I>> sessions) {
+	protected Collection<ActiveSession<I>> onInit(SystemContext ctx, List<ActiveSession<I>> sessions) {
 		return sessions;
 	}
 
@@ -82,14 +82,9 @@ public abstract class AbstractPlatformService<I extends VirtualInetAddress<?>> i
 	public String[] getMissingPackages() {
 		return new String[0];
 	}
-
-	@Override
-	public final String pubkey(String privateKey) {
-		return Keys.pubkey(privateKey).getBase64PublicKey();
-	}
 	
 	@Override
-	public final Collection<ActiveSession<I>> start(SystemContext context) {
+	public final Collection<ActiveSession<I>> init(SystemContext context) {
 		LOG.info(String.format("Starting platform services %s", getClass().getName()));
 		this.context = context;
 		beforeStart(context);
@@ -119,7 +114,14 @@ public abstract class AbstractPlatformService<I extends VirtualInetAddress<?>> i
 							LOG.info(String.format(
 									"Existing wireguard session on %s for %s, adding back to internal list", name, publicKey));
 							I ip = get(name);
-							sessions.add(configureExistingSession(context, connection, ip));
+							
+							// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+							// TODO
+							// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+							// Get the actual active peer if there is one
+							Optional<VpnPeer> peer = Optional.empty();
+							
+							sessions.add(configureExistingSession(context, connection, ip, peer));
 						}
 						catch(Exception e) {
 							LOG.info(String.format(
@@ -135,11 +137,36 @@ public abstract class AbstractPlatformService<I extends VirtualInetAddress<?>> i
 				}
 			}
 		}
-		return onStart(context, sessions);
+		return onInit(context, sessions);
 	}
 
-	protected ActiveSession<I> configureExistingSession(SystemContext context, WireguardConfiguration connection, I ip) {
-		return new ActiveSession<I>(connection, this, Optional.of(ip));
+	@Override
+    public Optional<VpnPeer> defaultGateway() {
+        return defaultGateway;
+    }
+	
+    @Override
+    public final void defaultGateway(VpnPeer peer) throws IOException {
+        resetDefaulGateway();
+        defaultGateway = Optional.of(peer);
+        onSetDefaultGateway(peer);
+    }
+    
+    @Override
+    public final void resetDefaulGateway() throws IOException {
+        if(defaultGateway.isPresent())  {
+            var gw =defaultGateway.get();
+            defaultGateway = Optional.empty();
+            onResetDefaultGateway(gw); 
+        };
+    }
+    
+    protected abstract void onResetDefaultGateway(VpnPeer session) throws IOException;
+
+    protected abstract void onSetDefaultGateway(VpnPeer connection) throws IOException;
+
+	protected ActiveSession<I> configureExistingSession(SystemContext context, VpnConfiguration connection, I ip, Optional<VpnPeer> peer) {
+		return new ActiveSession<I>(connection, this, Optional.of(ip), peer);
 	}
 	
 	protected String getPublicKey(String interfaceName) throws IOException {
@@ -170,7 +197,8 @@ public abstract class AbstractPlatformService<I extends VirtualInetAddress<?>> i
 		throw new IllegalArgumentException(String.format("No IP item %s", name));
 	}
 
-	protected final I get(String name) {
+	@Override
+	public final I get(String name) {
 		return find(name, ips(false));
 	}
 }

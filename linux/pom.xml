@@ -35,14 +35,9 @@
             <artifactId>logonbox-vpn-lib</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!--<dependency>
-            <groupId>com.sshtools</groupId>
-            <artifactId>forker-client</artifactId>
-            <version>1.8-SNAPSHOT</version>
-        </dependency>-->
         <dependency>
             <groupId>com.github.hypfvieh</groupId>
-            <artifactId>dbus-java-transport-tcp</artifactId>
+            <artifactId>dbus-java-core</artifactId>
             <version>4.3.1-SNAPSHOT</version>
         </dependency>
   </dependencies>
