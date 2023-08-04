@@ -75,7 +75,7 @@ public class Lbv extends AbstractCommand implements SystemContext {
     public void addScriptEnvironmentVariables(ActiveSession<?> connection, Map<String, String> env) {
     }
 
-    @Command(name = "show", description = "Shows the current configuration and device information", subcommands = { Show.Interfaces.class, Show.All.class })
+    @Command(name = "show", description = "Shows the current configuration and device information", subcommands = { Show.Interfaces.class, Show.All.class, Show.PublicKey.class })
     public final static class Show implements Callable<Integer> {
         
         @ParentCommand
@@ -122,6 +122,38 @@ public class Lbv extends AbstractCommand implements SystemContext {
             }
         }
         
+        @Command(name = "public-key", description = "Shows the public key")
+        public final static class PublicKey implements Callable<Integer> {
+            
+            @ParentCommand
+            private Show parent;
+
+            @Override
+            public Integer call() throws Exception {
+                parent.parent.setupLogging();
+                var ip = parent.parent.platform().get(parent.iface.get());
+                out.format("%s%n", ip.configuration().publicKey());
+                return 0;
+            }
+            
+        }
+        
+        @Command(name = "private-key", description = "Shows the private key")
+        public final static class PrivateKey implements Callable<Integer> {
+            
+            @ParentCommand
+            private Show parent;
+
+            @Override
+            public Integer call() throws Exception {
+                parent.parent.setupLogging();
+                var ip = parent.parent.platform().get(parent.iface.get());
+                out.format("%s%n", ip.configuration().privateKey());
+                return 0;
+            }
+            
+        }
+        
         @Command(name = "interfaces", description = "Shows the current configuration and device information")
         public final static class Interfaces implements Callable<Integer> {
             
@@ -140,7 +172,7 @@ public class Lbv extends AbstractCommand implements SystemContext {
             
         }
         
-        @Command(name = "all", description = "Shows all wireguard interfaces")
+        @Command(name = "all", description = "Shows all wireguard interfaces", subcommands = { All.PublicKey.class,All.PrivateKey.class })
         public final static class All implements Callable<Integer> {
             
             @ParentCommand
@@ -153,6 +185,40 @@ public class Lbv extends AbstractCommand implements SystemContext {
                     parent.show(ip);
                 }
                 return 0;
+            }
+            
+            @Command(name = "public-key", description = "Shows the public key")
+            public final static class PublicKey implements Callable<Integer> {
+                
+                @ParentCommand
+                private All parent;
+
+                @Override
+                public Integer call() throws Exception {
+                    parent.parent.parent.setupLogging();
+                    for(var ip : parent.parent.parent.platform().ips(true)) {
+                        out.format("%s\t%s%n", ip.getName(), ip.configuration().publicKey());
+                    }
+                    return 0;
+                }
+                
+            }
+            
+            @Command(name = "private-key", description = "Shows the private key")
+            public final static class PrivateKey implements Callable<Integer> {
+                
+                @ParentCommand
+                private All parent;
+
+                @Override
+                public Integer call() throws Exception {
+                    parent.parent.parent.setupLogging();
+                    for(var ip : parent.parent.parent.platform().ips(true)) {
+                        out.format("%s\t%s%n", ip.getName(), ip.configuration().privateKey());
+                    }
+                    return 0;
+                }
+                
             }
             
         }

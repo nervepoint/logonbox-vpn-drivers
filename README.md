@@ -1,6 +1,6 @@
 # logonbox-vpn-drivers
 
-These modules provide a common Java interface to configuration and configure a [Wireguard](https://www.wireguard.com/)
+These modules provide a common Java interface to configure and maintain a [Wireguard](https://www.wireguard.com/)
 VPN.
 
 It currently supports 3 operating systems.
