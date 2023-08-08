@@ -17,11 +17,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 public class ElevatableSystemCommands implements SystemCommands {
     
     private final Elevator elevator;
+    private Optional<Consumer<String[]>> onLog = Optional.empty();
     
     public ElevatableSystemCommands() {
         elevator = new Elevator.ElevatorBuilder().
@@ -34,78 +36,7 @@ public class ElevatableSystemCommands implements SystemCommands {
         if(OS.isAdministrator())
             return this;
         
-        return new SystemCommands() {
-
-            @Override
-            public int result(String... args) throws IOException {
-                try {
-                    return elevator.call(new WithResult(env(), args));
-                } catch (IOException | RuntimeException e) {
-                    throw e;
-                }  catch (Exception e) {
-                    throw new IOException("Failed to run command.", e);
-                }
-            }
-
-            @Override
-            public Collection<String> output(String... args) throws IOException {
-                try {
-                    return Arrays.asList(elevator.call(new Output(env(), args)));
-                } catch (IOException | RuntimeException e) {
-                    throw e;
-                }  catch (Exception e) {
-                    throw new IOException("Failed to run command.", e);
-                }
-            }
-
-            @Override
-            public void run(String... args) throws IOException {
-                try {
-                    elevator.call(new BasicRun(env(), args));
-                } catch (IOException | RuntimeException e) {
-                    throw e;
-                }  catch (Exception e) {
-                    throw new IOException("Failed to run command.", e);
-                }
-            }
-
-            @Override
-            public SystemCommands privileged() {
-                return this;
-            }
-
-            @Override
-            public void pipeTo(String content, String... args) throws IOException {
-                try {
-                    elevator.call(new PipeTo(env(), content, args));
-                } catch (IOException | RuntimeException e) {
-                    throw e;
-                }  catch (Exception e) {
-                    throw new IOException("Failed to run command.", e);
-                }
-            }
-
-            @Override
-            public PrintWriter pipe(Consumer<String> input, String... args) throws IOException {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public int consume(Consumer<String> consumer, String... args) throws IOException {
-                try {
-                    return elevator.call(new WithConsume(env(), consumer, args));
-                } catch (IOException | RuntimeException e) {
-                    throw e;
-                }  catch (Exception e) {
-                    throw new IOException("Failed to run command.", e);
-                }
-            }
-
-            @Override
-            public Map<String, String> env() {
-                return ElevatableSystemCommands.this.env();
-            }
-        };
+        return new PrvilegedSystemCommands(this);
     }
 
     @Override
@@ -166,6 +97,180 @@ public class ElevatableSystemCommands implements SystemCommands {
     @Override
     public PrintWriter pipe(Consumer<String> input, String... args) throws IOException {
         throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void onLog(Consumer<String[]> onLog) {
+        this.onLog = Optional.of(onLog);
+    }
+
+    @Override
+    public SystemCommands logged() {
+        return new LoggedSystemCommands(this);
+    } 
+
+    private final class PrvilegedSystemCommands implements SystemCommands {
+        private SystemCommands delegate;
+
+        public PrvilegedSystemCommands(SystemCommands delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public int result(String... args) throws IOException {
+            try {
+                return elevator.call(new WithResult(env(), args));
+            } catch (IOException | RuntimeException e) {
+                throw e;
+            }  catch (Exception e) {
+                throw new IOException("Failed to run command.", e);
+            }
+        }
+
+        @Override
+        public Collection<String> output(String... args) throws IOException {
+            try {
+                return Arrays.asList(elevator.call(new Output(env(), args)));
+            } catch (IOException | RuntimeException e) {
+                throw e;
+            }  catch (Exception e) {
+                throw new IOException("Failed to run command.", e);
+            }
+        }
+
+        @Override
+        public void run(String... args) throws IOException {
+            try {
+                elevator.call(new BasicRun(env(), args));
+            } catch (IOException | RuntimeException e) {
+                throw e;
+            }  catch (Exception e) {
+                throw new IOException("Failed to run command.", e);
+            }
+        }
+
+        @Override
+        public SystemCommands privileged() {
+            return this;
+        }
+
+        @Override
+        public void pipeTo(String content, String... args) throws IOException {
+            try {
+                elevator.call(new PipeTo(env(), content, args));
+            } catch (IOException | RuntimeException e) {
+                e.printStackTrace();
+                throw e;
+            }  catch (Exception e) {
+                throw new IOException("Failed to run command.", e);
+            }
+        }
+
+        @Override
+        public PrintWriter pipe(Consumer<String> input, String... args) throws IOException {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int consume(Consumer<String> consumer, String... args) throws IOException {
+            try {
+                return elevator.call(new WithConsume(env(), consumer, args));
+            } catch (IOException | RuntimeException e) {
+                throw e;
+            }  catch (Exception e) {
+                throw new IOException("Failed to run command.", e);
+            }
+        }
+
+        @Override
+        public Map<String, String> env() {
+            return delegate.env();
+        }
+
+        @Override
+        public void onLog(Consumer<String[]> commandLine) {
+            delegate.onLog(commandLine);
+        }
+
+        @Override
+        public SystemCommands logged() {
+            return new LoggedSystemCommands(this);
+        }
+
+        @Override
+        public <R extends Serializable> R task(ElevatedClosure<R, Serializable> task) throws Exception {
+            try {
+                return elevator.call(task);
+            } catch (IOException | RuntimeException e) {
+                throw e;
+            }  catch (Exception e) {
+                throw new IOException("Failed to run task.", e);
+            }
+        }
+    }
+
+    private final class LoggedSystemCommands implements SystemCommands {
+        private SystemCommands delegate;
+
+        LoggedSystemCommands(SystemCommands delegate) {
+            this.delegate = delegate;
+        }
+        
+        @Override
+        public void run(String... args) throws IOException {
+            onLog.ifPresent(c -> c.accept(args));
+            delegate.run(args);
+        }
+
+        @Override
+        public int result(String... args) throws IOException {
+            onLog.ifPresent(c -> c.accept(args));
+            return delegate.result(args);
+        }
+
+        @Override
+        public SystemCommands privileged() {
+            return new PrvilegedSystemCommands(this);
+        }
+
+        @Override
+        public void pipeTo(String content, String... args) throws IOException {
+            onLog.ifPresent(c -> c.accept(args));
+            delegate.pipeTo(content, args);
+        }
+
+        @Override
+        public PrintWriter pipe(Consumer<String> input, String... args) throws IOException {
+            onLog.ifPresent(c -> c.accept(args));
+            return delegate.pipe(input, args);
+        }
+
+        @Override
+        public Collection<String> output(String... args) throws IOException {
+            onLog.ifPresent(c -> c.accept(args));
+            return delegate.output(args);
+        }
+
+        @Override
+        public void onLog(Consumer<String[]> onLog) {
+            delegate.onLog(onLog);
+        }
+
+        @Override
+        public SystemCommands logged() {
+            return this;
+        }
+
+        @Override
+        public int consume(Consumer<String> consumer, String... args) throws IOException {
+            onLog.ifPresent(c -> c.accept(args));
+            return delegate.consume(consumer, args);
+        }
+
+        @Override
+        public <R extends Serializable> R task(ElevatedClosure<R, Serializable> task) throws Exception {
+            return delegate.task(task);
+        }
     }
 
     @SuppressWarnings("serial")
@@ -278,6 +383,7 @@ public class ElevatableSystemCommands implements SystemCommands {
         PipeTo(Map<String, String> env, String content, String... args) {
             this.args = args;
             this.env = env;
+            this.content = content;
         }
 
         @Override
@@ -290,8 +396,8 @@ public class ElevatableSystemCommands implements SystemCommands {
 
             var process = bldr.start();
             try (var stdin = process.getOutputStream()) {
-                process.getOutputStream().write(content.getBytes());
-                process.getOutputStream().flush();
+                stdin.write(content.getBytes());
+                stdin.flush();
             }
             try {
                 int ret = process.waitFor();
@@ -344,5 +450,10 @@ public class ElevatableSystemCommands implements SystemCommands {
                 throw new IOException("Interrupted.", ie);
             }
         }
-    } 
+    }
+
+    @Override
+    public <R extends Serializable> R task(ElevatedClosure<R, Serializable> task) throws Exception {
+        return task.call(task);
+    }
 }

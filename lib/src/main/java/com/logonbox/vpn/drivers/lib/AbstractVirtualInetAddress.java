@@ -20,9 +20,7 @@
  */
 package com.logonbox.vpn.drivers.lib;
 
-import java.util.Objects;
-
-public abstract class AbstractVirtualInetAddress<P extends PlatformService<?>> implements VpnInterface<P> {
+public abstract class AbstractVirtualInetAddress<P extends PlatformService<?>> implements VpnAddress {
 
 	public final static String TABLE_AUTO = "auto";
 	public final static String TABLE_OFF = "off";
@@ -31,28 +29,21 @@ public abstract class AbstractVirtualInetAddress<P extends PlatformService<?>> i
 	private String name;
 	private String peer;
 	private String table = TABLE_AUTO;
-	private DNSIntegrationMethod method = DNSIntegrationMethod.AUTO;
-	private P platform;
+	protected P platform;
     protected final SystemCommands commands;
 
 	public AbstractVirtualInetAddress(P platform) {
 		super();
 		this.platform = platform;
-	    commands = getPlatform().commands();
+	    commands = platform.commands();
 	}
 
 	public AbstractVirtualInetAddress(P platform, String name) {
 		super();
 		this.name = name;
 		this.platform = platform;
-	    commands = getPlatform().commands();
+	    commands = platform.commands();
 	}
-
-	@Override
-	public P getPlatform() {
-		return platform;
-	}
-	
 
 	@Override
 	public final int hashCode() {
@@ -85,59 +76,31 @@ public abstract class AbstractVirtualInetAddress<P extends PlatformService<?>> i
 	}
 
 	@Override
-	public final String getName() {
+	public final String name() {
 		return name;
 	}
 
 	@Override
-	public final String getPeer() {
+	public final String peer() {
 		return peer;
 	}
 
 	@Override
-	public final String getTable() {
+	public final String table() {
 		return table;
 	}
 
 	@Override
-	public final void setMtu(int mtu) {
+	public final void mtu(int mtu) {
 		this.mtu = mtu;
 	}
 
 	@Override
-	public final void setName(String name) {
-		this.name = name;
-	}
-
-	@Override
-	public void setPeer(String peer) {
-		if (!Objects.equals(peer, this.peer)) {
-			this.peer = peer;
-		}
-	}
-
-	@Override
-	public final void setTable(String table) {
-		this.table = table;
-	}
-
-
-	@Override
-	public final DNSIntegrationMethod method() {
-		return method;
-	}
-
-	@Override
-	public final VpnInterface<P> method(DNSIntegrationMethod method) {
-		this.method = method;
-		return this;
-	}
-
-	@Override
 	public final DNSIntegrationMethod calcDnsMethod() {
-		if (method() == DNSIntegrationMethod.AUTO) {
+	    var method = platform.context().configuration().dnsIntegrationMethod();
+		if (method == DNSIntegrationMethod.AUTO) {
 			return platform.dnsMethod();
 		} else
-			return method();
+			return method;
 	}
 }

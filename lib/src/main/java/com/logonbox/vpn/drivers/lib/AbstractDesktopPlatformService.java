@@ -56,7 +56,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-public abstract class AbstractDesktopPlatformService<I extends VpnInterface<?>> extends AbstractPlatformService<I> {
+public abstract class AbstractDesktopPlatformService<I extends VpnAddress> extends AbstractPlatformService<I> {
 
 	final static Logger LOG = LoggerFactory.getLogger(AbstractDesktopPlatformService.class);
 	
@@ -91,17 +91,17 @@ public abstract class AbstractDesktopPlatformService<I extends VpnInterface<?>> 
 	}
 
 	@Override
-	public final ActiveSession<I> start(VpnConfiguration configuration, Optional<VpnPeer> peer) throws IOException {		
+	public final VpnAdapter start(Optional<String> interfaceName, VpnConfiguration configuration, Optional<VpnPeer> peer) throws IOException {		
 	    
-	    var session = new ActiveSession<I>(configuration, this, peer);
+	    var session = new VpnAdapter(this);
 
         if(configuration.preUp().length > 0)  {
             var p = configuration.preUp();
             LOG.info("Running pre-up commands.", String.join("; ", p).trim());
-            runHook(session, p);
+            runHook(configuration, session, p);
         };
 	    
-        onStart(session);
+        onStart(interfaceName, configuration, session, peer);
     
         var gw = defaultGateway();
         if(gw.isPresent() && configuration.peers().contains(gw.get())) {
@@ -116,15 +116,15 @@ public abstract class AbstractDesktopPlatformService<I extends VpnInterface<?>> 
         if(configuration.postUp().length > 0)  {
 		    var p = configuration.postUp();
             LOG.info("Running post-up commands.", String.join("; ", p).trim());
-            runHook(session, p);
+            runHook(configuration, session, p);
 		};
 		
 		return session;
 	}
 
 	@Override
-	public final void cleanUp(ActiveSession<I> session) {
-		if(defaultGateway().isPresent() && session.configuration().peers().contains(defaultGateway().get())) {
+	protected final void onStop(VpnConfiguration configuration, VpnAdapter session) {
+		if(defaultGateway().isPresent() && configuration.peers().contains(defaultGateway().get())) {
 			try {
 			    resetDefaulGateway();
 			}
@@ -134,48 +134,21 @@ public abstract class AbstractDesktopPlatformService<I extends VpnInterface<?>> 
 		}
 	}
 
-	@Override
-	public I getByPublicKey(String publicKey) {
-		try {
-			for (I ip : ips(true)) {
-				if (publicKey.equals(getPublicKey(ip.getName()))) {
-					return ip;
-				}
-			}
-		} catch (IOException ioe) {
-			throw new IllegalStateException("Failed to list interface names.", ioe);
-		}
-		return null;
-	}
-
-	@Override
-	public List<I> ips(boolean wireguardInterface) {
+    @Override
+	public List<I> addresses() {
 		List<I> ips = new ArrayList<>();
 		try {
 			for (Enumeration<NetworkInterface> nifEn = NetworkInterface.getNetworkInterfaces(); nifEn
 					.hasMoreElements();) {
 				NetworkInterface nif = nifEn.nextElement();
-				if ((wireguardInterface && isWireGuardInterface(nif)) || (!wireguardInterface && isMatchesPrefix(nif))) {
-					I vaddr = createVirtualInetAddress(nif);
-					configureVirtualAddress(vaddr);
-					if (vaddr != null)
-						ips.add(vaddr);
-				}
+				I vaddr = createVirtualInetAddress(nif);
+				if (vaddr != null)
+					ips.add(vaddr);
 			}
 		} catch (Exception e) {
 			throw new IllegalStateException("Failed to get interfaces.", e);
 		}
 		return ips;
-	}
-
-	protected void configureVirtualAddress(I vaddr) {
-		try {
-			vaddr.method(context.configuration().dnsIntegrationMethod());
-		}
-		catch(Exception e) {
-			LOG.error("Failed to set DNS integeration method, reverting to AUTO.", e);
-			vaddr.method(DNSIntegrationMethod.AUTO);
-		}
 	}
 
 	protected abstract I createVirtualInetAddress(NetworkInterface nif) throws IOException;
@@ -189,7 +162,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnInterface<?>> 
 				LOG.info("No DNS servers configured for this connection.");
 		}
 		else {
-			LOG.info(String.format("Configuring DNS servers for %s as %s", ip.getName(), configuration.dns()));
+			LOG.info(String.format("Configuring DNS servers for %s as %s", ip.name(), configuration.dns()));
 		}
 		ip.dns(configuration.dns().toArray(new String[0]));
 		
@@ -197,8 +170,6 @@ public abstract class AbstractDesktopPlatformService<I extends VpnInterface<?>> 
 
 	protected abstract String getDefaultGateway() throws IOException;
 
-	protected abstract String getPublicKey(String interfaceName) throws IOException;
-	
 	public String getWGCommand() {
 		return "wg";
 	}
@@ -211,18 +182,22 @@ public abstract class AbstractDesktopPlatformService<I extends VpnInterface<?>> 
 		return isMatchesPrefix(nif);
 	}
 
-	protected abstract void onStart(ActiveSession<I> logonBoxVPNSession) throws IOException;
+	protected abstract void onStart(Optional<String> interfaceName, VpnConfiguration configuration, VpnAdapter logonBoxVPNSession, Optional<VpnPeer> peer) throws IOException;
 	
-	protected void waitForFirstHandshake(ActiveSession<I> session, Instant connectionStarted, Duration timeout)
+	protected void waitForFirstHandshake(VpnConfiguration configuration, VpnAdapter session, Instant connectionStarted, Optional<VpnPeer> peerOr, Duration timeout)
 			throws IOException {
-	    if(session.configuration().peers().size() != 1) {
+	    if(configuration.peers().size() != 1) {
 	        LOG.info("Not waiting for handshake, there are either no or multiple peers.");
 	        return;
 	    }
+	    
+	    if(peerOr.isEmpty()) {
+            LOG.info("Not waiting for handshake, no peer specified.");
+            return;
+	    }
 
-        
-	    var ip = session.ip().orElseThrow(() -> new IllegalStateException("Session not attached to interface."));
-	    var peer = session.peer().orElseThrow(() -> new IllegalStateException("Session not attached to peer."));
+        var peer = peerOr.get();
+	    var ip = session.address();
 	    
 	    if(peer.endpointAddress().isEmpty()) {
             LOG.info("Not waiting for handshake, the peer has no endpoint.");
@@ -235,10 +210,10 @@ public abstract class AbstractDesktopPlatformService<I extends VpnInterface<?>> 
 			try {
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {
-				throw new IOException(String.format("Interrupted connecting to %s", ip.getName()));
+				throw new IOException(String.format("Interrupted connecting to %s", ip.name()));
 			}
 			try {
-				var lastHandshake = ip.latestHandshake(peer.publicKey());
+				var lastHandshake = getLatestHandshake(ip.name(), peer.publicKey());
 				if(lastHandshake.equals(connectionStarted) || lastHandshake.isAfter(connectionStarted)) {
 					/* Ready ! */
 					return;
@@ -277,7 +252,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnInterface<?>> 
 	            return endpointAddress;
 	        }   
 		}).orElse(endpointAddress);
-		throw new NoHandshakeException(String.format("No handshake received from %s (%s) for %s within %d seconds.", endpointAddress, endpointName, ip.getName(), timeout.toSeconds()));
+		throw new NoHandshakeException(String.format("No handshake received from %s (%s) for %s within %d seconds.", endpointAddress, endpointName, ip.name(), timeout.toSeconds()));
 	}
 	
 	protected void write(VpnConfiguration configuration, Writer writer) {
@@ -394,14 +369,13 @@ public abstract class AbstractDesktopPlatformService<I extends VpnInterface<?>> 
 	protected void writePeer(VpnConfiguration configuration, VpnPeer peer, Writer writer) {
 	}
 
-	protected void runHookViaPipeToShell(ActiveSession<I> session, String... args) throws IOException {
+	protected void runHookViaPipeToShell(VpnConfiguration connection, VpnAdapter session, String... args) throws IOException {
 		if(LOG.isDebugEnabled()) {
 			LOG.debug("Executing hook");
 			for(String arg : args) {
 				LOG.debug(String.format("    %s", arg));
 			}
 		}
-		VpnConfiguration connection = session.configuration();
 		Map<String, String> env = new HashMap<String, String>();
 		if(connection != null) {
 		    env.put("LBVPN_ADDRESS", String.join(",", connection.addresses()));
@@ -420,13 +394,12 @@ public abstract class AbstractDesktopPlatformService<I extends VpnInterface<?>> 
 		}
 		context.addScriptEnvironmentVariables(session, env);
 		
-		session.ip().ifPresent(addr -> {
-            env.put("LBVPN_IP_MAC", addr.getMac());
-            env.put("LBVPN_IP_NAME", addr.getName());
-            env.put("LBVPN_IP_DISPLAY_NAME", addr.getDisplayName());
-            env.put("LBVPN_IP_PEER", addr.getPeer());
-            env.put("LBVPN_IP_TABLE", addr.getTable());
-		});
+		var addr = session.address();
+        env.put("LBVPN_IP_MAC", addr.getMac());
+        env.put("LBVPN_IP_NAME", addr.name());
+        env.put("LBVPN_IP_DISPLAY_NAME", addr.displayName());
+        env.put("LBVPN_IP_PEER", addr.peer());
+        env.put("LBVPN_IP_TABLE", addr.table());
 		if(LOG.isDebugEnabled()) {
 			LOG.debug("Environment:-");
 			for(Map.Entry<String, String> en : env.entrySet()) {
@@ -436,7 +409,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnInterface<?>> 
 
         LOG.debug("Command Output: ");
         var errorMessage = new StringBuffer();
-		int ret = commands().privileged().env(env).consume((line) -> {
+		int ret = commands().privileged().logged().env(env).consume((line) -> {
             LOG.debug(String.format("    %s", line));
             if(line.startsWith("[ERROR] ")) {
                 errorMessage.setLength(0); // TODO really only keep last error message. I'd like to change this, but may break any users of this (we know there is at least one)
@@ -455,7 +428,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnInterface<?>> 
 	}
 
 	@Override
-	public void runHook(ActiveSession<I> session, String... hookScript) throws IOException {
+	public void runHook(VpnConfiguration configuration, VpnAdapter session, String... hookScript) throws IOException {
 		for(String cmd : hookScript) {
 		    runCommand(Util.parseQuotedString(cmd));
 		}

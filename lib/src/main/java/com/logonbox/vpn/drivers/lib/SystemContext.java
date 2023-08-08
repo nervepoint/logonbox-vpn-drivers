@@ -29,7 +29,5 @@ public interface SystemContext {
     
     SystemConfiguration configuration();
 
-    VpnConfiguration configurationForPublicKey(String publicKey);
-
-    void addScriptEnvironmentVariables(ActiveSession<?> connection, Map<String, String> env);
+    void addScriptEnvironmentVariables(VpnAdapter connection, Map<String, String> env);
 }

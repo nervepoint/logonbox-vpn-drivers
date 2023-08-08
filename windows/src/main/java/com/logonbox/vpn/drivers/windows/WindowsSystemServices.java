@@ -972,10 +972,10 @@ public class WindowsSystemServices implements Closeable {
     public void setStartOnBoot(Service service, boolean startOnBoot) throws Exception {
         boolean enabledByDefault = isStartOnBoot(service);
         if (!startOnBoot && enabledByDefault) {
-            app.commands().privileged().run("cmd.exe", "/c", "sc", "config", service.getNativeName(), "start=",
+            app.commands().privileged().logged().run("cmd.exe", "/c", "sc", "config", service.getNativeName(), "start=",
                     "manual");
         } else if (startOnBoot && !enabledByDefault) {
-            app.commands().privileged().run("cmd.exe", "/c", "sc", "config", service.getNativeName(), "start=", "auto");
+            app.commands().privileged().logged().run("cmd.exe", "/c", "sc", "config", service.getNativeName(), "start=", "auto");
         }
     }
 

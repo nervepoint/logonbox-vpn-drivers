@@ -21,13 +21,14 @@
 package com.logonbox.vpn.drivers.windows;
 
 import com.logonbox.vpn.drivers.lib.AbstractDesktopPlatformService;
-import com.logonbox.vpn.drivers.lib.ActiveSession;
 import com.logonbox.vpn.drivers.lib.DNSIntegrationMethod;
-import com.logonbox.vpn.drivers.lib.VpnPeerInformation;
 import com.logonbox.vpn.drivers.lib.SystemContext;
+import com.logonbox.vpn.drivers.lib.VpnAdapter;
+import com.logonbox.vpn.drivers.lib.VpnAdapterConfiguration;
 import com.logonbox.vpn.drivers.lib.VpnConfiguration;
 import com.logonbox.vpn.drivers.lib.VpnInterfaceInformation;
 import com.logonbox.vpn.drivers.lib.VpnPeer;
+import com.logonbox.vpn.drivers.lib.VpnPeerInformation;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
 import com.logonbox.vpn.drivers.windows.WindowsSystemServices.Service.Status;
 import com.logonbox.vpn.drivers.windows.WindowsSystemServices.XAdvapi32;
@@ -52,16 +53,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.MessageFormat;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -148,9 +150,19 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
     public void restrictToUser(Path path) throws IOException {
         WindowsFileSecurity.restrictToUser(path);
     }
+    
+    @Override
+    public List<WindowsIP> addresses() {
+        return ips(false);
+    }
+
 
     @Override
-    public List<WindowsIP> ips(boolean wireguardInterface) {
+    public List<VpnAdapter> adapters() {
+        return ips(true).stream().map(addr -> configureExistingSession(addr)).toList();
+    }
+    
+    private List<WindowsIP> ips(boolean wireguardInterface) {
         Set<WindowsIP> ips = new LinkedHashSet<>();
 
         /* netsh first */
@@ -175,7 +187,6 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
                         var ifName = b.toString();
                         if (isMatchesPrefix(ifName)) {
                             WindowsIP vaddr = new WindowsIP(ifName.toString(), ifName.toString(), this);
-                            configureVirtualAddress(vaddr);
                             ips.add(vaddr);
                         }
                     }
@@ -207,7 +218,6 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
                         String description = args[1].trim();
                         if (description.startsWith("WireGuard Tunnel")) {
                             WindowsIP vaddr = new WindowsIP(name, description, this);
-                            configureVirtualAddress(vaddr);
                             ips.add(vaddr);
                             break;
                         }
@@ -219,7 +229,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
             LOG.error("Failed to list interfaces via Java.", e);
         }
 
-        ips.addAll(super.ips(wireguardInterface));
+        ips.addAll(super.addresses());
 
         return new ArrayList<WindowsIP>(ips);
     }
@@ -230,7 +240,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
         var addr = peer.endpointAddress().orElseThrow(() -> new IllegalArgumentException("Peer has no address."));
         LOG.info("Routing traffic all through peer {}", addr);
         LOG.info(String.join(" ", Arrays.asList("route", "add", addr, gw)));
-        commands().privileged().run("route", "add", addr, gw);
+        commands().privileged().logged().run("route", "add", addr, gw);
     }
 
     @Override
@@ -239,7 +249,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
         var addr = peer.endpointAddress().orElseThrow(() -> new IllegalArgumentException("Peer has no address."));
         LOG.info("Removing routing of all traffic  through peer {}", addr);
         LOG.info(String.join(" ", Arrays.asList("route", "delete", addr, gw)));
-        commands().privileged().run("route", "delete", addr, gw);
+        commands().privileged().logged().run("route", "delete", addr, gw);
     }
 
     @Override
@@ -265,19 +275,18 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
     }
 
     @Override
-    protected String getPublicKey(String interfaceName) throws IOException {
+    protected Optional<String> getPublicKey(String interfaceName) throws IOException {
         try (var adapter = new WireguardLibrary.Adapter(interfaceName)) {
             var wgIface = adapter.getConfiguration();
-            return wgIface.publicKey.toString();
+            return Optional.of(wgIface.publicKey.toString());
         } catch (IllegalArgumentException iae) {
-            return null;
+            return Optional.empty();
         }
     }
 
     @Override
-    protected void onStart(ActiveSession<WindowsIP> session) throws IOException {
+    protected void onStart(Optional<String> interfaceName, VpnConfiguration configuration, VpnAdapter session, Optional<VpnPeer> peer) throws IOException {
         WindowsIP ip = null;
-        var connection = session.configuration();
 
         /*
          * Look for wireguard interfaces that are available but not connected. If we
@@ -298,31 +307,31 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
             if (exists(name, ips)) {
                 LOG.info(String.format("    %s exists.", name));
                 /* Get if this is actually a Wireguard interface. */
-                WindowsIP nicByName = find(name, ips);
+                WindowsIP nicByName = find(name, ips).orElseThrow(() -> new IOException(MessageFormat.format("Could not find network interface {0}", name)));;
                 if (isWireGuardInterface(nicByName)) {
                     /* Interface exists and is wireguard, is it connected? */
 
                     // TODO check service state, we can't rely on the public key
                     // as we manage storage of it ourselves (no wg show command)
                     LOG.info(String.format("    Looking for public key for %s.", name));
-                    String publicKey = getPublicKey(name);
-                    if (publicKey == null) {
+                    var publicKey = getPublicKey(name);
+                    if (publicKey.isEmpty()) {
                         /* No addresses, wireguard not using it */
-                        LOG.info(String.format("    %s (%s) is free.", name, nicByName.getDisplayName()));
+                        LOG.info(String.format("    %s (%s) is free.", name, nicByName.displayName()));
                         ip = nicByName;
                         maxIface = i;
                         break;
-                    } else if (publicKey.equals(connection.publicKey())) {
+                    } else if (publicKey.get().equals(configuration.publicKey())) {
                         LOG.warn(String.format("    Peer with public key %s on %s is already active (by %s).",
-                                publicKey, name, nicByName.getDisplayName()));
+                                publicKey.get(), name, nicByName.displayName()));
                         session.attachToInterface(nicByName);
                         return;
                     } else {
-                        LOG.info(String.format("    %s is already in use (by %s).", name, nicByName.getDisplayName()));
+                        LOG.info(String.format("    %s is already in use (by %s).", name, nicByName.displayName()));
                     }
                 } else
                     LOG.info(String.format("    %s is already in use by something other than WinTun (%s).", name,
-                            nicByName.getDisplayName()));
+                            nicByName.displayName()));
             } else if (maxIface == -1) {
                 /* This one is the next free number */
                 maxIface = i;
@@ -336,12 +345,11 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
         if (ip == null) {
             String name = getInterfacePrefix() + maxIface;
             LOG.info(String.format("No existing unused interfaces, creating new one (%s) for public key .", name,
-                    connection.publicKey()));
+                    configuration.publicKey()));
             ip = new WindowsIP(name, "Wintun Userspace Tunnel", this);
-            configureVirtualAddress(ip);
             LOG.info(String.format("Created %s", name));
         } else
-            LOG.info(String.format("Using %s", ip.getName()));
+            LOG.info(String.format("Using %s", ip.name()));
 
         session.attachToInterface(ip);
 
@@ -369,23 +377,23 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
                     Kernel32Util.formatMessageFromLastErrorCode(err)));
         }
 
-        Path confFile = confDir.resolve(ip.getName() + ".conf");
+        Path confFile = confDir.resolve(ip.name() + ".conf");
         try (Writer writer = Files.newBufferedWriter(confFile)) {
-            write(connection, writer);
+            write(configuration, writer);
         }
 
         /* Install service for the network interface */
         boolean install = false;
-        if (!services.hasService(TUNNEL_SERVICE_NAME_PREFIX + "$" + ip.getName())) {
+        if (!services.hasService(TUNNEL_SERVICE_NAME_PREFIX + "$" + ip.name())) {
             install = true;
-            installService(ip.getName(), cwd);
+            installService(ip.name(), cwd);
         } else
-            LOG.info(String.format("Service for %s already exists.", ip.getName()));
+            LOG.info(String.format("ServicADDRe for %s already exists.", ip.name()));
 
         /* The service may take a short while to appear */
         int i = 0;
         for (; i < SERVICE_INSTALL_TIMEOUT; i++) {
-            if (services.hasService(TUNNEL_SERVICE_NAME_PREFIX + "$" + ip.getName()))
+            if (services.hasService(TUNNEL_SERVICE_NAME_PREFIX + "$" + ip.name()))
                 break;
             try {
                 Thread.sleep(1000);
@@ -396,7 +404,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
         if (i == 10)
             throw new IOException(
                     String.format("Service for %s cannot be found, suggesting installation failed, please check logs.",
-                            ip.getName()));
+                            ip.name()));
 
         /*
          * About to start connection. The "last handshake" should be this value or later
@@ -413,11 +421,11 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
         LOG.info("Service should be settled.");
 
         if (ip.isUp()) {
-            LOG.info(String.format("Service for %s is already up.", ip.getName()));
+            LOG.info(String.format("Service for %s is already up.", ip.name()));
         } else {
-            LOG.info(String.format("Bringing up %s", ip.getName()));
+            LOG.info(String.format("Bringing up %s", ip.name()));
             try {
-                ip.setMtu(connection.mtu().or(() -> context.configuration().defaultMTU()).orElse(0));
+                ip.mtu(configuration.mtu().or(() -> context.configuration().defaultMTU()).orElse(0));
                 ip.up();
             } catch (IOException | RuntimeException ioe) {
                 /* Just installed service failed, clean it up */
@@ -434,12 +442,12 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
          * connection. We don't know WHY, just it has failed
          */
         if (context.configuration().connectTimeout().isPresent()) {
-            waitForFirstHandshake(session, connectionStarted, context.configuration().connectTimeout().get());
+            waitForFirstHandshake(configuration, session, connectionStarted, peer, context.configuration().connectTimeout().get());
         }
 
         /* DNS */
         try {
-            dns(connection, ip);
+            dns(configuration, ip);
         } catch (IOException | RuntimeException ioe) {
             try {
                 session.close();
@@ -450,7 +458,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
     }
 
     @Override
-    protected Collection<ActiveSession<WindowsIP>> onInit(SystemContext ctx, List<ActiveSession<WindowsIP>> sessions) {
+    protected void onInit(SystemContext ctx) {
         /*
          * Check for an remove any wireguard interface services that are stopped (they
          * should either be running or not exist
@@ -470,7 +478,6 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
         } catch (Exception e) {
             LOG.error("Failed to remove dead services.", e);
         }
-        return sessions;
     }
 
     @Override
@@ -602,12 +609,12 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
     }
 
     protected boolean isWireGuardInterface(WindowsIP nif) {
-        return isMatchesPrefix(nif) && (nif.getDisplayName().startsWith("Wintun Userspace Tunnel")
-                || nif.getDisplayName().startsWith("WireGuard Tunnel") || isMatchesPrefix(nif.getDisplayName()));
+        return isMatchesPrefix(nif) && (nif.displayName().startsWith("Wintun Userspace Tunnel")
+                || nif.displayName().startsWith("WireGuard Tunnel") || isMatchesPrefix(nif.displayName()));
     }
 
     protected boolean isMatchesPrefix(WindowsIP nif) {
-        return isMatchesPrefix(nif.getName());
+        return isMatchesPrefix(nif.name());
     }
 
     protected boolean isMatchesPrefix(String name) {
@@ -675,8 +682,8 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
     }
 
     @Override
-    public void runHook(ActiveSession<WindowsIP> session, String... hookScript) throws IOException {
-        runHookViaPipeToShell(session, OsUtil.getPathOfCommandInPathOrFail("cmd.exe").toString(), "/c",
+    public void runHook(VpnConfiguration configuration, VpnAdapter session, String... hookScript) throws IOException {
+        runHookViaPipeToShell(configuration, session, OsUtil.getPathOfCommandInPathOrFail("cmd.exe").toString(), "/c",
                 String.join(" & ", hookScript).trim());
     }
 
@@ -687,38 +694,14 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
 
     @Override
     protected void runCommand(List<String> commands) throws IOException {
-        commands().privileged().run(commands.toArray(new String[0]));
+        commands().privileged().logged().run(commands.toArray(new String[0]));
     }
 
-    VpnConfiguration configuration(WindowsIP windowsIP) throws IOException {
-
-        var cfgBldr = new VpnConfiguration.Builder();
-
-        try (var adapter = new WireguardLibrary.Adapter(windowsIP.getName())) {
-            var wgIface = adapter.getConfiguration();
-            cfgBldr.withPublicKey(wgIface.publicKey.toString());
-            cfgBldr.withPrivateKey(wgIface.privateKey.toString());
-            cfgBldr.withListenPort(wgIface.listenPort);
-            for (var peer : wgIface.peers) {
-                var peerBldr = new VpnPeer.Builder();
-                peerBldr.withPublicKey(peer.publicKey.toString());
-                peerBldr.withPersistentKeepalive(peer.PersistentKeepalive);
-                peerBldr.withEndpoint(peer.endpoint);
-                for (var allowed : peer.allowedIPs) {
-                    peerBldr.addAllowedIps(allowed.address.getHostAddress() + "/" + allowed.cidr);
-                }
-                cfgBldr.addPeers(peerBldr.build());
-            }
-
-        }
-
-        return cfgBldr.build();
-    }
-
-
-    VpnInterfaceInformation information(String iface) throws IOException {
+    @Override
+    public VpnInterfaceInformation information(VpnAdapter vpnAdapter) {
+        var iface = vpnAdapter.address();
         var lastHandshake = new AtomicLong(0);
-        try (var adapter = new WireguardLibrary.Adapter(iface)) {
+        try (var adapter = new WireguardLibrary.Adapter(iface.name())) {
             var wgIface = adapter.getConfiguration();
             var tx = new AtomicLong(0);
             var rx = new AtomicLong(0);
@@ -728,7 +711,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
                 lastHandshake.set(Math.max(lastHandshake.get(), thisHandshake.toEpochMilli()));
                 tx.addAndGet(peer.txBytes);
                 rx.addAndGet(peer.rxBytes);
-                
+                var allowedIps = Arrays.asList(peer.allowedIPs).stream().map(a -> String.format("%s/%d", a.address.getHostAddress(), a.cidr)).toList();
                 peers.add(new VpnPeerInformation() {
                     @Override
                     public long tx() {
@@ -738,11 +721,6 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
                     @Override
                     public long rx() {
                         return peer.rxBytes;
-                    }
-                    
-                    @Override
-                    public String publicKey() {
-                        return peer.publicKey.toString();
                     }
                     
                     @Override
@@ -762,12 +740,22 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
                     }
 
                     @Override
+                    public String publicKey() {
+                        return peer.publicKey.toString();
+                    }
+
+                    @Override
                     public Optional<String> presharedKey() {
                         return peer.presharedKey == null ? Optional.empty() : Optional.of(peer.presharedKey.toString());
                     }
+
+                    @Override
+                    public List<String> allowedIps() {
+                        return allowedIps;
+                    }
                 });
             }
-
+            
             return new VpnInterfaceInformation() {
 
                 @Override
@@ -792,7 +780,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
 
                 @Override
                 public String interfaceName() {
-                    return iface;
+                    return iface.name();
                 }
                 
                 @Override
@@ -804,7 +792,53 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
                 public Optional<Integer> listenPort() {
                     return Optional.of(wgIface.listenPort);
                 }
+
+                @Override
+                public Optional<Integer> fwmark() {
+                    return Optional.empty();
+                }
+
+                @Override
+                public String publicKey() {
+                    return wgIface.publicKey.toString();
+                }
+
+                @Override
+                public String privateKey() {
+                    return wgIface.privateKey.toString();
+                }
             };
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Override
+    public VpnAdapterConfiguration configuration(VpnAdapter vpnAdapter) {
+        var iface = vpnAdapter.address();
+        var cfgBldr = new VpnAdapterConfiguration.Builder();
+        try (var adapter = new WireguardLibrary.Adapter(iface.name())) {
+            var wgIface = adapter.getConfiguration();
+            cfgBldr.withPrivateKey(wgIface.privateKey.toString());
+            cfgBldr.withPublicKey(wgIface.publicKey.toString());
+            cfgBldr.withListenPort(wgIface.listenPort);
+            for (var peer : wgIface.peers) {
+                var peerBldr = new VpnPeer.Builder();
+                peerBldr.withPublicKey(peer.publicKey.toString());
+                peerBldr.withPersistentKeepalive(peer.PersistentKeepalive);
+                if(peer.endpoint != null)
+                    peerBldr.withEndpoint(peer.endpoint);
+                if(peer.presharedKey != null)
+                    peerBldr.withPresharedKey(peer.presharedKey.toString());
+                for (var allowed : peer.allowedIPs) {
+                    peerBldr.addAllowedIps(allowed.address.getHostAddress() + "/" + allowed.cidr);
+                }
+                var peerCfg = peerBldr.build();
+                cfgBldr.addPeers(peerCfg);
+            }
+            return cfgBldr.build();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 }

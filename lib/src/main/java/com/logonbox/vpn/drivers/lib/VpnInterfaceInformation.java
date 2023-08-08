@@ -43,6 +43,21 @@ public interface VpnInterfaceInformation {
         public Optional<Integer> listenPort() {
             return Optional.empty();
         }
+
+        @Override
+        public Optional<Integer> fwmark() {
+            return Optional.empty();
+        }
+
+        @Override
+        public String publicKey() {
+            return "";
+        }
+
+        @Override
+        public String privateKey() {
+            return "";
+        }
     };
     
     String interfaceName();
@@ -55,12 +70,18 @@ public interface VpnInterfaceInformation {
 
     Instant lastHandshake();
     
+    String publicKey();
+    
+    String privateKey();
+    
     /**
      * Actual listening port if it can be determined.
      * 
      * @return listening port or empty if cannot be determined
      */
     Optional<Integer> listenPort();
+    
+    Optional<Integer> fwmark();
 
     Optional<String> error();
 

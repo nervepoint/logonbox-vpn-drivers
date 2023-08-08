@@ -1,12 +1,10 @@
 package com.logonbox.vpn.quick;
 
-import com.logonbox.vpn.drivers.lib.ActiveSession;
 import com.logonbox.vpn.drivers.lib.PlatformService;
 import com.logonbox.vpn.drivers.lib.SystemConfiguration;
 import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.Vpn;
-import com.logonbox.vpn.drivers.lib.VpnConfiguration;
-import com.logonbox.vpn.drivers.lib.VpnInterface;
+import com.logonbox.vpn.drivers.lib.VpnAdapter;
 import com.logonbox.vpn.drivers.lib.util.Keys;
 import com.logonbox.vpn.drivers.lib.util.Util;
 
@@ -33,7 +31,8 @@ public class Lbv extends AbstractCommand implements SystemContext {
     final static PrintStream out = System.out;
 
     public static void main(String[] args) throws Exception {
-        System.exit(new CommandLine(new Lbv()).execute(args));
+        Lbv cmd = new Lbv();
+        System.exit(new CommandLine(cmd).setExecutionExceptionHandler(new ExceptionHandler(cmd)).execute(args));
     }
 
     private PlatformService<?> platformService;
@@ -67,15 +66,10 @@ public class Lbv extends AbstractCommand implements SystemContext {
     }
 
     @Override
-    public VpnConfiguration configurationForPublicKey(String publicKey) {
-        throw new UnsupportedOperationException();
+    public void addScriptEnvironmentVariables(VpnAdapter connection, Map<String, String> env) {
     }
 
-    @Override
-    public void addScriptEnvironmentVariables(ActiveSession<?> connection, Map<String, String> env) {
-    }
-
-    @Command(name = "show", description = "Shows the current configuration and device information", subcommands = { Show.Interfaces.class, Show.All.class, Show.PublicKey.class })
+    @Command(name = "show", description = "Shows the current configuration and device information", subcommands = { Show.Interfaces.class, Show.All.class, Show.PublicKey.class, Show.ListenPort.class, Show.FwMark.class, Show.Peers.class, Show.PresharedKeys.class, Show.Endpoints.class })
     public final static class Show implements Callable<Integer> {
         
         @ParentCommand
@@ -86,12 +80,13 @@ public class Lbv extends AbstractCommand implements SystemContext {
 
         @Override
         public Integer call() throws Exception {
+            parent.setupLogging();
             if(iface.isPresent())
-                show(parent.platform().get(iface.get()));
+                show(parent.platform().adapter(iface.get()));
             return 0;
         }
         
-        void show(VpnInterface<?> vpn) throws IOException {
+        void show(VpnAdapter vpn) throws IOException {
             var info = vpn.information();
             var config = vpn.configuration();
             
@@ -99,26 +94,29 @@ public class Lbv extends AbstractCommand implements SystemContext {
             out.format("  public key: %s%n", config.publicKey());
             out.format("  private key: %s%n", "(hidden)");
             info.listenPort().ifPresent(p -> out.format("  listening port: %s%n", p));
-            out.println();
             
-            for (var peer : config.peers()) {
-                
-                out.format("peer: %s%n", peer.publicKey());
-                
-                peer.endpointAddress().ifPresent(ep -> {
-                    out.format("  endpoint: %s%n", ep, peer.endpointPort().orElse(Vpn.DEFAULT_PORT));
-                });
-                
-                out.format("  allowed ips: %s%n", String.join(", ", peer.allowedIps()));
-                
-                var peerInfo = info.peer(peer.publicKey());
-                peerInfo.ifPresent(i -> {
-                    var seconds = Duration.between(i.lastHandshake(), Instant.now()).toSeconds(); 
-                    out.format("  latest handshake: %d %s ago%n", seconds, seconds < 2 ? "second" : "seconds");  
-                    out.format("  transfer: %s received, %s sent%n", Util.toHumanSize(i.rx()), Util.toHumanSize(i.tx()));
-                });
-                
-                peer.persistentKeepalive().ifPresent(p -> out.format("  persistent keepalive: every %d %s%n", p, p < 2 ? "second" : "seconds"));
+            var peers = config.peers();
+            if(peers.size() > 0) {
+                out.println();
+                for (var peer : peers) {
+                    
+                    out.format("peer: %s%n", peer.publicKey());
+                    
+                    peer.endpointAddress().ifPresent(ep -> {
+                        out.format("  endpoint: %s%n", ep, peer.endpointPort().orElse(Vpn.DEFAULT_PORT));
+                    });
+                    
+                    out.format("  allowed ips: %s%n", String.join(", ", peer.allowedIps()));
+                    
+                    var peerInfo = info.peer(peer.publicKey());
+                    peerInfo.ifPresent(i -> {
+                        var seconds = Duration.between(i.lastHandshake(), Instant.now()).toSeconds(); 
+                        out.format("  latest handshake: %d %s ago%n", seconds, seconds < 2 ? "second" : "seconds");  
+                        out.format("  transfer: %s received, %s sent%n", Util.toHumanSize(i.rx()), Util.toHumanSize(i.tx()));
+                    });
+                    
+                    peer.persistentKeepalive().ifPresent(p -> out.format("  persistent keepalive: every %d %s%n", p, p < 2 ? "second" : "seconds"));
+                }
             }
         }
         
@@ -131,8 +129,8 @@ public class Lbv extends AbstractCommand implements SystemContext {
             @Override
             public Integer call() throws Exception {
                 parent.parent.setupLogging();
-                var ip = parent.parent.platform().get(parent.iface.get());
-                out.format("%s%n", ip.configuration().publicKey());
+                var ip = parent.parent.platform().adapter(parent.iface.get());
+                out.format("%s%n", ip.information().publicKey());
                 return 0;
             }
             
@@ -147,8 +145,76 @@ public class Lbv extends AbstractCommand implements SystemContext {
             @Override
             public Integer call() throws Exception {
                 parent.parent.setupLogging();
-                var ip = parent.parent.platform().get(parent.iface.get());
-                out.format("%s%n", ip.configuration().privateKey());
+                var ip = parent.parent.platform().adapter(parent.iface.get());
+                out.format("%s%n", ip.information().privateKey());
+                return 0;
+            }
+            
+        }
+        
+        @Command(name = "listen-port", description = "Shows the listening port")
+        public final static class ListenPort implements Callable<Integer> {
+            
+            @ParentCommand
+            private Show parent;
+
+            @Override
+            public Integer call() throws Exception {
+                parent.parent.setupLogging();
+                var ip = parent.parent.platform().adapter(parent.iface.get());
+                out.format("%s%n", ip.information().listenPort().orElse(0));
+                return 0;
+            }
+            
+        }
+        
+        @Command(name = "fwmark", description = "Shows the fwmark")
+        public final static class FwMark implements Callable<Integer> {
+            
+            @ParentCommand
+            private Show parent;
+
+            @Override
+            public Integer call() throws Exception {
+                parent.parent.setupLogging();
+                var ip = parent.parent.platform().adapter(parent.iface.get());
+                out.format("%s%n", ip.information().fwmark().map(i -> i.toString()).orElse("off"));
+                return 0;
+            }
+            
+        }
+        
+        @Command(name = "peers", description = "Shows the peers")
+        public final static class Peers implements Callable<Integer> {
+            
+            @ParentCommand
+            private Show parent;
+
+            @Override
+            public Integer call() throws Exception {
+                parent.parent.setupLogging();
+                var ip = parent.parent.platform().adapter(parent.iface.get());
+                for(var peer : ip.information().peers()) {
+                    out.println(peer.publicKey());
+                }
+                return 0;
+            }
+            
+        }
+        
+        @Command(name = "preshared-keys", description = "Shows the preshared keys")
+        public final static class PresharedKeys implements Callable<Integer> {
+            
+            @ParentCommand
+            private Show parent;
+
+            @Override
+            public Integer call() throws Exception {
+                parent.parent.setupLogging();
+                var ip = parent.parent.platform().adapter(parent.iface.get());
+                for(var peer : ip.information().peers()) {
+                    out.format("%s\t%s%n", peer.publicKey(), peer.presharedKey().orElse("(none)"));
+                }
                 return 0;
             }
             
@@ -163,16 +229,32 @@ public class Lbv extends AbstractCommand implements SystemContext {
             @Override
             public Integer call() throws Exception {
                 parent.parent.setupLogging();
-                var ips = parent.parent.platform().ips(true);
+                var ips = parent.parent.platform().adapters();
                 if(!ips.isEmpty()) {
-                    out.println(String.join(" ", ips.stream().map(VpnInterface::getName).toList()));
+                    out.println(String.join(" ", ips.stream().map(a -> a.address().name()).toList()));
                 }
                 return 0;
             }
             
         }
         
-        @Command(name = "all", description = "Shows all wireguard interfaces", subcommands = { All.PublicKey.class,All.PrivateKey.class })
+        @Command(name = "endpoints", description = "Shows the endpoints")
+        public final static class Endpoints implements Callable<Integer> {
+            
+            @ParentCommand
+            private Show parent;
+
+            @Override
+            public Integer call() throws Exception { 
+                var ip = parent.parent.platform().adapter(parent.iface.get());
+                for(var peer : ip.information().peers()) {
+                    out.format("%s\t%s%n", peer.publicKey(), peer.remoteAddress().map(s -> s.toString()).orElse("(none)"));
+                }
+                return 0;
+            }
+        }
+        
+        @Command(name = "all", description = "Shows all wireguard interfaces", subcommands = { All.PublicKey.class,All.PrivateKey.class, All.ListenPort.class, All.FwMark.class, All.Peers.class, All.PresharedKeys.class, All.Endpoints.class })
         public final static class All implements Callable<Integer> {
             
             @ParentCommand
@@ -181,7 +263,10 @@ public class Lbv extends AbstractCommand implements SystemContext {
             @Override
             public Integer call() throws Exception {
                 parent.parent.setupLogging();
-                for(var ip : parent.parent.platform().ips(true)) {
+                var idx = 0;
+                for(var ip : parent.parent.platform().adapters()) {
+                    if(idx++ > 0)
+                        out.println();
                     parent.show(ip);
                 }
                 return 0;
@@ -196,8 +281,8 @@ public class Lbv extends AbstractCommand implements SystemContext {
                 @Override
                 public Integer call() throws Exception {
                     parent.parent.parent.setupLogging();
-                    for(var ip : parent.parent.parent.platform().ips(true)) {
-                        out.format("%s\t%s%n", ip.getName(), ip.configuration().publicKey());
+                    for(var ip : parent.parent.parent.platform().adapters()) {
+                        out.format("%s\t%s%n", ip.address().name(), ip.information().publicKey());
                     }
                     return 0;
                 }
@@ -213,8 +298,119 @@ public class Lbv extends AbstractCommand implements SystemContext {
                 @Override
                 public Integer call() throws Exception {
                     parent.parent.parent.setupLogging();
-                    for(var ip : parent.parent.parent.platform().ips(true)) {
-                        out.format("%s\t%s%n", ip.getName(), ip.configuration().privateKey());
+                    for(var ip : parent.parent.parent.platform().adapters()) {
+                        out.format("%s\t%s%n", ip.address().name(), ip.information().privateKey());
+                    }
+                    return 0;
+                }
+                
+            }
+            
+            @Command(name = "listen-port", description = "Shows the listening ports")
+            public final static class ListenPort implements Callable<Integer> {
+                
+                @ParentCommand
+                private All parent;
+
+                @Override
+                public Integer call() throws Exception {
+                    parent.parent.parent.setupLogging();
+                    for(var ip : parent.parent.parent.platform().adapters()) {
+                        out.format("%s\t%s%n", ip.address().name(), ip.information().listenPort().orElse(0));
+                    }
+                    return 0;
+                }
+                
+            }
+            
+            @Command(name = "fwmark", description = "Shows the fwmark")
+            public final static class FwMark implements Callable<Integer> {
+                
+                @ParentCommand
+                private All parent;
+
+                @Override
+                public Integer call() throws Exception {
+                    parent.parent.parent.setupLogging();
+                    for(var ip : parent.parent.parent.platform().adapters()) {
+                        out.format("%s\t%s%n", ip.address().name(), ip.information().fwmark().map(i -> i.toString()).orElse("off"));
+                    }
+                    return 0;
+                }
+                
+            }
+            
+            @Command(name = "peers", description = "Shows the peers")
+            public final static class Peers implements Callable<Integer> {
+                
+                @ParentCommand
+                private All parent;
+
+                @Override
+                public Integer call() throws Exception {
+                    parent.parent.parent.setupLogging();
+                    for(var ip : parent.parent.parent.platform().adapters()) {
+                        for(var peer : ip.information().peers()) {
+                            out.format("%s\t%s%n", ip.address().name(), peer.publicKey());
+                        }
+                    }
+                    return 0;
+                }
+                
+            }
+            
+            @Command(name = "preshared-keys", description = "Shows the preshared keys")
+            public final static class PresharedKeys implements Callable<Integer> {
+                
+                @ParentCommand
+                private All parent;
+
+                @Override
+                public Integer call() throws Exception {
+                    parent.parent.parent.setupLogging();
+                    for(var ip : parent.parent.parent.platform().adapters()) {
+                        for(var peer : ip.information().peers()) {
+                            out.format("%s\t%s\t%s%n", ip.address().name(), peer.publicKey(), peer.presharedKey().orElse("(none)"));
+                        }
+                    }
+                    return 0;
+                }
+                
+            }
+            
+            @Command(name = "endpoints", description = "Shows the endpoints")
+            public final static class Endpoints implements Callable<Integer> {
+                
+                @ParentCommand
+                private All parent;
+
+                @Override
+                public Integer call() throws Exception {
+                    parent.parent.parent.setupLogging();
+                    for(var ip : parent.parent.parent.platform().adapters()) {
+                        out.format("%s\t", ip.address().name()); /* TODO: really? this is how "wg show all endpoints" does it, but it looks like a bug. Others always start with interface name */
+                        for(var peer : ip.information().peers()) {
+                            out.format("%s\t%s%n", peer.publicKey(), peer.remoteAddress().map(s -> s.toString()).orElse("(none)"));
+                        }
+                    }
+                    return 0;
+                }
+                
+            }
+            
+            @Command(name = "allowed-ips", description = "Shows the allowed IPs")
+            public final static class AllowedIps implements Callable<Integer> {
+                
+                @ParentCommand
+                private All parent;
+
+                @Override
+                public Integer call() throws Exception {
+                    parent.parent.parent.setupLogging();
+                    for(var ip : parent.parent.parent.platform().adapters()) {
+                        for(var peer : ip.information().peers()) {
+                            out.format("%s\t%s%n", peer.publicKey(), String.join(", ", peer.allowedIps()));
+                        }
                     }
                     return 0;
                 }
@@ -236,7 +432,7 @@ public class Lbv extends AbstractCommand implements SystemContext {
         @Override
         public Integer call() throws Exception {
             parent.setupLogging();
-            parent.platform().get(iface).configuration().write(out); 
+            parent.platform().adapter(iface).configuration().write(out); 
             return 0;
         }
     }

@@ -203,8 +203,8 @@ public class OSXNetworksetupDNS {
 			checkForError(commands.output(OsUtil.debugCommandArgs(args.toArray(new String[0]))));
 		}
 
-		commands.privileged().result("dscacheutil", "-flushcache");
-		commands.privileged().result("killall", "-HUP", "mDNSResponder");
+		commands.privileged().logged().result("dscacheutil", "-flushcache");
+		commands.privileged().logged().result("killall", "-HUP", "mDNSResponder");
 		
 		currentServices = newServices;
 	}

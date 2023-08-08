@@ -16,14 +16,21 @@ public final class Vpn implements Closeable {
 
     public final static class Builder {
 
+        private Optional<String> interfaceName = Optional.empty();
         private Optional<PlatformService<?>> platformService = Optional.empty();
         private Optional<VpnConfiguration> vpnConfiguration = Optional.empty();
         private Optional<VpnPeer> vpnPeer = Optional.empty();
+        private Optional<SystemContext> systemContext = Optional.empty();
         private Optional<SystemConfiguration> systemConfiguration = Optional.empty();
-        private Optional<BiConsumer<ActiveSession<?>, Map<String, String>>> onAddScriptEnvironment = Optional.empty();
+        private Optional<BiConsumer<VpnAdapter, Map<String, String>>> onAddScriptEnvironment = Optional.empty();
         
         public Builder withPlatformService(PlatformService<?> platformService) {
             this.platformService = Optional.of(platformService);
+            return this;
+        }
+        
+        public Builder withSystemContext(SystemContext systemContext) {
+            this.systemContext = Optional.of(systemContext);
             return this;
         }
         
@@ -49,59 +56,88 @@ public final class Vpn implements Closeable {
             this.systemConfiguration = Optional.of(systemConfiguration);
             return this;
         }
+
+        public Builder withInterfaceName(String interfaceName) {
+            return withInterfaceName(Optional.of(interfaceName));
+        }
         
-        public Builder onAddScriptEnvironment(BiConsumer<ActiveSession<?>, Map<String, String>> onAddScriptEnvironment) {
+        public Builder withInterfaceName(Optional<String> interfaceName) {
+            this.interfaceName = interfaceName;
+            return this;
+        }
+        
+        public Builder onAddScriptEnvironment(BiConsumer<VpnAdapter, Map<String, String>> onAddScriptEnvironment) {
             this.onAddScriptEnvironment = Optional.of(onAddScriptEnvironment);
             return this;
         }
         
-        public Vpn build() throws IOException {
+        public Vpn build() {
             return new Vpn(this);
         }
     }
 
     public static final Integer DEFAULT_PORT = 51820;
     
-    private final PlatformService<?> platformService;
-    private final Optional<BiConsumer<ActiveSession<?>, Map<String, String>>> onAddScriptEnvironment;
-    private final ActiveSession<?> session;
+    private final PlatformService<? extends VpnAddress> platformService;
+    private final Optional<BiConsumer<VpnAdapter, Map<String, String>>> onAddScriptEnvironment;
+    private final VpnConfiguration cfg;
+    private final Optional<VpnPeer> peer;
+    private final Optional<String> interfaceName;
+
+    private Optional<VpnAdapter> adapter = Optional.empty();
+
     
-    private Vpn(Builder builder) throws IOException {
+    private Vpn(Builder builder) {
         onAddScriptEnvironment = builder.onAddScriptEnvironment;
-        
-        var cfg = builder.vpnConfiguration.orElseThrow(() -> new IllegalStateException("No VPN configuration supplied."));
+        interfaceName = builder.interfaceName;
+        cfg = builder.vpnConfiguration.orElseThrow(() -> new IllegalStateException("No VPN configuration supplied."));
         
         /* If no specific peer, then try to find the first with an endpoint address and
          * assume that's the one to use.
          */
-        var peer = builder.vpnPeer.or(() -> {
+        peer = builder.vpnPeer.or(() -> {
             for(var p : cfg.peers()) {
                 if(p.endpointAddress().isPresent())
                     return Optional.of(p);
             }
             return Optional.empty();
-        });
+        }); 
 
         /* Either start a new session, or find an existing one */
+        
         if (builder.platformService.isPresent()) {
             platformService = builder.platformService.get();
-            session = platformService.start(cfg, peer);
         } else {
             platformService = PlatformService.create();
-            var active = platformService.init(new VpnSystemContext(builder.systemConfiguration, cfg));
-            ActiveSession<?> found = null;
-            for (var s : active) {
-                if (s.configuration().publicKey().equals(cfg.publicKey())) {
-                    found = s;
-                    break;
-                }
-            }
-            if (found == null) {
-                session = platformService.start(cfg, peer);
-            } else {
-                session = found;
+            platformService.init(builder.systemContext.orElseGet(() -> new VpnSystemContext(builder.systemConfiguration)));
+        }
+        
+        VpnAdapter found = null;
+        var pk = cfg.publicKey();
+        for (var s : platformService.adapters()) {
+            VpnAdapterConfiguration ncfg = s.configuration();
+            if (ncfg.publicKey().equals(pk)) {
+                found = s;
+                break;
             }
         }
+        adapter = Optional.ofNullable(found);
+    }
+    
+    public boolean started() {
+        return adapter.isPresent();
+    }
+    
+    public void open() throws IOException {
+ /* Either start a new session, or find an existing one */
+        if(adapter.isPresent())
+            throw new IllegalStateException(MessageFormat.format("`{0}` already exists", adapter().address().name()));
+        
+        adapter = Optional.of(platformService.start(interfaceName, cfg, peer));
+    }
+    
+    public Optional<String> interfaceName() {
+        return interfaceName;
     }
     
     public PlatformService<?> platformService() {
@@ -109,20 +145,20 @@ public final class Vpn implements Closeable {
     }
     
     public VpnConfiguration configuration() {
-        return session.configuration();
+        return cfg;
     }
     
-    public VpnInterface<?> ip() {
-        return session.ip().orElseThrow(() -> new IllegalStateException("Not active"));
+    public VpnAdapter adapter() {
+        return adapter.orElseThrow(() -> new IllegalStateException("Not started."));
     }
     
     public VpnInterfaceInformation information() throws IOException {
-        return ip().information();
+        return adapter().information();
     }
 
     @Override
     public void close() throws IOException {
-        session.close();
+        platformService.stop(cfg, adapter());
         if(platformService.context() instanceof VpnSystemContext)
             ((VpnSystemContext)platformService.context()).close();
     }
@@ -130,11 +166,9 @@ public final class Vpn implements Closeable {
     class VpnSystemContext implements SystemContext, Closeable {
         private final ScheduledExecutorService queue = Executors.newSingleThreadScheduledExecutor();
         private final SystemConfiguration configuration;
-        private final VpnConfiguration vpnConfiguration;
         
-        VpnSystemContext(Optional<SystemConfiguration> configuration, VpnConfiguration vpnConfiguration) {
+        VpnSystemContext(Optional<SystemConfiguration> configuration) {
             this.configuration = configuration.orElseGet(() -> SystemConfiguration.defaultConfiguration());
-            this.vpnConfiguration = vpnConfiguration;
         }
 
         @Override
@@ -148,15 +182,7 @@ public final class Vpn implements Closeable {
         }
 
         @Override
-        public VpnConfiguration configurationForPublicKey(String publicKey) {
-            if(vpnConfiguration.publicKey().equals(publicKey))
-                return vpnConfiguration;
-            else
-                throw new IllegalArgumentException(MessageFormat.format("No configuration for public key {0}", publicKey));
-        }
-
-        @Override
-        public void addScriptEnvironmentVariables(ActiveSession<?> connection, Map<String, String> env) {
+        public void addScriptEnvironmentVariables(VpnAdapter connection, Map<String, String> env) {
             onAddScriptEnvironment.ifPresent(e -> e.accept(connection, env));
         }
 

@@ -22,8 +22,6 @@ package com.logonbox.vpn.drivers.macos;
 
 import com.logonbox.vpn.drivers.lib.AbstractVirtualInetAddress;
 import com.logonbox.vpn.drivers.lib.DNSIntegrationMethod;
-import com.logonbox.vpn.drivers.lib.VpnConfiguration;
-import com.logonbox.vpn.drivers.lib.VpnInterfaceInformation;
 import com.logonbox.vpn.drivers.lib.util.IpUtil;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
 import com.logonbox.vpn.drivers.lib.util.Util;
@@ -65,57 +63,44 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 
 	public void addAddress(String address) throws IOException {
 		if (addresses.contains(address))
-			throw new IllegalStateException(String.format("Interface %s already has address %s", getName(), address));
-		if (addresses.size() > 0 && Util.isNotBlank(getPeer()))
+			throw new IllegalStateException(String.format("Interface %s already has address %s", name(), address));
+		if (addresses.size() > 0 && Util.isNotBlank(peer()))
 			throw new IllegalStateException(String.format(
-					"Interface %s is configured to have a single peer %s, so cannot add a second address %s", getName(),
-					getPeer(), address));
+					"Interface %s is configured to have a single peer %s, so cannot add a second address %s", name(),
+					peer(), address));
 
 		if (address.matches(".*:.*"))
-			commands.privileged().result(OsUtil.debugCommandArgs("ifconfig", getName(), "inet6", address, "alias"));
+			commands.privileged().logged().result(OsUtil.debugCommandArgs("ifconfig", name(), "inet6", address, "alias"));
 		else
-			commands.privileged().result(OsUtil.debugCommandArgs("ifconfig", getName(), "inet", address,
+			commands.privileged().logged().result(OsUtil.debugCommandArgs("ifconfig", name(), "inet", address,
 					address.replace("/*", ""), "alias"));
 		addresses.add(address);
 	}
 
 	@Override
 	public void delete() throws IOException {
-		commands.privileged().result(OsUtil.debugCommandArgs("rm", "-f", getSocketFile().getAbsolutePath()));
+		commands.privileged().logged().result(OsUtil.debugCommandArgs("rm", "-f", getSocketFile().getAbsolutePath()));
 	}
 
-	protected File getSocketFile() {
-		return new File("/var/run/wireguard/" + getName() + ".sock");
-	}
-
-    @Override
-    public VpnInterfaceInformation information() throws IOException {
-        return getPlatform().information(this);
-    }
-
-    @Override
-    public VpnConfiguration configuration() throws IOException {
-        return getPlatform().configuration(this); 
-    }
-
-	public void dns(String[] dns) throws IOException {
+	@Override
+    public void dns(String[] dns) throws IOException {
 		if (dns == null || dns.length == 0) {
 			unsetDns();
 		} else {
 			DNSIntegrationMethod method = calcDnsMethod();
 			try {
-				LOG.info(String.format("Setting DNS for %s to %s using %s", getName(), String.join(", ", dns), method));
+				LOG.info(String.format("Setting DNS for %s to %s using %s", name(), String.join(", ", dns), method));
 				switch (method) {
 				case NETWORKSETUP:
-				    OSXNetworksetupDNS.get().changeDns(new InterfaceDNS(getName(), dns));
+				    OSXNetworksetupDNS.get().changeDns(new InterfaceDNS(name(), dns));
 					break;
 				case SCUTIL_COMPATIBLE:
-					try (SCUtil scutil = new SCUtil(commands, getName())) {
+					try (SCUtil scutil = new SCUtil(commands, name())) {
 						scutil.compatible(IpUtil.filterAddresses(dns), IpUtil.filterNames(dns));
 					}
 					break;
 				case SCUTIL_SPLIT:
-					try (SCUtil scutil = new SCUtil(commands,getName())) {
+					try (SCUtil scutil = new SCUtil(commands,name())) {
 						scutil.split(IpUtil.filterAddresses(dns), IpUtil.filterNames(dns));
 					}
 					break;
@@ -131,16 +116,16 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 		}
 	}
 
-    @Override
+	@Override
 	public void down() throws IOException {
 		unsetDns();
 		/*
 		 * TODO
-		 * 
+		 *
 		 * [[ $HAVE_SET_FIREWALL -eq 0 ]] || remove_firewall
-		 * 
+		 *
 		 * TODO
-		 * 
+		 *
 		 * if [[ -z $TABLE || $TABLE == auto ]] && get_fwmark table && [[ $(wg show
 		 * "$INTERFACE" allowed-ips) =~ /0(\ |$'\n'|$) ]]; then while [[ $(ip -4 rule
 		 * show 2>/dev/null) == *"lookup $table"* ]]; do cmd ip -4 rule delete table
@@ -156,14 +141,14 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 		setRoutes(new ArrayList<>());
 	}
 
-	public Set<String> getAddresses() {
+    public Set<String> getAddresses() {
 		return addresses;
 	}
 
 	@Override
-	public String getDisplayName() {
+	public String displayName() {
 		try {
-			NetworkInterface iface = getByName(getName());
+			NetworkInterface iface = getByName(name());
 			return iface == null ? "Unknown" : iface.getDisplayName();
 		} catch (IOException ioe) {
 			return "Unknown";
@@ -173,7 +158,7 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 	@Override
 	public String getMac() {
 		try {
-			NetworkInterface iface = getByName(getName());
+			NetworkInterface iface = getByName(name());
 			return iface == null ? null : IpUtil.toIEEE802(iface.getHardwareAddress());
 		} catch (IOException ioe) {
 			return null;
@@ -199,13 +184,13 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 
 	public void removeAddress(String address) throws IOException {
 		if (!addresses.contains(address))
-			throw new IllegalStateException(String.format("Interface %s not not have address %s", getName(), address));
-		if (addresses.size() > 0 && Util.isNotBlank(getPeer()))
+			throw new IllegalStateException(String.format("Interface %s not not have address %s", name(), address));
+		if (addresses.size() > 0 && Util.isNotBlank(peer()))
 			throw new IllegalStateException(String.format(
-					"Interface %s is configured to have a single peer %s, so cannot add a second address %s", getName(),
-					getPeer(), address));
+					"Interface %s is configured to have a single peer %s, so cannot add a second address %s", name(),
+					peer(), address));
 
-		commands.privileged().result(OsUtil.debugCommandArgs("ifconfig", getName(), "-alias", address));
+		commands.privileged().logged().result(OsUtil.debugCommandArgs("ifconfig", name(), "-alias", address));
 		addresses.remove(address);
 	}
 
@@ -245,17 +230,17 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 		// TODO
 		LOG.warn("TODO: setEndpointDirectRoute() not implemented.");
 	}
-
-	@Override
-	public void setPeer(String peer) {
-		if (!Objects.equals(peer, this.getPeer())) {
-			if (Util.isNotBlank(peer) && addresses.size() > 1)
-				throw new IllegalStateException(String.format(
-						"Interface %s is already configured to have multiple addresses, so cannot have a single peer %s",
-						getName(), peer));
-			super.setPeer(peer);
-		}
-	}
+//
+//	@Override
+//	public void setPeer(String peer) {
+//		if (!Objects.equals(peer, this.peer())) {
+//			if (Util.isNotBlank(peer) && addresses.size() > 1)
+//				throw new IllegalStateException(String.format(
+//						"Interface %s is already configured to have multiple addresses, so cannot have a single peer %s",
+//						name(), peer));
+//			super.setPeer(peer);
+//		}
+//	}
 
 	public void setRoutes(Collection<String> allows) throws IOException {
 
@@ -267,21 +252,21 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 				continue;
 			if (l.length > 0 && l[0].equals("Internet6:")) {
 				ipv6 = true;
-			} else if (l.length > 3 && l[3].equals(getName())) {
+			} else if (l.length > 3 && l[3].equals(name())) {
 				String gateway = l[1];
-				if (gateway.equals(getName())) {
+				if (gateway.equals(name())) {
 					if (getAddresses().isEmpty())
 						continue;
 					else
 						gateway = getAddresses().iterator().next();
 				}
-				LOG.info(String.format("Removing route %s %s for %s", l[0], gateway, getName()));
+				LOG.info(String.format("Removing route %s %s for %s", l[0], gateway, name()));
 				if (ipv6) {
-					commands.privileged().result(OsUtil.debugCommandArgs("route", "-qn", "delete", "-inet6", "-ifp",
-							getName(), l[0], gateway));
+					commands.privileged().logged().result(OsUtil.debugCommandArgs("route", "-qn", "delete", "-inet6", "-ifp",
+							name(), l[0], gateway));
 				} else {
-					commands.privileged().result(
-							OsUtil.debugCommandArgs("route", "-qn", "delete", "-ifp", getName(), l[0], gateway));
+					commands.privileged().logged().result(
+							OsUtil.debugCommandArgs("route", "-qn", "delete", "-ifp", name(), l[0], gateway));
 				}
 			}
 		}
@@ -293,20 +278,24 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 
 	@Override
 	public String toString() {
-		return "Ip [name=" + getName() + ", addresses=" + addresses + ", peer=" + getPeer() + "]";
+		return "Ip [name=" + name() + ", addresses=" + addresses + ", peer=" + peer() + "]";
 	}
 
 	@Override
 	public void up() throws IOException {
 		setMtu();
 
-		commands.privileged().result(OsUtil.debugCommandArgs("ifconfig", getName(), "up"));
+		commands.privileged().logged().result(OsUtil.debugCommandArgs("ifconfig", name(), "up"));
+	}
+
+	protected File getSocketFile() {
+		return new File("/var/run/wireguard/" + name() + ".sock");
 	}
 
 	protected void setMtu() throws IOException {
 
 		int currentMtu = 0;
-		for (String line : commands.output(OsUtil.debugCommandArgs("ifconfig", getName()))) {
+		for (String line : commands.output(OsUtil.debugCommandArgs("ifconfig", name()))) {
 			List<String> parts = Arrays.asList(line.split("\\s+"));
 			int idx = parts.indexOf("mtu");
 			if (idx == -1 && idx < parts.size() - 1)
@@ -353,7 +342,7 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 		/* Bring it up! */
 		if (currentMtu > 0 && tmtu != currentMtu) {
 			LOG.info(String.format("Setting MTU to %d", tmtu));
-			commands.privileged().result(OsUtil.debugCommandArgs("ifconfig", getName(), "mtu", String.valueOf(tmtu)));
+			commands.privileged().logged().result(OsUtil.debugCommandArgs("ifconfig", name(), "mtu", String.valueOf(tmtu)));
 		} else
 			LOG.info(String.format("MTU already set to %d", tmtu));
 	}
@@ -362,56 +351,56 @@ public class BrewOSXIP extends AbstractVirtualInetAddress<BrewOSXPlatformService
 		String proto = "inet";
 		if (route.matches(".*:.*"))
 			proto = "inet6";
-		if (TABLE_OFF.equals(getTable()))
+		if (TABLE_OFF.equals(table()))
 			return;
 
-		if (route.endsWith("/0") && (Util.isBlank(getTable()) || TABLE_AUTO.equals(getTable()))) {
+		if (route.endsWith("/0") && (Util.isBlank(table()) || TABLE_AUTO.equals(table()))) {
 			if (route.matches(".*:.*")) {
 				autoRoute6 = true;
-				commands.privileged().result(OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-inet6", "::/1:",
-						"-interface", getName()));
-				commands.privileged().result(OsUtil.debugCommandArgs("route", "-q", "-m", "add", "-inet6", "8000::/1",
-						"-interface", getName()));
+				commands.privileged().logged().result(OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-inet6", "::/1:",
+						"-interface", name()));
+				commands.privileged().logged().result(OsUtil.debugCommandArgs("route", "-q", "-m", "add", "-inet6", "8000::/1",
+						"-interface", name()));
 			} else {
 				autoRoute4 = true;
-				commands.privileged().result(OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-inet", "0.0.0.0/1",
-						"-interface", getName()));
-				commands.privileged().result(OsUtil.debugCommandArgs("route", "-q", "-m", "add", "-inet", "128.0.0.1/1",
-						"-interface", getName()));
+				commands.privileged().logged().result(OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-inet", "0.0.0.0/1",
+						"-interface", name()));
+				commands.privileged().logged().result(OsUtil.debugCommandArgs("route", "-q", "-m", "add", "-inet", "128.0.0.1/1",
+						"-interface", name()));
 			}
 		} else {
-			if (!TABLE_MAIN.equals(getTable()) && !TABLE_AUTO.equals(getTable()) && !Util.isBlank(getTable())) {
+			if (!TABLE_MAIN.equals(table()) && !TABLE_AUTO.equals(table()) && !Util.isBlank(table())) {
 				throw new IOException("Darwin only supports TABLE=auto|main|off");
 			}
 
 			for (String line : commands.output(OsUtil.debugCommandArgs("route", "-n", "get", "-" + proto, route))) {
 				line = line.trim();
 				String[] args = line.split(":");
-				if (args.length > 1 && args[0].equals("interface:") && args[1].equals(getName())) {
+				if (args.length > 1 && args[0].equals("interface:") && args[1].equals(name())) {
 					// Already have route
 					return;
 				}
 			}
 
-			LOG.info(String.format("Adding route %s to %s for %s", route, getName(), proto));
-			commands.privileged().result(
-					OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-" + proto, route, "-interface", getName()));
+			LOG.info(String.format("Adding route %s to %s for %s", route, name(), proto));
+			commands.privileged().logged().result(
+					OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-" + proto, route, "-interface", name()));
 		}
 
 	}
 
 	private void unsetDns() throws IOException {
-		LOG.info(String.format("unsetting DNS for %s (iface prefix %s)", getName(),
-				getPlatform().resolvconfIfacePrefix()));
+		LOG.info(String.format("unsetting DNS for %s (iface prefix %s)", name(),
+		        platform.resolvconfIfacePrefix()));
 		switch (calcDnsMethod()) {
 		case NETWORKSETUP:
-			if (OSXNetworksetupDNS.get().isSet(getName())) {
-			    OSXNetworksetupDNS.get().popDns(getName());
+			if (OSXNetworksetupDNS.get().isSet(name())) {
+			    OSXNetworksetupDNS.get().popDns(name());
 			}
 			break;
 		case SCUTIL_SPLIT:
 		case SCUTIL_COMPATIBLE:
-			try (SCUtil scutil = new SCUtil(commands, getName())) {
+			try (SCUtil scutil = new SCUtil(commands, name())) {
 				scutil.remove();
 			}
 			break;

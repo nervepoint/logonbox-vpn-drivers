@@ -39,7 +39,7 @@ public class SCUtil implements Closeable {
 	public SCUtil(SystemCommands commands, String iface) throws IOException {
 		this.iface = iface;
 		LOG.info("Running scutil");
-		out = commands.privileged().pipe(line -> {
+		out = commands.privileged().logged().pipe(line -> {
             LOG.info("SCUTIL: " + line);    
 		}, "scutil");
 	}

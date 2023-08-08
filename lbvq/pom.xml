@@ -216,6 +216,24 @@ ACTION
                                     </buildArgs>
                                 </configuration>
                             </execution>
+                            <execution>
+                                <id>lbvquick</id>
+                                <goals>
+                                    <goal>native-image</goal>
+                                </goals>
+                                <phase>package</phase>
+                                <configuration>
+                                    <mainClass>com.logonbox.vpn.quick.LbvQuick</mainClass>
+                                    <imageName>lbv-quick</imageName>
+                                    <buildArgs>
+                                        --gc=G1
+                                        --report-unsupported-elements-at-runtime
+                                        -H:+BuildReport
+                                        -R:MaxHeapSize=64m
+                                        ${graalvm.pgo} ${graalvm.compatibility}
+                                    </buildArgs>
+                                </configuration>
+                            </execution>
                         </executions>
                     </plugin>
                 </plugins>

@@ -22,6 +22,7 @@ package com.logonbox.vpn.drivers.linux;
 
 import com.logonbox.vpn.drivers.lib.PlatformService;
 import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
+import com.logonbox.vpn.drivers.lib.VpnAddress;
 import com.sshtools.liftlib.OS;
 
 public class LinuxPlatformServiceFactory implements PlatformServiceFactory {
@@ -32,7 +33,7 @@ public class LinuxPlatformServiceFactory implements PlatformServiceFactory {
     }
 
     @Override
-    public PlatformService<?> createPlatformService() {
+    public PlatformService<? extends VpnAddress> createPlatformService() {
         return new LinuxPlatformServiceImpl();
     }
 

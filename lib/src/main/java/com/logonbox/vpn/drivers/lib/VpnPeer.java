@@ -17,6 +17,7 @@ public interface VpnPeer {
         private Optional<String> publicKey = Optional.empty();
         private List<String> allowedIps = new ArrayList<>();
         private Optional<Integer> persistentKeepalive = Optional.empty();
+        private Optional<String> presharedKey;
 
         public Builder addAllowedIps(String... allowedIps) {
             return addAllowedIps(Arrays.asList(allowedIps));
@@ -94,6 +95,15 @@ public interface VpnPeer {
             return this;
         }
 
+        public Builder withPresharedKey(String presharedKey) {
+            return withPresharedKey(Optional.of(presharedKey));
+        }
+
+        public Builder withPresharedKey(Optional<String> presharedKey) {
+            this.presharedKey = presharedKey;
+            return this;
+        }
+
         public Builder withPublicKey(String publicKey) {
             return withPublicKey(Optional.of(publicKey));
         }
@@ -114,6 +124,7 @@ public interface VpnPeer {
             private final String publicKey;
             private final List<String> allowedIps;
             private final Optional<Integer> persistentKeepalive;
+            private final Optional<String> presharedKey;
 
             DefaultVpnPeer(Builder builder) {
                 persistentKeepalive = builder.persistentKeepalive;
@@ -121,6 +132,12 @@ public interface VpnPeer {
                 endpointAddress = builder.endpointAddress;
                 publicKey = builder.publicKey.orElseThrow(() -> new IllegalStateException("No public key"));
                 allowedIps = Collections.unmodifiableList(new ArrayList<>(builder.allowedIps));
+                presharedKey = builder.presharedKey;
+            }
+
+            @Override
+            public Optional<String> presharedKey() {
+                return presharedKey;
             }
 
             @Override
@@ -160,4 +177,6 @@ public interface VpnPeer {
     Optional<Integer> persistentKeepalive();
 
     List<String> allowedIps();
+    
+    Optional<String> presharedKey();
 }

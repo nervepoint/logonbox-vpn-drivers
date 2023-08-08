@@ -22,6 +22,8 @@ package com.logonbox.vpn.drivers.lib;
 
 import java.net.InetSocketAddress;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 public interface VpnPeerInformation {
@@ -63,7 +65,14 @@ public interface VpnPeerInformation {
             return Optional.empty();
         }
 
+        @Override
+        public List<String> allowedIps() {
+            return Collections.emptyList();
+        }
+
 	};
+
+    List<String> allowedIps();
 	
 	Optional<InetSocketAddress> remoteAddress();
 	

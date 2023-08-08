@@ -23,28 +23,29 @@ package com.logonbox.vpn.drivers.lib;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-public interface PlatformService<I extends VpnInterface<?>> {
+public interface PlatformService<ADDR extends VpnAddress> {
     
     /**
      * Create a default instance.
      * 
      * @return instance
      */
-    public static PlatformService<? extends VpnInterface<?>> create() {
+    public static PlatformService<? extends VpnAddress> create() {
         return PlatformServiceFactory.get().createPlatformService();
     }
 
     /**
-     * Do any platform specific clean up. It should not be necessary to 
-     * call this yourself.
+     * Stop the VPN. This method should be used as opposed to {@link VpnAdapter#close()},
+     * as this method will tear down DNS, routes, run hooks etc.
      * 
+     * @param configuration configuration containing tear down details
      * @param session session to clean up
+     * @throws IOException on error
      */
-    void cleanUp(ActiveSession<I> session);
+    void stop(VpnConfiguration configuration, VpnAdapter session) throws IOException;
 
 	/**
 	 * Open file permissions so that it is readable by everyone.
@@ -82,47 +83,64 @@ public interface PlatformService<I extends VpnInterface<?>> {
 	 * Start the services for this platform.
 	 * 
 	 * @param ctx context
-	 * @return any sessions that are already active.
 	 */
-	Collection<ActiveSession<I>> init(SystemContext ctx);
+	void init(SystemContext ctx);
 
 	/**
 	 * Connect, optionally waiting for the first handshake from the given peer.
-	 * 
+	 * @param interfaceName TODO
 	 * @param configuration the configuration
 	 * @param peer peer from which to wait for the first handshake from
+	 * 
 	 * @return the session that can be used to control the interface
 	 * @throws IOException on any error
 	 */
-	ActiveSession<I> start(VpnConfiguration configuration, Optional<VpnPeer> peer) throws IOException;
+	VpnAdapter start(Optional<String> interfaceName, VpnConfiguration configuration, Optional<VpnPeer> peer) throws IOException;
 
 	/**
-	 * Get an interface that is using this public key, or <code>null</code> if no
+	 * Get an interface that is using this public key, or {@link Optional#empty()} if no
 	 * interface is using this public key at the moment.
 	 * 
 	 * @param public key return interface
+	 * @throws IOException 
 	 */
-	I getByPublicKey(String publicKey);
+    default Optional<VpnAdapter> getByPublicKey(String publicKey) throws IOException {
+        for (VpnAdapter ip : adapters()) {
+            if (publicKey.equals(ip.information().publicKey())) {
+                return Optional.of(ip);
+            }
+        }
+        return Optional.empty();
+    }
 
 	/**
 	 * Get all interfaces.
 	 * 
-	 * @param wireguardOnly only wireguard interfaces
-	 * @return interfaces
+	 * @return addresses
 	 */
-	List<I> ips(boolean wireguardOnly);
+	List<ADDR> addresses();
+
+    /**
+     * Get all adapters. These are {@link VpnAddress}es that have beeon
+     * configured as wireguard adapters. An adapter always has an address,
+     * but an address may not (yet) have an adapter.
+     * 
+     * @return adapters
+     */
+    List<VpnAdapter> adapters();
 
 	/**
 	 * Run a hook script appropriate for the platform. Ideally, this should
 	 * be run as a script fragment.
 	 *  
+	 * @param configuration configuration containing scripts
 	 * @param session session
 	 * @param hookScript script
 	 */
-	void runHook(ActiveSession<I> session, String... hookScript) throws IOException;
+	void runHook(VpnConfiguration configuration, VpnAdapter session, String... hookScript) throws IOException;
 	
 	/**
-	 * Get the default DNS integration method. Will NOT return {@link DNSIntegrationMethod#AUTO}.
+	 * Detect the default DNS integration method to use given the current platform and platform configuration. Will NOT return {@link DNSIntegrationMethod#AUTO}.
 	 * 
 	 * @return method
 	 */
@@ -160,18 +178,28 @@ public interface PlatformService<I extends VpnInterface<?>> {
     void resetDefaulGateway() throws IOException;
 
     /**
-     * Get an interface given its short name. Avoid call this too often, it
+     * Get an {@link VpnAddress} given its short name. Avoid call this too often, it
      * may be slower on some platforms. Instead you should access the 
-     * reference of {@link ActiveSession#ip()}.
+     * reference of {@link VpnAdapter#address()}.
      * 
      * @param name name
-     * @return interface
+     * @return address
      */
-    I get(String name);
+    ADDR address(String name);
+
+    /**
+     * Get a {@link VpnAdapter} given its short name. Avoid call this too often, it
+     * may be slower on some platforms. Instead you should access the 
+     * reference of {@link VpnAdapter#ip()}.
+     * 
+     * @param name name
+     * @return address
+     */
+    VpnAdapter adapter(String name);
 
     /**
      * Get the latest handshake given an interface name and public key.
-     * By default this will delegate to {@link VpnInterface#latestHandshake(String)},
+     * By default this will delegate to {@link VpnAdapter#latestHandshake(String)},
      * but certain platforms may provide a optimised version of this call.
      * <p>
      * It is preferable when monitoring handshakes to use this call.
@@ -182,10 +210,25 @@ public interface PlatformService<I extends VpnInterface<?>> {
      * @throws IOException
      */
     default Instant getLatestHandshake(String iface, String publicKey) throws IOException {
-        return get(iface).latestHandshake(publicKey);
+        return adapter(iface).latestHandshake(publicKey);
     }
- 
-    
-    
 
+    /**
+     * Retrieve details about the wireguard adapter. Statistics can be obtained via this object. 
+     * 
+     * @param adapter wireguard adapter
+     * @return information
+     * @throws UncheckedIOException on error
+     */
+    VpnInterfaceInformation information(VpnAdapter adapter);
+
+    /**
+     * Retrieve configuration of the wireguard adapter.  
+     * 
+     * @param adapter wireguard adapter
+     * @return configuration
+     * @throws UncheckedIOException on error
+     */
+    VpnAdapterConfiguration configuration(VpnAdapter adapter);
+ 
 }

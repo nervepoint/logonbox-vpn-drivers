@@ -1,7 +1,10 @@
 package com.logonbox.vpn.drivers.lib;
 
+import com.sshtools.liftlib.ElevatedClosure;
+
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.Serializable;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
@@ -60,6 +63,21 @@ public interface SystemCommands {
             public int consume(Consumer<String> consumer, String... args) throws IOException {
                 return delegate.consume(consumer, args);
             }
+
+            @Override
+            public void onLog(Consumer<String[]> commandLine) {
+                delegate.onLog(commandLine);
+            }
+
+            @Override
+            public SystemCommands logged() {
+                return delegate.logged();
+            }
+
+            @Override
+            public <R extends Serializable> R task(ElevatedClosure<R, Serializable> task) throws Exception {
+                return delegate.task(task);
+            }
         };
     }
     
@@ -67,9 +85,13 @@ public interface SystemCommands {
         return Collections.emptyMap();
     }
     
+    void onLog(Consumer<String[]> onLog);
+    
     PrintWriter pipe(Consumer<String> input, String... args) throws IOException;
 
     SystemCommands privileged();
+
+    SystemCommands logged();
 
     default SystemCommands env(Map<String, String> env) {
         return withEnv(env, this);
@@ -84,5 +106,7 @@ public interface SystemCommands {
     void pipeTo(String content, String... args) throws IOException;
 
     int consume(Consumer<String> consumer, String... args) throws IOException;
+    
+    <R extends Serializable> R task(ElevatedClosure<R, Serializable> task) throws Exception;
 
 }

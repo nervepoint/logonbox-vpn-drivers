@@ -21,8 +21,6 @@
 package com.logonbox.vpn.drivers.macos;
 
 import com.logonbox.vpn.drivers.lib.AbstractVirtualInetAddress;
-import com.logonbox.vpn.drivers.lib.VpnConfiguration;
-import com.logonbox.vpn.drivers.lib.VpnInterfaceInformation;
 
 import java.io.IOException;
 
@@ -31,16 +29,6 @@ public class OSXIP extends AbstractVirtualInetAddress<OSXPlatformServiceImpl> {
 	public OSXIP(OSXPlatformServiceImpl platform) {
 		super(platform);
 	}
-
-    @Override
-    public VpnInterfaceInformation information() throws IOException {
-        return getPlatform().information(this);
-    }
-
-    @Override
-    public VpnConfiguration configuration() throws IOException {
-        return getPlatform().configuration(this); 
-    }
 
 	@Override
 	public boolean isUp() {
@@ -68,7 +56,7 @@ public class OSXIP extends AbstractVirtualInetAddress<OSXPlatformServiceImpl> {
 	}
 
 	@Override
-	public String getDisplayName() {
+	public String displayName() {
 		throw new UnsupportedOperationException("TODO");
 	}
 

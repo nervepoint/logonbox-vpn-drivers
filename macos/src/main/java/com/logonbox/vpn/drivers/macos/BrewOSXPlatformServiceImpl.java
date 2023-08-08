@@ -25,14 +25,12 @@ import static com.logonbox.vpn.drivers.lib.util.OsUtil.is64bit;
 import static com.logonbox.vpn.drivers.lib.util.OsUtil.isAarch64;
 
 import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
-import com.logonbox.vpn.drivers.lib.ActiveSession;
 import com.logonbox.vpn.drivers.lib.DNSIntegrationMethod;
 import com.logonbox.vpn.drivers.lib.SystemContext;
+import com.logonbox.vpn.drivers.lib.VpnAdapter;
 import com.logonbox.vpn.drivers.lib.VpnConfiguration;
-import com.logonbox.vpn.drivers.lib.VpnInterfaceInformation;
 import com.logonbox.vpn.drivers.lib.VpnPeer;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
-import com.logonbox.vpn.drivers.macos.OSXNetworksetupDNS.InterfaceDNS;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,12 +45,11 @@ import java.net.InterfaceAddress;
 import java.net.NetworkInterface;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.text.MessageFormat;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.StringTokenizer;
 import java.util.regex.Matcher;
@@ -123,8 +120,8 @@ public class BrewOSXPlatformServiceImpl extends AbstractUnixDesktopPlatformServi
 	}
 
 	protected BrewOSXIP add(String name, String type) throws IOException {
-	    commands().privileged().result(wgGoCommandPath.toString(), name);
-		return find(name, ips(false));
+	    commands().privileged().logged().result(wgGoCommandPath.toString(), name);
+		return find(name, addresses()).orElseThrow(() -> new IOException(MessageFormat.format("Could not find new network interface {0}", name)));
 	}
 
 	@Override
@@ -173,7 +170,7 @@ public class BrewOSXPlatformServiceImpl extends AbstractUnixDesktopPlatformServi
 	}
 
 	@Override
-	public List<BrewOSXIP> ips(boolean wireguardOnly) {
+	public List<BrewOSXIP> addresses() {
 		List<BrewOSXIP> l = new ArrayList<>();
 		BrewOSXIP lastLink = null;
 		try {
@@ -182,11 +179,8 @@ public class BrewOSXPlatformServiceImpl extends AbstractUnixDesktopPlatformServi
 				if (!r.startsWith(" ")) {
 					String[] a = r.split(":");
 					String name = a[0].trim();
-					if (!wireguardOnly || (wireguardOnly && name.startsWith(getInterfacePrefix()))) {
-						l.add(lastLink = new BrewOSXIP(name, this));
-						configureVirtualAddress(lastLink);
-						state = IpAddressState.MAC;
-					}
+					l.add(lastLink = new BrewOSXIP(name, this));
+					state = IpAddressState.MAC;
 				} else if (lastLink != null) {
 					r = r.trim();
 					if (state == IpAddressState.MAC) {
@@ -216,13 +210,6 @@ public class BrewOSXPlatformServiceImpl extends AbstractUnixDesktopPlatformServi
 			}
 		}
 		return l;
-	}
-
-	protected BrewOSXIP find(String name, Iterable<BrewOSXIP> links) {
-		for (BrewOSXIP link : links)
-			if (Objects.equals(name, link.getName()))
-				return link;
-		throw new IllegalArgumentException(String.format("No IP item %s", name));
 	}
 
 	String resolvconfIfacePrefix() throws IOException {
@@ -272,31 +259,30 @@ public class BrewOSXPlatformServiceImpl extends AbstractUnixDesktopPlatformServi
 	}
 
 	@Override
-	protected ActiveSession<BrewOSXIP> configureExistingSession(SystemContext context, VpnConfiguration connection, BrewOSXIP ip, Optional<VpnPeer> peer) {
+    protected VpnAdapter configureExistingSession(BrewOSXIP ip) {
 		switch(ip.calcDnsMethod()) {
-		case SCUTIL_COMPATIBLE:
-			/* Should still be in correct state. State is also lost at reboot (good thing!) */
-			break;
-		case NETWORKSETUP:
-			OSXNetworksetupDNS.get().configure(new InterfaceDNS(ip.getName(), connection.dns().toArray(new String[0])));
-			break;
+//		case SCUTIL_COMPATIBLE:
+//			/* Should still be in correct state. State is also lost at reboot (good thing!) */
+//			break;
+//		case NETWORKSETUP:
+//			OSXNetworksetupDNS.get().configure(new InterfaceDNS(ip.getName(), connection.dns().toArray(new String[0])));
+//			break;
 		default:
 			// Should not happen
-			throw new UnsupportedOperationException();
+			throw new UnsupportedOperationException("TODO");
 		}
-		return super.configureExistingSession(context, connection, ip, peer);
+//		return super.configureExistingSession(ip);
 	}
 
 	@Override
-	protected Collection<ActiveSession<BrewOSXIP>> onInit(SystemContext ctx, List<ActiveSession<BrewOSXIP>> sessions) {
+	protected void onInit(SystemContext ctx) {
 		OSXNetworksetupDNS.get().start(ctx, commands());
-		return super.onInit(ctx, sessions);
+		super.onInit(ctx);
 	}
 
 	@Override
-	protected void onStart(ActiveSession<BrewOSXIP> session) throws IOException {
+	protected void onStart(Optional<String> interfaceName, VpnConfiguration configuration, VpnAdapter session, Optional<VpnPeer> peer) throws IOException {
 		BrewOSXIP ip = null;
-		var connection = session.configuration();
 
 		/*
 		 * Look for wireguard interfaces that are available but not connected. If we
@@ -304,20 +290,20 @@ public class BrewOSXPlatformServiceImpl extends AbstractUnixDesktopPlatformServi
 		 */
 		int maxIface = -1;
 
-		List<BrewOSXIP> ips = ips(false);
+		List<BrewOSXIP> ips = addresses();
 		for (int i = 0; i < MAX_INTERFACES; i++) {
 			String name = getInterfacePrefix() + i;
 			log.info(String.format("Looking for %s.", name));
 			if (exists(name, ips)) {
 				/* Interface exists, is it connected? */
-				String publicKey = getPublicKey(name);
-				if (publicKey == null && new File("/var/run/wireguard/" + name + ".sock").exists()) {
+				var publicKey = getPublicKey(name);
+				if (publicKey.isEmpty() && new File("/var/run/wireguard/" + name + ".sock").exists()) {
 					/* No addresses, wireguard not using it */
 					log.info(String.format("%s is free.", name));
-					ip = find(name, ips);
+					ip = find(name, ips).orElseThrow(() -> new IOException(MessageFormat.format("Could not find network interface {0}", name)));;
 					maxIface = i;
 					break;
-				} else if (publicKey != null && publicKey.equals(connection.publicKey())) {
+				} else if (publicKey.isPresent() && publicKey.get().equals(configuration.publicKey())) {
 					throw new IllegalStateException(
 							String.format("Peer with public key %s on %s is already active.", publicKey, name));
 				} else {
@@ -335,23 +321,23 @@ public class BrewOSXPlatformServiceImpl extends AbstractUnixDesktopPlatformServi
 		if (ip == null) {
 			String name = getInterfacePrefix() + maxIface;
 			log.info(String.format("No existing unused interfaces, creating new one (%s) for public key .", name,
-					connection.publicKey()));
+					configuration.publicKey()));
 			ip = add(name, "wireguard");
 			if (ip == null) 
 				throw new IOException("Failed to create virtual IP address.");
 			log.info(String.format("Created %s", name));
 		} else
-			log.info(String.format("Using %s", ip.getName()));
+			log.info(String.format("Using %s", ip.name()));
 
 		Path tempFile = Files.createTempFile("wg", "cfg");
 		try {
 			try (Writer writer = Files.newBufferedWriter(tempFile)) {
-				write(connection, writer);
+				write(configuration, writer);
 			}
-			log.info(String.format("Activating Wireguard configuration for %s (in %s)", ip.getName(), tempFile));
+			log.info(String.format("Activating Wireguard configuration for %s (in %s)", ip.name(), tempFile));
 			checkWGCommand();
-			commands().privileged().result(getWGCommand(), "setconf", ip.getName(), tempFile.toString());
-			log.info(String.format("Activated Wireguard configuration for %s", ip.getName()));
+			commands().privileged().logged().result(getWGCommand(), "setconf", ip.name(), tempFile.toString());
+			log.info(String.format("Activated Wireguard configuration for %s", ip.name()));
 		} finally {
 			Files.delete(tempFile);
 		}
@@ -363,15 +349,15 @@ public class BrewOSXPlatformServiceImpl extends AbstractUnixDesktopPlatformServi
         var connectionStarted = Instant.ofEpochMilli(((System.currentTimeMillis() / 1000l) - 1) * 1000l);
 
 		/* Set the address reserved */
-		if(connection.addresses().size() > 0) {
-		    var addr = connection.addresses().get(0);
-    		log.info(String.format("Setting address %s on %s", addr, ip.getName()));
+		if(configuration.addresses().size() > 0) {
+		    var addr = configuration.addresses().get(0);
+    		log.info(String.format("Setting address %s on %s", addr, ip.name()));
     		ip.setAddresses(addr);
 		}
 
 		/* Bring up the interface (will set the given MTU) */
-		ip.setMtu(connection.mtu().or(() -> context.configuration().defaultMTU()).orElse(0));
-		log.info(String.format("Bringing up %s", ip.getName()));
+		ip.mtu(configuration.mtu().or(() -> context.configuration().defaultMTU()).orElse(0));
+		log.info(String.format("Bringing up %s", ip.name()));
 		ip.up();
 		session.attachToInterface(ip);
 
@@ -381,12 +367,12 @@ public class BrewOSXPlatformServiceImpl extends AbstractUnixDesktopPlatformServi
 		 * connection. We don't know WHY, just it has failed
 		 */
 		if(context.configuration().connectTimeout().isPresent()) {
-            waitForFirstHandshake(session, connectionStarted, context.configuration().connectTimeout().get());
+            waitForFirstHandshake(configuration, session, connectionStarted, peer, context.configuration().connectTimeout().get());
         }
 
 		/* Set the routes */
 		try {
-			log.info(String.format("Setting routes for %s", ip.getName()));
+			log.info(String.format("Setting routes for %s", ip.name()));
 			setRoutes(session, ip);
 		}
 		catch(IOException | RuntimeException ioe) {
@@ -404,7 +390,7 @@ public class BrewOSXPlatformServiceImpl extends AbstractUnixDesktopPlatformServi
 		
 		/* DNS */
 		try {
-			dns(connection, ip);
+			dns(configuration, ip);
 		}
 		catch(IOException | RuntimeException ioe) {
 			try {
@@ -420,13 +406,13 @@ public class BrewOSXPlatformServiceImpl extends AbstractUnixDesktopPlatformServi
 
 	}
 
-	void setRoutes(ActiveSession<BrewOSXIP> session, BrewOSXIP ip) throws IOException {
+	void setRoutes(VpnAdapter session, BrewOSXIP ip) throws IOException {
 
 		/* Set routes from the known allowed-ips supplies by Wireguard. */
 		session.allows().clear();
 
 		checkWGCommand();
-		for (String s : commands().privileged() .output(getWGCommand(), "show", ip.getName(), "allowed-ips")) {
+		for (String s : commands().privileged() .output(getWGCommand(), "show", ip.name(), "allowed-ips")) {
 			StringTokenizer t = new StringTokenizer(s);
 			if (t.hasMoreTokens()) {
 				t.nextToken();
@@ -454,8 +440,8 @@ public class BrewOSXPlatformServiceImpl extends AbstractUnixDesktopPlatformServi
 	}
 
 	@Override
-	public void runHook(ActiveSession<BrewOSXIP> session, String... hookScript) throws IOException {
-		runHookViaPipeToShell(session, OsUtil.getPathOfCommandInPathOrFail("bash").toString(), "-c", String.join(" ; ",  hookScript).trim());
+	public void runHook(VpnConfiguration configuration, VpnAdapter session, String... hookScript) throws IOException {
+		runHookViaPipeToShell(configuration, session, OsUtil.getPathOfCommandInPathOrFail("bash").toString(), "-c", String.join(" ; ",  hookScript).trim());
 	}
 
 	@Override
@@ -465,16 +451,6 @@ public class BrewOSXPlatformServiceImpl extends AbstractUnixDesktopPlatformServi
 
     @Override
     protected void runCommand(List<String> commands) throws IOException {
-        commands().privileged().run(commands.toArray(new String[0]));
-    }
-
-    @Override
-    public VpnInterfaceInformation information(BrewOSXIP iface) throws IOException {
-        return super.information(iface);
-    }
-
-    @Override
-    public VpnConfiguration configuration(BrewOSXIP iface) throws IOException {
-        return super.configuration(iface);
+        commands().privileged().logged().run(commands.toArray(new String[0]));
     }
 }

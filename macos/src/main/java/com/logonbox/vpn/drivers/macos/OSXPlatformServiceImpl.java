@@ -21,10 +21,10 @@
 package com.logonbox.vpn.drivers.macos;
 
 import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
-import com.logonbox.vpn.drivers.lib.ActiveSession;
 import com.logonbox.vpn.drivers.lib.DNSIntegrationMethod;
+import com.logonbox.vpn.drivers.lib.VpnAdapter;
 import com.logonbox.vpn.drivers.lib.VpnConfiguration;
-import com.logonbox.vpn.drivers.lib.VpnInterfaceInformation;
+import com.logonbox.vpn.drivers.lib.VpnPeer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.NetworkInterface;
 import java.util.List;
+import java.util.Optional;
 
 public class OSXPlatformServiceImpl extends AbstractUnixDesktopPlatformService<OSXIP> {
 
@@ -67,7 +68,7 @@ public class OSXPlatformServiceImpl extends AbstractUnixDesktopPlatformService<O
 	}
 
 	@Override
-	protected void onStart(ActiveSession<OSXIP> logonBoxVPNSession)
+	protected void onStart(Optional<String> interfaceName, VpnConfiguration configuration, VpnAdapter logonBoxVPNSession, Optional<VpnPeer> peer)
 			throws IOException {
 		throw new UnsupportedOperationException("TODO");
 	}
@@ -79,17 +80,13 @@ public class OSXPlatformServiceImpl extends AbstractUnixDesktopPlatformService<O
 
     @Override
     protected void runCommand(List<String> commands) throws IOException {
-        commands().privileged().run(commands.toArray(new String[0]));
+        commands().privileged().logged().run(commands.toArray(new String[0]));
     }
 
     @Override
-    public VpnInterfaceInformation information(OSXIP iface) throws IOException {
-        return super.information(iface);
+    public List<OSXIP> addresses() {
+        throw new UnsupportedOperationException("TODO");
     }
 
-    @Override
-    public VpnConfiguration configuration(OSXIP iface) throws IOException {
-        return super.configuration(iface);
-    }
 
 }
