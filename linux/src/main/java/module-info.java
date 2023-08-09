@@ -21,8 +21,8 @@
 import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
 import com.logonbox.vpn.drivers.linux.LinuxPlatformServiceFactory;
 
-module com.logonbox.vpn.drivers.os {
-    opens com.logonbox.vpn.drivers.linux.dbus to org.freedesktop.dbus;
+open module com.logonbox.vpn.drivers.os {
+//    opens com.logonbox.vpn.drivers.linux.dbus to org.freedesktop.dbus;
     
     exports com.logonbox.vpn.drivers.linux;
     requires transitive com.logonbox.vpn.drivers.lib;
@@ -31,6 +31,7 @@ module com.logonbox.vpn.drivers.os {
     requires org.slf4j;
     requires org.freedesktop.dbus;
     requires com.sshtools.liftlib;
+    requires static uk.co.bithatch.nativeimage.annotations;
     
     provides PlatformServiceFactory with LinuxPlatformServiceFactory;
 }

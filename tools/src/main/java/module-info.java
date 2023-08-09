@@ -18,14 +18,12 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
-import com.logonbox.vpn.drivers.macos.MacOsPlatformServiceFactory;
 
-module com.logonbox.vpn.drivers.os {
-    exports com.logonbox.vpn.drivers.macos;
-    requires transitive com.logonbox.vpn.drivers.lib;
-    requires org.slf4j;
+open module com.logonbox.vpn.quick {
+    requires transitive com.logonbox.vpn.drivers.os;
+	requires info.picocli;
+    requires com.logonbox.vpn.drivers.lib;
+    requires transitive com.sshtools.porter;
     requires com.sshtools.liftlib;
-    provides PlatformServiceFactory with MacOsPlatformServiceFactory;
-    requires static uk.co.bithatch.nativeimage.annotations;
+    requires transitive jul.to.slf4j;
 }

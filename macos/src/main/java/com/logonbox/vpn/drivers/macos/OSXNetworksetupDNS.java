@@ -35,9 +35,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -135,7 +133,7 @@ public class OSXNetworksetupDNS {
 	}
 	
 	public synchronized void pushDns(InterfaceDNS dns) throws IOException {
-		LOG.info(String.format("Pushing DNS state for %s", dns.getIface()));
+		LOG.info("Pushing DNS state for {}", dns.getIface());
 		if(interfaceDns.containsKey(dns.getIface()))
 			throw new IllegalArgumentException(String.format("DNS for interface %s already pushed.", dns.getIface()));
 		interfaceDns.put(dns.getIface(), dns);
@@ -143,13 +141,13 @@ public class OSXNetworksetupDNS {
 	}
 	
 	public synchronized void changeDns(InterfaceDNS dns) throws IOException {
-		LOG.info(String.format("Changing DNS state for %s", dns.getIface()));
+		LOG.info("Changing DNS state for {}", dns.getIface());
 		interfaceDns.put(dns.getIface(), dns);
 		updateDns();
 	}
 	
 	public synchronized void popDns(String iface) throws IOException {
-		LOG.info(String.format("Popping DNS state for %s", iface));
+		LOG.info("Popping DNS state for {}", iface);
 		if(!interfaceDns.containsKey(iface))
 			throw new IllegalArgumentException(String.format("DNS for interface %s not pushed.", iface));
 		interfaceDns.remove(iface);
@@ -162,13 +160,13 @@ public class OSXNetworksetupDNS {
 
 	protected void updateDns() throws IOException {
 		LOG.info("Updating DNS state");
-		LOG.info("Current default state: " + defaultServices.values());
-		LOG.info("Current internal state: " + interfaceDns.values());
+		LOG.info("Current default state: {}", defaultServices.values());
+		LOG.info("Current internal state: {}", interfaceDns.values());
 		
 		/* Get all unique DNS servers and domains */
-		Set<String> dnsServers = new LinkedHashSet<>();
-		Set<String> dnsDomains = new LinkedHashSet<>();
-		for(InterfaceDNS ifaceDns : interfaceDns.values()) {
+		var dnsServers = new LinkedHashSet<String>();
+		var dnsDomains = new LinkedHashSet<String>();
+		for(var ifaceDns : interfaceDns.values()) {
 			dnsServers.addAll(ifaceDns.getServers());
 			dnsDomains.addAll(ifaceDns.getDomains());
 		}
@@ -176,9 +174,9 @@ public class OSXNetworksetupDNS {
 		/* Build a new map of defaultServices that merges the original DNS configuration
 		 * with all pushed interface dns configuration
 		 */
-		Map<String, OSXService> newServices = new HashMap<>();
-		for(Map.Entry<String, OSXService> srvEn : defaultServices.entrySet()) {
-			OSXService newSrv = new OSXService(srvEn.getKey());
+		var newServices = new HashMap<String, OSXService>();
+		for(var srvEn : defaultServices.entrySet()) {
+			var newSrv = new OSXService(srvEn.getKey());
 			newSrv.getServers().addAll(dnsServers);
 			newSrv.getServers().addAll(srvEn.getValue().getServers());
 			newSrv.getDomains().addAll(dnsDomains);
@@ -188,8 +186,8 @@ public class OSXNetworksetupDNS {
 
 		/* Now actually set the DNS based on this merged map */
 		for(Map.Entry<String, OSXService> srvEn : newServices.entrySet()) {
-			LOG.info(String.format("Setting DNS for service %s", srvEn.getKey()));
-			List<String> args = new ArrayList<>(Arrays.asList("networksetup", "-setdnsservers", srvEn.getKey()));
+			LOG.info("Setting DNS for service {}", srvEn.getKey());
+			var args = new ArrayList<String>(Arrays.asList("networksetup", "-setdnsservers", srvEn.getKey()));
 			if(srvEn.getValue().getServers().isEmpty()) 
 				args.add("Empty");
 			else 
@@ -211,26 +209,26 @@ public class OSXNetworksetupDNS {
 	
 
 	private Set<String> collectNewServiceDns() throws IOException {
-		Set<String> foundServices = new HashSet<>();
+		var foundServices = new HashSet<String>();
 		LOG.debug("Running network setup to determine all network service.");
-		for(String service : commands.output(debugCommandArgs("networksetup", "-listallnetworkservices"))) {
+		for(var service : commands.output(debugCommandArgs("networksetup", "-listallnetworkservices"))) {
 			if(service.startsWith("*")) {
 				service = service.substring(1);
-				LOG.debug(String.format("%s is disabled service.", service));
+				LOG.debug("{} is disabled service.", service);
 			}
 			else if(service.startsWith("An asterisk")) {
 				continue;
 			}
-			LOG.debug(String.format("%s service found.", service));
+			LOG.debug("{} service found.", service);
 			foundServices.add(service);
 			
-			OSXService srv = defaultServices.get(service);
+			var srv = defaultServices.get(service);
 			if(srv == null) {
 				srv = new OSXService(service);
 				defaultServices.put(service, srv);
 			}
 			
-			for(String out : commands.output(debugCommandArgs("networksetup", "-getdnsservers", service))) {
+			for(var out : commands.output(debugCommandArgs("networksetup", "-getdnsservers", service))) {
 				if(out.indexOf(' ') != -1) {
 					/* Multi-word message indicating no Dns servers */
 					srv.getServers().clear();
@@ -238,16 +236,16 @@ public class OSXNetworksetupDNS {
 				}
 				else {
 					if(isDNSAddressUsedByIface(out)) {
-						LOG.debug(String.format("%s service has %s for DNS, but it supplied by a VPN interface.", service, out));
+						LOG.debug("{} service has %s for DNS, but it supplied by a VPN interface.", service, out);
 					}
 					else {
-						LOG.debug(String.format("%s service has %s for DNS.", service, out));
+						LOG.debug("{} service has %s for DNS.", service, out);
 						srv.getServers().add(out);
 					}
 				}
  			}
 			
-			for(String out : commands.output(debugCommandArgs("networksetup", "-getsearchdomains", service))) {
+			for(var out : commands.output(debugCommandArgs("networksetup", "-getsearchdomains", service))) {
 				if(out.indexOf(' ') != -1) {
 					/* Multi-word message indicating no Dns servers */
 					srv.getDomains().clear();
@@ -256,10 +254,10 @@ public class OSXNetworksetupDNS {
 				else {
 
 					if(isDNSDomainUsedByIface(out)) {
-						LOG.debug(String.format("%s service has %s for domain search, but it is supplied by a VPN interface.", service, out));
+						LOG.debug("{} service has {} for domain search, but it is supplied by a VPN interface.", service, out);
 					}
 					else {
-						LOG.debug(String.format("%s service has %s for domain search.", service, out));
+						LOG.debug("{} service has {} for domain search.", service, out);
 						srv.getDomains().add(out);
 					}
 				}
@@ -267,10 +265,10 @@ public class OSXNetworksetupDNS {
 		}
 		
 		/* Remove anything that doesn't exist */
-		for(Iterator<Map.Entry<String,OSXService>> serviceIt = defaultServices.entrySet().iterator(); serviceIt.hasNext(); ) {
-			Map.Entry<String,OSXService> serviceEn = serviceIt.next();
+		for(var serviceIt = defaultServices.entrySet().iterator(); serviceIt.hasNext(); ) {
+			var serviceEn = serviceIt.next();
 			if(!foundServices.contains(serviceEn.getKey())) {
-				LOG.debug(String.format("Removing service %s, it either doesn't exist or has no DNS configuration.", serviceEn.getKey()));
+				LOG.debug("Removing service {}, it either doesn't exist or has no DNS configuration.", serviceEn.getKey());
 				serviceIt.remove();
 			}
 		}

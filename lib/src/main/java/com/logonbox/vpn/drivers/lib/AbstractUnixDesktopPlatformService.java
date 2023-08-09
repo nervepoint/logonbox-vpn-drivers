@@ -1,6 +1,10 @@
 package com.logonbox.vpn.drivers.lib;
 
+import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -17,6 +21,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
         extends AbstractDesktopPlatformService<I> {
+    private final static Logger LOG = LoggerFactory.getLogger(AbstractUnixDesktopPlatformService.class);
 
     public AbstractUnixDesktopPlatformService(String interfacePrefix) {
         super(interfacePrefix);
@@ -27,7 +32,7 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
         try {
             checkWGCommand();
             var l = new ArrayList<VpnAdapter>();
-            for (var line : commands().output(getWGCommand(), "show", "interfaces")) {
+            for (var line : commands().output(nativeComponents().tool(Tool.WG), "show", "interfaces")) {
                 for(var ifaceName : line.split("\\s+")) {
                     l.add(configureExistingSession(address(ifaceName)));
                 }
@@ -44,7 +49,6 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
         var gw = getDefaultGateway();
         var addr = peer.endpointAddress().orElseThrow(() -> new IllegalArgumentException("Peer has no address."));
         LOG.info("Routing traffic all through peer {}", addr);
-        LOG.info(String.join(" ", Arrays.asList("route", "add", addr, "gw", gw)));
         commands().privileged().logged().run("route", "add", addr, "gw", gw);
     }
 
@@ -53,14 +57,13 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
         var gw = getDefaultGateway();
         var addr = peer.endpointAddress().orElseThrow(() -> new IllegalArgumentException("Peer has no address."));
         LOG.info("Removing routing of all traffic  through peer {}", addr);
-        LOG.info(String.join(" ", Arrays.asList("route", "del", addr, "gw", gw)));
         commands().privileged().logged().run("route", "del", addr, "gw", gw);
     }
 
     @Override
     public Instant getLatestHandshake(String iface, String publicKey) throws IOException {
         checkWGCommand();
-        for (String line : commands().privileged().output(getWGCommand(), "show", iface, "latest-handshakes")) {
+        for (String line : commands().privileged().output(nativeComponents().tool(Tool.WG), "show", iface, "latest-handshakes")) {
             String[] args = line.trim().split("\\s+");
             if (args.length == 2) {
                 if (args[0].equals(publicKey)) {
@@ -75,7 +78,7 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
     protected Optional<String> getPublicKey(String interfaceName) throws IOException {
         try {
             checkWGCommand();
-            String pk = commands().privileged().output(getWGCommand(), "show", interfaceName, "public-key").iterator()
+            String pk = commands().privileged().output(nativeComponents().tool(Tool.WG), "show", interfaceName, "public-key").iterator()
                     .next().trim();
             if (pk.equals("(none)") || pk.equals(""))
                 return Optional.empty();
@@ -108,7 +111,7 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
             var publicKey = new StringBuffer();
             var privateKey = new StringBuffer();
     
-            for (var line : commands().privileged().output(getWGCommand(), "show", iface.name(), "dump")) {
+            for (var line : commands().privileged().output(nativeComponents().tool(Tool.WG), "show", iface.name(), "dump")) {
                 var st = new StringTokenizer(line);
                 if (st.countTokens() == 4) {
                     privateKey.append(st.nextToken());
@@ -245,7 +248,7 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
                 checkWGCommand();
                 return new VpnAdapterConfiguration.Builder()
                         .fromFileContent(String.join(System.lineSeparator(),
-                                commands().privileged().output(getWGCommand(), "showconf", adapter.address().name())))
+                                commands().privileged().output(nativeComponents().tool(Tool.WG), "showconf", adapter.address().name())))
                         .build();
             } catch (ParseException e) {
                 throw new IOException("Failed to parse configuration.", e);

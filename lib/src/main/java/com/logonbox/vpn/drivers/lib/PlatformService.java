@@ -63,14 +63,6 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	 */
 	void restrictToUser(Path path) throws IOException;
 
-	/**
-	 * Get a list of the common names of any 3rd party or distribution packages that
-	 * are needed on this platform.
-	 * 
-	 * @return message packages
-	 */
-	String[] getMissingPackages();
-
     /**
      * Get the system context that called {@link #init(SystemContext)}.
      * {@link IllegalStateException} will be thrown if not started.
@@ -230,5 +222,14 @@ public interface PlatformService<ADDR extends VpnAddress> {
      * @throws UncheckedIOException on error
      */
     VpnAdapterConfiguration configuration(VpnAdapter adapter);
+
+    /**
+     * {@link NativeComponents} manages locating, or potentially (temporarily)
+     * installing various native tools, such as the <code>wg</code> command,
+     * the userspace <code>wireguard-go</code> implementation and more. 
+     * 
+     * @return configuration
+     */
+    NativeComponents nativeComponents();
  
 }

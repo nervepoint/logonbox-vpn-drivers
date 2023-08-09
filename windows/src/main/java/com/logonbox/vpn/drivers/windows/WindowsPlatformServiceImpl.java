@@ -47,11 +47,7 @@ import com.sun.jna.ptr.PointerByReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.UncheckedIOException;
 import java.io.Writer;
@@ -72,6 +68,9 @@ import java.util.StringTokenizer;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.prefs.Preferences;
 
+import uk.co.bithatch.nativeimage.annotations.Resource;
+
+@Resource("win32-x84-64/.*")
 public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<WindowsIP> {
 
     public final static String SID_ADMINISTRATORS_GROUP = "S-1-5-32-544";
@@ -89,7 +88,6 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
             .parseInt(System.getProperty("logonbox.vpn.serviceInstallTimeout", "10"));
 
     private static Preferences PREFS = null;
-    private Object lock = new Object();
 
     public static Preferences getInterfaceNode(String name) {
         return getInterfacesNode().node(name);
@@ -129,7 +127,6 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
         return PREFS;
     }
 
-    private File wgFile;
     private final WindowsSystemServices services;
 
     public WindowsPlatformServiceImpl() {
@@ -167,7 +164,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
 
         /* netsh first */
         try {
-            for (String line : commands().privileged().output("netsh", "interface", "ip", "show", "interfaces")) {
+            for (var line : commands().privileged().output("netsh", "interface", "ip", "show", "interfaces")) {
                 line = line.trim();
                 if (line.equals("") || line.startsWith("Idx") || line.startsWith("---"))
                     continue;
@@ -205,19 +202,19 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
              * active WireGuard interfaces for some reason, so use ipconfig /all to create a
              * merged list.
              */
-            for (String line : commands().privileged().output("ipconfig", "/all")) {
+            for (var line : commands().privileged().output("ipconfig", "/all")) {
                 line = line.trim();
                 if (line.startsWith("Unknown adapter")) {
-                    String[] args = line.split("\\s+");
+                    var args = line.split("\\s+");
                     if (args.length > 1 && args[2].startsWith(getInterfacePrefix())) {
                         name = args[2].split(":")[0];
                     }
                 } else if (name != null && line.startsWith("Description ")) {
-                    String[] args = line.split(":");
+                    var args = line.split(":");
                     if (args.length > 1) {
-                        String description = args[1].trim();
+                        var description = args[1].trim();
                         if (description.startsWith("WireGuard Tunnel")) {
-                            WindowsIP vaddr = new WindowsIP(name, description, this);
+                            var vaddr = new WindowsIP(name, description, this);
                             ips.add(vaddr);
                             break;
                         }
@@ -239,7 +236,6 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
         var gw = getDefaultGateway();
         var addr = peer.endpointAddress().orElseThrow(() -> new IllegalArgumentException("Peer has no address."));
         LOG.info("Routing traffic all through peer {}", addr);
-        LOG.info(String.join(" ", Arrays.asList("route", "add", addr, gw)));
         commands().privileged().logged().run("route", "add", addr, gw);
     }
 
@@ -248,14 +244,13 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
         var gw = getDefaultGateway();
         var addr = peer.endpointAddress().orElseThrow(() -> new IllegalArgumentException("Peer has no address."));
         LOG.info("Removing routing of all traffic  through peer {}", addr);
-        LOG.info(String.join(" ", Arrays.asList("route", "delete", addr, gw)));
         commands().privileged().logged().run("route", "delete", addr, gw);
     }
 
     @Override
     protected String getDefaultGateway() throws IOException {
         String gw = null;
-        for (String line : commands().privileged().output("ipconfig")) {
+        for (var line : commands().privileged().output("ipconfig")) {
             if (gw == null) {
                 line = line.trim();
                 if (line.startsWith("Default Gateway ")) {
@@ -297,15 +292,15 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
         List<WindowsIP> ips = ips(false);
 
         for (int i = 0; i < MAX_INTERFACES; i++) {
-            String name = getInterfacePrefix() + i;
-            LOG.info(String.format("Looking for %s.", name));
+            var name = getInterfacePrefix() + i;
+            LOG.info("Looking for {}.", name);
 
             /*
              * Get ALL the interfaces because on Windows the interface name is netXXX, and
              * 'net' isn't specific to wireguard, nor even to WinTun.
              */
             if (exists(name, ips)) {
-                LOG.info(String.format("    %s exists.", name));
+                LOG.info("    {} exists.", name);
                 /* Get if this is actually a Wireguard interface. */
                 WindowsIP nicByName = find(name, ips).orElseThrow(() -> new IOException(MessageFormat.format("Could not find network interface {0}", name)));;
                 if (isWireGuardInterface(nicByName)) {
@@ -313,29 +308,29 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
 
                     // TODO check service state, we can't rely on the public key
                     // as we manage storage of it ourselves (no wg show command)
-                    LOG.info(String.format("    Looking for public key for %s.", name));
+                    LOG.info("    Looking for public key for {}.", name);
                     var publicKey = getPublicKey(name);
                     if (publicKey.isEmpty()) {
                         /* No addresses, wireguard not using it */
-                        LOG.info(String.format("    %s (%s) is free.", name, nicByName.displayName()));
+                        LOG.info("    {} ({}) is free.", name, nicByName.displayName());
                         ip = nicByName;
                         maxIface = i;
                         break;
                     } else if (publicKey.get().equals(configuration.publicKey())) {
-                        LOG.warn(String.format("    Peer with public key %s on %s is already active (by %s).",
-                                publicKey.get(), name, nicByName.displayName()));
+                        LOG.warn("    Peer with public key {} on {} is already active (by {}).",
+                                publicKey.get(), name, nicByName.displayName());
                         session.attachToInterface(nicByName);
                         return;
                     } else {
-                        LOG.info(String.format("    %s is already in use (by %s).", name, nicByName.displayName()));
+                        LOG.info("    {} is already in use (by {}).", name, nicByName.displayName());
                     }
                 } else
-                    LOG.info(String.format("    %s is already in use by something other than WinTun (%s).", name,
-                            nicByName.displayName()));
+                    LOG.info("    {} is already in use by something other than WinTun ({}).", name,
+                            nicByName.displayName());
             } else if (maxIface == -1) {
                 /* This one is the next free number */
                 maxIface = i;
-                LOG.info(String.format("    %s is next free interface.", name));
+                LOG.info("    {} is next free interface.", name);
                 break;
             }
         }
@@ -343,18 +338,18 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
             throw new IOException(String.format("Exceeds maximum of %d interfaces.", MAX_INTERFACES));
 
         if (ip == null) {
-            String name = getInterfacePrefix() + maxIface;
-            LOG.info(String.format("No existing unused interfaces, creating new one (%s) for public key .", name,
-                    configuration.publicKey()));
+            var name = getInterfacePrefix() + maxIface;
+            LOG.info("No existing unused interfaces, creating new one ({}) for public key .", name,
+                    configuration.publicKey());
             ip = new WindowsIP(name, "Wintun Userspace Tunnel", this);
-            LOG.info(String.format("Created %s", name));
+            LOG.info("Created {}", name);
         } else
-            LOG.info(String.format("Using %s", ip.name()));
+            LOG.info("Using {}", ip.name());
 
         session.attachToInterface(ip);
 
-        Path cwd = Paths.get(System.getProperty("user.dir"));
-        Path confDir = cwd.resolve("conf").resolve("connections");
+        var cwd = Paths.get(System.getProperty("user.dir"));
+        var confDir = cwd.resolve("conf").resolve("connections");
         if (!Files.exists(confDir))
             Files.createDirectories(confDir);
 
@@ -366,29 +361,29 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
          * This took a lot of finding :\
          * 
          */
-        PointerByReference securityDescriptor = new PointerByReference();
+        var securityDescriptor = new PointerByReference();
         XAdvapi32.INSTANCE.ConvertStringSecurityDescriptorToSecurityDescriptor(
                 "O:BAG:BAD:PAI(A;OICI;FA;;;BA)(A;OICI;FA;;;SY)", 1, securityDescriptor, null);
         if (!Advapi32.INSTANCE.SetFileSecurity(confDir.toFile().getPath(),
                 WinNT.OWNER_SECURITY_INFORMATION | WinNT.GROUP_SECURITY_INFORMATION | WinNT.DACL_SECURITY_INFORMATION,
                 securityDescriptor.getValue())) {
-            int err = Kernel32.INSTANCE.GetLastError();
+            var err = Kernel32.INSTANCE.GetLastError();
             throw new IOException(String.format("Failed to set file security on '%s'. %d. %s", confDir, err,
                     Kernel32Util.formatMessageFromLastErrorCode(err)));
         }
 
-        Path confFile = confDir.resolve(ip.name() + ".conf");
-        try (Writer writer = Files.newBufferedWriter(confFile)) {
+        var confFile = confDir.resolve(ip.name() + ".conf");
+        try (var writer = Files.newBufferedWriter(confFile)) {
             write(configuration, writer);
         }
 
         /* Install service for the network interface */
-        boolean install = false;
+        var install = false;
         if (!services.hasService(TUNNEL_SERVICE_NAME_PREFIX + "$" + ip.name())) {
             install = true;
             installService(ip.name(), cwd);
         } else
-            LOG.info(String.format("ServicADDRe for %s already exists.", ip.name()));
+            LOG.info("Service for {} already exists.", ip.name());
 
         /* The service may take a short while to appear */
         int i = 0;
@@ -412,8 +407,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
          */
         var connectionStarted = Instant.ofEpochMilli(((System.currentTimeMillis() / 1000l) - 1) * 1000l);
 
-        LOG.info(String.format("Waiting %d seconds for service to settle.",
-                context.configuration().serviceWait().toSeconds()));
+        LOG.info("Waiting {} seconds for service to settle.", context.configuration().serviceWait().toSeconds());
         try {
             Thread.sleep(context.configuration().serviceWait().toMillis());
         } catch (InterruptedException e) {
@@ -421,9 +415,9 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
         LOG.info("Service should be settled.");
 
         if (ip.isUp()) {
-            LOG.info(String.format("Service for %s is already up.", ip.name()));
+            LOG.info("Service for {} is already up.", ip.name());
         } else {
-            LOG.info(String.format("Bringing up %s", ip.name()));
+            LOG.info("Bringing up {}", ip.name());
             try {
                 ip.mtu(configuration.mtu().or(() -> context.configuration().defaultMTU()).orElse(0));
                 ip.up();
@@ -471,7 +465,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
                     try {
                         uninstall(service.getNativeName());
                     } catch (Exception e) {
-                        LOG.error(String.format("Failed to uninstall dead service %s", service.getNativeName()), e);
+                        LOG.error("Failed to uninstall dead service {}", service.getNativeName(), e);
                     }
                 }
             }
@@ -485,39 +479,34 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
         return new WindowsIP(nif.getName(), nif.getDisplayName(), this);
     }
 
-    @Override
-    public String[] getMissingPackages() {
-        return new String[0];
-    }
-
     void install(String serviceName, String displayName, String description, String[] dependencies, String account,
             String password, String command, int winStartType, boolean interactive,
             Winsvc.SERVICE_FAILURE_ACTIONS failureActions, boolean delayedAutoStart, DWORD sidType) throws IOException {
 
-        XAdvapi32 advapi32 = XAdvapi32.INSTANCE;
+        var advapi32 = XAdvapi32.INSTANCE;
 
-        XWinsvc.SERVICE_DESCRIPTION desc = new XWinsvc.SERVICE_DESCRIPTION();
+        var desc = new XWinsvc.SERVICE_DESCRIPTION();
         desc.lpDescription = description;
 
-        SC_HANDLE serviceManager = WindowsSystemServices.getManager(null, Winsvc.SC_MANAGER_ALL_ACCESS);
+        var serviceManager = WindowsSystemServices.getManager(null, Winsvc.SC_MANAGER_ALL_ACCESS);
         try {
 
-            int dwServiceType = WinNT.SERVICE_WIN32_OWN_PROCESS;
+            var dwServiceType = WinNT.SERVICE_WIN32_OWN_PROCESS;
             if (interactive)
                 dwServiceType |= WinNT.SERVICE_INTERACTIVE_PROCESS;
 
-            SC_HANDLE service = advapi32.CreateService(serviceManager, serviceName, displayName,
+            var service = advapi32.CreateService(serviceManager, serviceName, displayName,
                     Winsvc.SERVICE_ALL_ACCESS, dwServiceType, winStartType, WinNT.SERVICE_ERROR_NORMAL, command, null,
                     null, (dependencies == null ? "" : String.join("\0", dependencies)) + "\0", account, password);
 
             if (service != null) {
                 try {
-                    boolean success = false;
+                    var success = false;
                     if (failureActions != null) {
                         success = advapi32.ChangeServiceConfig2(service, Winsvc.SERVICE_CONFIG_FAILURE_ACTIONS,
                                 failureActions);
                         if (!success) {
-                            int err = Native.getLastError();
+                            var err = Native.getLastError();
                             throw new IOException(String.format("Failed to set failure actions. %d. %s", err,
                                     Kernel32Util.formatMessageFromLastErrorCode(err)));
                         }
@@ -525,18 +514,18 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
 
                     success = advapi32.ChangeServiceConfig2(service, Winsvc.SERVICE_CONFIG_DESCRIPTION, desc);
                     if (!success) {
-                        int err = Native.getLastError();
+                        var err = Native.getLastError();
                         throw new IOException(String.format("Failed to set description. %d. %s", err,
                                 Kernel32Util.formatMessageFromLastErrorCode(err)));
                     }
 
                     if (delayedAutoStart) {
-                        XWinsvc.SERVICE_DELAYED_AUTO_START_INFO delayedDesc = new XWinsvc.SERVICE_DELAYED_AUTO_START_INFO();
+                        var delayedDesc = new XWinsvc.SERVICE_DELAYED_AUTO_START_INFO();
                         delayedDesc.fDelayedAutostart = true;
                         success = advapi32.ChangeServiceConfig2(service, Winsvc.SERVICE_CONFIG_DELAYED_AUTO_START_INFO,
                                 delayedDesc);
                         if (!success) {
-                            int err = Native.getLastError();
+                            var err = Native.getLastError();
                             throw new IOException(String.format("Failed to set autostart. %d. %s", err,
                                     Kernel32Util.formatMessageFromLastErrorCode(err)));
                         }
@@ -547,11 +536,11 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
                      * service
                      */
                     if (sidType != null) {
-                        XWinsvc.SERVICE_SID_INFO info = new XWinsvc.SERVICE_SID_INFO();
+                        var info = new XWinsvc.SERVICE_SID_INFO();
                         info.dwServiceSidType = sidType;
                         success = advapi32.ChangeServiceConfig2(service, Winsvc.SERVICE_CONFIG_SERVICE_SID_INFO, info);
                         if (!success) {
-                            int err = Native.getLastError();
+                            var err = Native.getLastError();
                             throw new IOException(String.format("Failed to set SERVICE_SID_INFO. %d. %s", err,
                                     Kernel32Util.formatMessageFromLastErrorCode(err)));
                         }
@@ -561,7 +550,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
                     advapi32.CloseServiceHandle(service);
                 }
             } else {
-                int err = Kernel32.INSTANCE.GetLastError();
+                var err = Kernel32.INSTANCE.GetLastError();
                 throw new IOException(String.format("Failed to install. %d. %s", err,
                         Kernel32Util.formatMessageFromLastErrorCode(err)));
 
@@ -572,12 +561,12 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
     }
 
     public void installService(String name, Path cwd) throws IOException {
-        LOG.info(String.format("Installing service for %s", name));
-        StringBuilder cmd = new StringBuilder();
+        LOG.info("Installing service for {}", name);
+        var cmd = new StringBuilder();
 
         var nativeNCS = Paths.get("network-configuration-service.exe");
         if (Files.exists(nativeNCS)) {
-            LOG.info("Using natively compiled network configuration service at {0}", nativeNCS.toAbsolutePath());
+            LOG.info("Using natively compiled network configuration service at {}", nativeNCS.toAbsolutePath());
             cmd.append('"');
             cmd.append(nativeNCS.toAbsolutePath().toString());
             cmd.append('"');
@@ -600,7 +589,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
                 null, cmd.toString(), WinNT.SERVICE_DEMAND_START, false, null, false,
                 XWinsvc.SERVICE_SID_TYPE_UNRESTRICTED);
 
-        LOG.info(String.format("Installed service for %s (%s)", name, cmd));
+        LOG.info("Installed service for {} ({})", name, cmd);
     }
 
     @Override
@@ -621,34 +610,8 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
         return name.startsWith(getInterfacePrefix());
     }
 
-    @Override
-    public String getWGCommand() {
-        synchronized (lock) {
-            if (wgFile == null) {
-                try {
-                    wgFile = File.createTempFile("wgx", ".exe");
-                    try (InputStream in = WindowsPlatformServiceImpl.class.getResourceAsStream(getWGExeResource())) {
-                        try (OutputStream out = new FileOutputStream(wgFile)) {
-                            in.transferTo(out);
-                        }
-                    }
-                } catch (IOException ioe) {
-                    throw new IllegalStateException("Failed to get wg.exe.", ioe);
-                }
-            }
-            return wgFile.toString();
-        }
-    }
-
-    private String getWGExeResource() {
-        if (System.getProperty("os.arch").indexOf("64") == -1)
-            return "/win32-x86/wg.exe";
-        else
-            return "/win32-x86-64/wg.exe";
-    }
-
     public void uninstall(String serviceName) throws IOException {
-        XAdvapi32 advapi32 = XAdvapi32.INSTANCE;
+        var advapi32 = XAdvapi32.INSTANCE;
         SC_HANDLE serviceManager, service;
         serviceManager = WindowsSystemServices.getManager(null, WinNT.GENERIC_ALL);
         try {
@@ -656,7 +619,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
             if (service != null) {
                 try {
                     if (!advapi32.DeleteService(service)) {
-                        int err = Kernel32.INSTANCE.GetLastError();
+                        var err = Kernel32.INSTANCE.GetLastError();
                         throw new IOException(String.format("Failed to find service to uninstall '%s'. %d. %s",
                                 serviceName, err, Kernel32Util.formatMessageFromLastErrorCode(err)));
                     }
@@ -664,7 +627,7 @@ public class WindowsPlatformServiceImpl extends AbstractDesktopPlatformService<W
                     advapi32.CloseServiceHandle(service);
                 }
             } else {
-                int err = Kernel32.INSTANCE.GetLastError();
+                var err = Kernel32.INSTANCE.GetLastError();
                 throw new IOException(String.format("Failed to find service to uninstall '%s'. %d. %s", serviceName,
                         err, Kernel32Util.formatMessageFromLastErrorCode(err)));
             }

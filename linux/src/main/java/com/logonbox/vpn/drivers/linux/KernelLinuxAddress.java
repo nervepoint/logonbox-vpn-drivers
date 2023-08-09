@@ -18,14 +18,24 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
-import com.logonbox.vpn.drivers.macos.MacOsPlatformServiceFactory;
+package com.logonbox.vpn.drivers.linux;
 
-module com.logonbox.vpn.drivers.os {
-    exports com.logonbox.vpn.drivers.macos;
-    requires transitive com.logonbox.vpn.drivers.lib;
-    requires org.slf4j;
-    requires com.sshtools.liftlib;
-    provides PlatformServiceFactory with MacOsPlatformServiceFactory;
-    requires static uk.co.bithatch.nativeimage.annotations;
+import java.io.IOException;
+
+public class KernelLinuxAddress extends AbstractLinuxAddress {
+
+    KernelLinuxAddress(String name, AbstractLinuxPlatformService platform) {
+        super(name, platform);
+    }
+
+    @Override
+    protected void onDelete() throws IOException {
+        commands.privileged().logged().result("ip", "link", "del", "dev", name());
+    } 
+    
+    @Override
+    public boolean isUp() {
+        return true;
+    }
+
 }

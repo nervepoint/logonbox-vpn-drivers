@@ -25,7 +25,18 @@ import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
 import com.logonbox.vpn.drivers.lib.VpnAddress;
 import com.sshtools.liftlib.OS;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
+import uk.co.bithatch.nativeimage.annotations.Resource;
+
+@Resource("linux-x84-64/.*")
 public class LinuxPlatformServiceFactory implements PlatformServiceFactory {
+    final static Logger LOG = LoggerFactory.getLogger(LinuxPlatformServiceFactory.class);
 
     @Override
     public boolean isSupported() {
@@ -34,7 +45,32 @@ public class LinuxPlatformServiceFactory implements PlatformServiceFactory {
 
     @Override
     public PlatformService<? extends VpnAddress> createPlatformService() {
-        return new LinuxPlatformServiceImpl();
+        if(Boolean.getBoolean("logonbox.vpn.forceUserspace")) {
+            LOG.warn("Forcing use of userspace implementation through system property.");
+        }
+        else if(Boolean.getBoolean("logonbox.vpn.forceKernel")) {
+            LOG.warn("Forcing use of kernel implementation through system property.");
+            return new KernelLinuxPlatformService();
+        } else {
+            var modulesPath = Paths.get("/proc/modules");
+            if(Files.exists(modulesPath)) {
+                try(var in = Files.newBufferedReader(modulesPath)) {
+                    String line;
+                    while( ( line = in.readLine() ) != null) {
+                        if(line.split("\\s+")[0].equals("wireguard")) {
+                            LOG.info("Found wireguard module, using kernel implementation");
+                            return new KernelLinuxPlatformService();
+                        }
+                    }
+                }
+                catch(IOException ioe) {
+                }
+                LOG.info("Cannot detect wireguard module, using userspace implementation");
+            }
+            else
+                LOG.info("Cannot detect if wireguard module is available, assuming userspace implementation");
+        }
+        return new UserspaceLinuxPlatformService();
     }
 
 }

@@ -52,5 +52,5 @@ The simplest usage is to create a working VPN tunnel given a standard Wireguard 
 
 ## Full Example Application And Tools
 
-See [lbvq/README.md](lbvq/README.md) for a complete example application and usable tools.
+See [tools/README.md](tools/README.md) for a complete example application and usable tools.
  

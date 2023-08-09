@@ -21,7 +21,6 @@
 package com.logonbox.vpn.drivers.windows;
 
 import com.logonbox.vpn.drivers.lib.AbstractVirtualInetAddress;
-import com.logonbox.vpn.drivers.lib.DNSIntegrationMethod;
 import com.logonbox.vpn.drivers.lib.SystemCommands;
 import com.logonbox.vpn.drivers.lib.util.IpUtil;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
@@ -41,217 +40,224 @@ import java.util.Objects;
 import java.util.Set;
 
 public class WindowsIP extends AbstractVirtualInetAddress<WindowsPlatformServiceImpl> {
-	enum IpAddressState {
-		HEADER, IP, MAC
-	}
+    enum IpAddressState {
+        HEADER, IP, MAC
+    }
 
-	final static Logger LOG = LoggerFactory.getLogger(WindowsIP.class);
+    final static Logger LOG = LoggerFactory.getLogger(WindowsIP.class);
 
-	private Object lock = new Object();
-	private String displayName;
-	private Set<String> domainsAdded = new LinkedHashSet<String>();
-	private final SystemCommands commands;
-	
-	public WindowsIP(String name, String displayName, WindowsPlatformServiceImpl platform) {
-		super(platform, name); 
-		this.displayName = displayName;
-		commands = platform.commands();
-	}
+    private Object lock = new Object();
+    private String displayName;
+    private Set<String> domainsAdded = new LinkedHashSet<String>();
+    private final SystemCommands commands;
 
-	@Override
-	public void delete() throws IOException {
-		synchronized (lock) {
-			if (isUp()) {
-				down();
-			}
-			platform.uninstall(getServiceName());
-		}
-	}
+    public WindowsIP(String name, String displayName, WindowsPlatformServiceImpl platform) {
+        super(platform, name);
+        this.displayName = displayName;
+        commands = platform.commands();
+    }
 
     @Override
-	public void down() throws IOException {
-		synchronized (lock) {
-			try {
-				unsetDns();
-				platform.services().stopService(getService());
-			} catch (IOException ioe) {
-				throw ioe;
-			} catch (Exception e) {
-				throw new IOException("Failed to take interface down.", e);
-			}
-		}
-	}
+    public void delete() throws IOException {
+        synchronized (lock) {
+            if (isUp()) {
+                down();
+            }
+            platform.uninstall(getServiceName());
+        }
+    }
 
-	@Override
-	public boolean isUp() {
-		synchronized (lock) {
-			try {
-				return getService().getStatus().isRunning();
-			} catch (IOException e) {
-				return false;
-			}
-		}
-	}
+    @Override
+    public void down() throws IOException {
+        synchronized (lock) {
+            try {
+                unsetDns();
+                platform.services().stopService(getService());
+            } catch (IOException ioe) {
+                throw ioe;
+            } catch (Exception e) {
+                throw new IOException("Failed to take interface down.", e);
+            }
+        }
+    }
 
-	protected Service getService() throws IOException {
-		Service service = platform.services().getService(getServiceName());
-		if (service == null)
-			throw new IOException(String.format("No service for interface %s.", name()));
-		return service;
-	}
+    @Override
+    public boolean isUp() {
+        synchronized (lock) {
+            try {
+                return getService().getStatus().isRunning();
+            } catch (IOException e) {
+                return false;
+            }
+        }
+    }
 
-	protected String getServiceName() {
-		return WindowsPlatformServiceImpl.TUNNEL_SERVICE_NAME_PREFIX + "$" + name();
-	}
+    protected Service getService() throws IOException {
+        var service = platform.services().getService(getServiceName());
+        if (service == null)
+            throw new IOException(String.format("No service for interface %s.", name()));
+        return service;
+    }
 
-	public boolean isInstalled() {
-		synchronized (lock) {
-			try {
-				getService();
-				return true;
-			} catch (IOException ioe) {
-				return false;
-			}
-		}
-	}
+    protected String getServiceName() {
+        return WindowsPlatformServiceImpl.TUNNEL_SERVICE_NAME_PREFIX + "$" + name();
+    }
 
-	@Override
-	public String toString() {
-		return "Ip [name=" + name() + ", peer=" + peer() + "]";
-	}
+    public boolean isInstalled() {
+        synchronized (lock) {
+            try {
+                getService();
+                return true;
+            } catch (IOException ioe) {
+                return false;
+            }
+        }
+    }
 
-	@Override
-	public void up() throws IOException {
-		synchronized (lock) {
-			try {
-			    platform.services().startService(getService());
+    @Override
+    public String toString() {
+        return "Ip [name=" + name() + ", peer=" + peer() + "]";
+    }
 
-				var tmtu = this.getMtu(); 
-				
-				if(tmtu == 0) {
-					/* TODO detect */
-						
-					/* Still not found, use generic default */
-					if (tmtu == 0)
-						tmtu = 1500;
-	
-					/* Subtract 80, because .. */
-					tmtu -= 80;
-				}
+    @Override
+    public void up() throws IOException {
+        synchronized (lock) {
+            try {
+                platform.services().startService(getService());
 
-				commands.privileged().logged().result("netsh", "interface", "ipv4", "set", "subinterface", name(), "mtu=" + String.valueOf(tmtu), "store=persistent");
-			} catch (IOException e) {
-				throw e;
-			} catch (Exception e) {
-				throw new IOException("Failed to bring up interface service.", e);
-			}
-		}
-	}
+                var tmtu = this.getMtu();
 
-	@Override
-	public String getMac() {
-		throw new UnsupportedOperationException();
-	}
+                if (tmtu == 0) {
+                    /* TODO detect */
 
-	@Override
-	public String displayName() {
-		return displayName;
-	}
+                    /* Still not found, use generic default */
+                    if (tmtu == 0)
+                        tmtu = 1500;
 
-	@Override
-	public void dns(String[] dns) throws IOException {
-		if (dns == null || dns.length == 0) {
-			unsetDns();
-		} else {
-			DNSIntegrationMethod method = calcDnsMethod();
-			try {
-				LOG.info(String.format("Setting DNS for %s to %s using %s", name(),
-						String.join(", ", dns), method));
-				switch (method) {
-				case NETSH:
-					/* Ipv4 */
-					String[] dnsAddresses = IpUtil.filterIpV4Addresses(dns);
-					if(dnsAddresses.length > 2) {
-						LOG.warn("Windows only supports a maximum of 2 DNS servers. {} were supplied, the last {} will be ignored.", dnsAddresses.length, dnsAddresses.length - 2);
-					}
+                    /* Subtract 80, because .. */
+                    tmtu -= 80;
+                }
 
-					commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv4", "delete", "dnsservers", name(), "all"));
-					if(dnsAddresses.length > 0) {
-					    commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv4", "add", "dnsserver", name(), dnsAddresses[0], "index=1", "no"));	
-					} 
-					if(dnsAddresses.length > 1) {
-					    commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv4", "add", "dnsserver", name(), dnsAddresses[1], "index=2", "no"));	
-					} 
+                commands.privileged().logged().result("netsh", "interface", "ipv4", "set", "subinterface", name(),
+                        "mtu=" + String.valueOf(tmtu), "store=persistent");
+            } catch (IOException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new IOException("Failed to bring up interface service.", e);
+            }
+        }
+    }
 
-					/* Ipv6 */
-					dnsAddresses = IpUtil.filterIpV6Addresses(dns);
-					if(dnsAddresses.length > 2) {
-						LOG.warn("Windows only supports a maximum of 2 DNS servers. {} were supplied, the last {} will be ignored.", dnsAddresses.length, dnsAddresses.length - 2);
-					}
+    @Override
+    public String getMac() {
+        throw new UnsupportedOperationException();
+    }
 
-					commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv6", "delete", "dnsservers", name(), "all"));
-					if(dnsAddresses.length > 0) {
-					    commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv6", "add", "dnsserver", name(), dnsAddresses[0], "index=1", "no"));	
-					} 
-					if(dnsAddresses.length > 1) {
-					    commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv6", "add", "dnsserver", name(), dnsAddresses[1], "index=2", "no"));	
-					} 
+    @Override
+    public String displayName() {
+        return displayName;
+    }
 
-					String[] dnsNames = IpUtil.filterNames(dns);
-					String currentDomains = null;
-					try {
-						currentDomains = Advapi32Util.registryGetStringValue
-				                (WinReg.HKEY_LOCAL_MACHINE,
-				                        "System\\CurrentControlSet\\Services\\TCPIP\\Parameters", "SearchList");
-					}
-					catch(Exception e) {
-						//
-					}
-					Set<String> newDomainList = new LinkedHashSet<>(Util.isBlank(currentDomains) ? Collections.emptySet() : Arrays.asList(currentDomains.split(",")));
-					for(String dnsName : dnsNames) {
-						if(!newDomainList.contains(dnsName)) {
-							LOG.info(String.format("Adding domain %s to search", dnsName));
-							newDomainList.add(dnsName);
-						}
-					}
-					String newDomains = String.join(",", newDomainList);
-					if(!Objects.equals(currentDomains, newDomains)) {
-						domainsAdded.clear();
-						domainsAdded.addAll(newDomainList);
-						LOG.info(String.format("Final domain search %s", newDomains));
-						Advapi32Util.registrySetStringValue
-			            (WinReg.HKEY_LOCAL_MACHINE,
-			                    "System\\CurrentControlSet\\Services\\TCPIP\\Parameters", "SearchList", newDomains);
-					}
-					break;
-				case NONE:
-					break;
-				default:
-					throw new UnsupportedOperationException(String.format("DNS integration method %s not supported.", method));
-				}
-			}
-			finally {
-				LOG.info("Done setting DNS");
-			}
-		}
-		
-	}
+    @Override
+    public void dns(String[] dns) throws IOException {
+        if (dns == null || dns.length == 0) {
+            unsetDns();
+        } else {
+            var method = calcDnsMethod();
+            try {
+                LOG.info("Setting DNS for {} to {} using {}", name(), String.join(", ", dns), method);
+                switch (method) {
+                case NETSH:
+                    /* Ipv4 */
+                    var dnsAddresses = IpUtil.filterIpV4Addresses(dns);
+                    if (dnsAddresses.length > 2) {
+                        LOG.warn(
+                                "Windows only supports a maximum of 2 DNS servers. {} were supplied, the last {} will be ignored.",
+                                dnsAddresses.length, dnsAddresses.length - 2);
+                    }
 
-	private void unsetDns() {
-		String currentDomains = Advapi32Util.registryGetStringValue
-                (WinReg.HKEY_LOCAL_MACHINE,
-                        "System\\CurrentControlSet\\Services\\TCPIP\\Parameters", "SearchList");
-		Set<String> currentDomainList = new LinkedHashSet<>(Util.isBlank(currentDomains) ? Collections.emptySet() : Arrays.asList(currentDomains));
-		for(String dnsName : domainsAdded) {
-			LOG.info(String.format("Removing domain %s from search", dnsName));
-			currentDomainList.remove(dnsName);
-		}
-		String newDomains = String.join(",", currentDomainList);
-		if(!Objects.equals(currentDomains, newDomains)) {
-			LOG.info(String.format("Final domain search %s", newDomains));
-			Advapi32Util.registrySetStringValue
-            (WinReg.HKEY_LOCAL_MACHINE,
+                    commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv4",
+                            "delete", "dnsservers", name(), "all"));
+                    if (dnsAddresses.length > 0) {
+                        commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv4",
+                                "add", "dnsserver", name(), dnsAddresses[0], "index=1", "no"));
+                    }
+                    if (dnsAddresses.length > 1) {
+                        commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv4",
+                                "add", "dnsserver", name(), dnsAddresses[1], "index=2", "no"));
+                    }
+
+                    /* Ipv6 */
+                    dnsAddresses = IpUtil.filterIpV6Addresses(dns);
+                    if (dnsAddresses.length > 2) {
+                        LOG.warn(
+                                "Windows only supports a maximum of 2 DNS servers. {} were supplied, the last {} will be ignored.",
+                                dnsAddresses.length, dnsAddresses.length - 2);
+                    }
+
+                    commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv6",
+                            "delete", "dnsservers", name(), "all"));
+                    if (dnsAddresses.length > 0) {
+                        commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv6",
+                                "add", "dnsserver", name(), dnsAddresses[0], "index=1", "no"));
+                    }
+                    if (dnsAddresses.length > 1) {
+                        commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv6",
+                                "add", "dnsserver", name(), dnsAddresses[1], "index=2", "no"));
+                    }
+
+                    var dnsNames = IpUtil.filterNames(dns);
+                    String currentDomains = null;
+                    try {
+                        currentDomains = Advapi32Util.registryGetStringValue(WinReg.HKEY_LOCAL_MACHINE,
+                                "System\\CurrentControlSet\\Services\\TCPIP\\Parameters", "SearchList");
+                    } catch (Exception e) {
+                        //
+                    }
+                    var newDomainList = new LinkedHashSet<String>(Util.isBlank(currentDomains) ? Collections.emptySet()
+                            : Arrays.asList(currentDomains.split(",")));
+                    for (var dnsName : dnsNames) {
+                        if (!newDomainList.contains(dnsName)) {
+                            LOG.info("Adding domain {} to search", dnsName);
+                            newDomainList.add(dnsName);
+                        }
+                    }
+                    var newDomains = String.join(",", newDomainList);
+                    if (!Objects.equals(currentDomains, newDomains)) {
+                        domainsAdded.clear();
+                        domainsAdded.addAll(newDomainList);
+                        LOG.info("Final domain search {}", newDomains);
+                        Advapi32Util.registrySetStringValue(WinReg.HKEY_LOCAL_MACHINE,
+                                "System\\CurrentControlSet\\Services\\TCPIP\\Parameters", "SearchList", newDomains);
+                    }
+                    break;
+                case NONE:
+                    break;
+                default:
+                    throw new UnsupportedOperationException(
+                            String.format("DNS integration method %s not supported.", method));
+                }
+            } finally {
+                LOG.info("Done setting DNS");
+            }
+        }
+
+    }
+
+    private void unsetDns() {
+        var currentDomains = Advapi32Util.registryGetStringValue(WinReg.HKEY_LOCAL_MACHINE,
+                "System\\CurrentControlSet\\Services\\TCPIP\\Parameters", "SearchList");
+        var currentDomainList = new LinkedHashSet<String>(
+                Util.isBlank(currentDomains) ? Collections.emptySet() : Arrays.asList(currentDomains));
+        for (var dnsName : domainsAdded) {
+            LOG.info(String.format("Removing domain %s from search", dnsName));
+            currentDomainList.remove(dnsName);
+        }
+        var newDomains = String.join(",", currentDomainList);
+        if (!Objects.equals(currentDomains, newDomains)) {
+            LOG.info("Final domain search {}", newDomains);
+            Advapi32Util.registrySetStringValue(WinReg.HKEY_LOCAL_MACHINE,
                     "System\\CurrentControlSet\\Services\\TCPIP\\Parameters", "SearchList", newDomains);
-		}		
-	}
+        }
+    }
 }

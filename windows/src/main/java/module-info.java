@@ -29,6 +29,7 @@ module com.logonbox.vpn.drivers.os {
     requires transitive com.sun.jna.platform;
     requires transitive java.prefs;
     requires transitive com.sun.jna;
+    requires static uk.co.bithatch.nativeimage.annotations;
     
     provides PlatformServiceFactory with WindowsPlatformServiceFactory;
 }

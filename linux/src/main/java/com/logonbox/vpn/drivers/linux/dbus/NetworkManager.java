@@ -20,8 +20,6 @@
  */
 package com.logonbox.vpn.drivers.linux.dbus;
 
-import java.util.Map;
-
 import org.freedesktop.dbus.DBusPath;
 import org.freedesktop.dbus.Struct;
 import org.freedesktop.dbus.annotations.DBusInterfaceName;
@@ -30,11 +28,19 @@ import org.freedesktop.dbus.interfaces.DBusInterface;
 import org.freedesktop.dbus.types.UInt32;
 import org.freedesktop.dbus.types.Variant;
 
+import java.util.Map;
+
+import uk.co.bithatch.nativeimage.annotations.Proxy;
+import uk.co.bithatch.nativeimage.annotations.Reflectable;
+import uk.co.bithatch.nativeimage.annotations.TypeReflect;
+
 @DBusInterfaceName("org.freedesktop.NetworkManager")
+@Proxy
 public interface NetworkManager extends DBusInterface {
 	DBusPath GetDeviceByIpIface(String iface);
 
 	@DBusInterfaceName("org.freedesktop.NetworkManager.Settings")
+	@Proxy
 	public interface Settings extends DBusInterface {
 		DBusPath[] ListConnections();
 		
@@ -46,6 +52,8 @@ public interface NetworkManager extends DBusInterface {
 		}
 	}
 
+	@Reflectable
+    @TypeReflect(fields = true)
 	public static class Ipv6Address extends Struct {
 		@Position(0)
 		private byte[] unknown1;

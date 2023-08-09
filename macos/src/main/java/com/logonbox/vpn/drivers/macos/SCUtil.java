@@ -40,7 +40,7 @@ public class SCUtil implements Closeable {
 		this.iface = iface;
 		LOG.info("Running scutil");
 		out = commands.privileged().logged().pipe(line -> {
-            LOG.info("SCUTIL: " + line);    
+            LOG.info("SCUTIL: {}", line);    
 		}, "scutil");
 	}
 	

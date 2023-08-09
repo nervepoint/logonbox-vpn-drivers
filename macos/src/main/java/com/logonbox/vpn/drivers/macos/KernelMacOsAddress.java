@@ -18,14 +18,51 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
-import com.logonbox.vpn.drivers.macos.MacOsPlatformServiceFactory;
+package com.logonbox.vpn.drivers.macos;
 
-module com.logonbox.vpn.drivers.os {
-    exports com.logonbox.vpn.drivers.macos;
-    requires transitive com.logonbox.vpn.drivers.lib;
-    requires org.slf4j;
-    requires com.sshtools.liftlib;
-    provides PlatformServiceFactory with MacOsPlatformServiceFactory;
-    requires static uk.co.bithatch.nativeimage.annotations;
+import com.logonbox.vpn.drivers.lib.AbstractVirtualInetAddress;
+
+import java.io.IOException;
+
+public class KernelMacOsAddress extends AbstractVirtualInetAddress<KernelMacOsPlatformService> {
+
+	public KernelMacOsAddress(KernelMacOsPlatformService platform) {
+		super(platform);
+	}
+
+	@Override
+	public boolean isUp() {
+		throw new UnsupportedOperationException("TODO");
+	}
+
+	@Override
+	public void delete() throws IOException {
+		throw new UnsupportedOperationException("TODO");
+	}
+
+	@Override
+	public void down() throws IOException {
+		throw new UnsupportedOperationException("TODO");
+	}
+
+	@Override
+	public void up() throws IOException {
+		throw new UnsupportedOperationException("TODO");
+	}
+
+	@Override
+	public String getMac() {
+		throw new UnsupportedOperationException("TODO");
+	}
+
+	@Override
+	public String displayName() {
+		throw new UnsupportedOperationException("TODO");
+	}
+
+	@Override
+	public void dns(String[] dns) throws IOException {
+		throw new UnsupportedOperationException("TODO");
+	}
+
 }

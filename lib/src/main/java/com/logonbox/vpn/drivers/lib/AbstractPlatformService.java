@@ -37,13 +37,15 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
 	protected static final int MAX_INTERFACES = Integer.parseInt(System.getProperty("logonbox.vpn.maxInterfaces", "250"));
 
 
-	protected SystemContext context;
 	private final String interfacePrefix;
-	
+    private final NativeComponents nativeComponents;
+
+    protected SystemContext context;
 	private Optional<VpnPeer> defaultGateway = Optional.empty();
 	
 	protected AbstractPlatformService(String interfacePrefix) {
 		this.interfacePrefix = interfacePrefix;
+		nativeComponents = new NativeComponents(this);
 	}
 	
 	protected void beforeStart(SystemContext ctx) {
@@ -54,15 +56,15 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
 
 	@Override
     public void openToEveryone(Path path) throws IOException {
-        LOG.info(String.format("Setting permissions on %s to %s", path,
-                Arrays.asList(PosixFilePermission.values())));
+        LOG.info("Setting permissions on {} to {}", path,
+                Arrays.asList(PosixFilePermission.values()));
         Files.setPosixFilePermissions(path, new LinkedHashSet<>(Arrays.asList(PosixFilePermission.values())));
     }
 
     @Override
     public void restrictToUser(Path path) throws IOException {
         var prms = Arrays.asList(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
-        LOG.info(String.format("Setting permissions on %s to %s", path, prms));
+        LOG.info("Setting permissions on {} to {}", path, prms);
         Files.setPosixFilePermissions(path, new LinkedHashSet<>(
                 prms));
     }
@@ -73,15 +75,10 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
             throw new IllegalStateException("Service not started.");
         return context;
     }
-
-    @Override
-	public String[] getMissingPackages() {
-		return new String[0];
-	}
 	
 	@Override
 	public final void init(SystemContext context) {
-		LOG.info(String.format("Starting platform services %s", getClass().getName()));
+		LOG.info("Starting platform services {}", getClass().getName());
 		this.context = context;
 		beforeStart(context);
 		onInit(context);
@@ -100,6 +97,11 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
     }
     
     @Override
+    public NativeComponents nativeComponents() {
+        return nativeComponents;
+    }
+
+    @Override
     public final void resetDefaulGateway() throws IOException {
         if(defaultGateway.isPresent())  {
             var gw =defaultGateway.get();
@@ -112,11 +114,11 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
     public final void stop(VpnConfiguration configuration, VpnAdapter session) throws IOException {
         try {
 
-            LOG.info(String.format("Stopping VPN for %s", session.address().name()));
+            LOG.info("Stopping VPN for {}", session.address().name());
 
             if(configuration.preDown().length > 0) {
                 var p = configuration.preDown();
-                LOG.info("Running pre-down commands.", String.join(" ; ", p).trim());
+                LOG.info("Running pre-down commands. {}", String.join(" ; ", p).trim());
                 runHook(configuration, session, p);
             }
             
@@ -127,7 +129,7 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
             } finally {
                 if(configuration.postDown().length > 0) {
                     var p = configuration.postDown();
-                    LOG.info("Running post-down commands.", String.join(" ; ", p).trim());
+                    LOG.info("Running post-down commands. {}", String.join(" ; ", p).trim());
                     runHook(configuration, session, p);
                 }
             }

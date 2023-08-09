@@ -24,6 +24,9 @@ import com.logonbox.vpn.drivers.lib.PlatformService;
 import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
 import com.sshtools.liftlib.OS;
 
+import uk.co.bithatch.nativeimage.annotations.Resource;
+
+@Resource({"macos-x84-64/.*","macos-aarch64/.*"})
 public class MacOsPlatformServiceFactory implements PlatformServiceFactory {
 
     @Override
@@ -33,7 +36,7 @@ public class MacOsPlatformServiceFactory implements PlatformServiceFactory {
 
     @Override
     public PlatformService<?> createPlatformService() {
-        return new BrewOSXPlatformServiceImpl();
+        return new UserspaceMacOsPlatformService();
     }
 
 }

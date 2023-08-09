@@ -18,14 +18,27 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
-import com.logonbox.vpn.drivers.macos.MacOsPlatformServiceFactory;
+package com.logonbox.vpn.drivers.linux;
 
-module com.logonbox.vpn.drivers.os {
-    exports com.logonbox.vpn.drivers.macos;
-    requires transitive com.logonbox.vpn.drivers.lib;
-    requires org.slf4j;
-    requires com.sshtools.liftlib;
-    provides PlatformServiceFactory with MacOsPlatformServiceFactory;
-    requires static uk.co.bithatch.nativeimage.annotations;
+import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
+
+import java.io.IOException;
+import java.text.MessageFormat;
+
+public class UserspaceLinuxPlatformService extends AbstractLinuxPlatformService {
+
+    public UserspaceLinuxPlatformService() {
+        super();
+    }
+
+    @Override
+    protected AbstractLinuxAddress add(String name, String type) throws IOException {
+        commands().privileged().logged().result(nativeComponents().tool(Tool.WIREGUARD_GO), name);
+        return find(name, addresses()).orElseThrow(() -> new IOException(MessageFormat.format("Could not find new network interface {0}", name)));
+    }
+
+    @Override
+    protected AbstractLinuxAddress createAddress(String name) {
+        return new UserspaceLinuxAddress(name, this);
+    }
 }

@@ -18,14 +18,31 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
-import com.logonbox.vpn.drivers.macos.MacOsPlatformServiceFactory;
+package com.logonbox.vpn.drivers.linux;
 
-module com.logonbox.vpn.drivers.os {
-    exports com.logonbox.vpn.drivers.macos;
-    requires transitive com.logonbox.vpn.drivers.lib;
-    requires org.slf4j;
-    requires com.sshtools.liftlib;
-    provides PlatformServiceFactory with MacOsPlatformServiceFactory;
-    requires static uk.co.bithatch.nativeimage.annotations;
+import com.logonbox.vpn.drivers.lib.util.OsUtil;
+
+import java.io.File;
+import java.io.IOException;
+
+public class UserspaceLinuxAddress extends AbstractLinuxAddress {
+
+    UserspaceLinuxAddress(String name, AbstractLinuxPlatformService platform) {
+        super(name, platform);
+    }
+
+    @Override
+    protected void onDelete() throws IOException {
+        commands.privileged().logged().result(OsUtil.debugCommandArgs("rm", "-f", getSocketFile().getAbsolutePath()));
+    }
+
+    @Override
+    public boolean isUp() {
+        return getSocketFile().exists();
+    }
+
+    protected File getSocketFile() {
+        return new File("/var/run/wireguard/" + name() + ".sock");
+    }
+
 }

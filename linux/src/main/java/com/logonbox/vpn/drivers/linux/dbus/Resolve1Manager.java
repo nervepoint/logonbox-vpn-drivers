@@ -20,26 +20,33 @@
  */
 package com.logonbox.vpn.drivers.linux.dbus;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.Arrays;
-import java.util.List;
+import com.github.jgonian.ipmath.Ipv4;
+import com.github.jgonian.ipmath.Ipv6;
 
 import org.freedesktop.dbus.DBusPath;
-import org.freedesktop.dbus.ObjectPath;
 import org.freedesktop.dbus.Struct;
 import org.freedesktop.dbus.annotations.DBusInterfaceName;
 import org.freedesktop.dbus.annotations.Position;
 import org.freedesktop.dbus.interfaces.DBusInterface;
 
-import com.github.jgonian.ipmath.Ipv4;
-import com.github.jgonian.ipmath.Ipv6;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.Arrays;
+import java.util.List;
+
+import uk.co.bithatch.nativeimage.annotations.Proxy;
+import uk.co.bithatch.nativeimage.annotations.Reflectable;
+import uk.co.bithatch.nativeimage.annotations.TypeReflect;
 
 @DBusInterfaceName("org.freedesktop.resolve1.Manager")
+@Proxy
 public interface Resolve1Manager extends DBusInterface {
 	static final int AF_INET6 = 10;
 	static final int AF_INET = 2;
 
+
+    @Reflectable
+    @TypeReflect(fields = true)
 	public class SetLinkDNSStruct extends Struct {
 
 		@Position(0)
@@ -85,6 +92,8 @@ public interface Resolve1Manager extends DBusInterface {
 		}
 	}
 
+    @Reflectable
+    @TypeReflect(fields = true)
 	public class SetLinkDomainsStruct extends Struct {
 		@Position(0)
 		private final String domain;

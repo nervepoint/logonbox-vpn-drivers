@@ -58,7 +58,7 @@ import java.util.Set;
 
 public abstract class AbstractDesktopPlatformService<I extends VpnAddress> extends AbstractPlatformService<I> {
 
-	final static Logger LOG = LoggerFactory.getLogger(AbstractDesktopPlatformService.class);
+	private final static Logger LOG = LoggerFactory.getLogger(AbstractDesktopPlatformService.class);
 	
 	protected Path tempCommandDir;
 
@@ -71,7 +71,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 	}
 
 	protected Path extractCommand(String platform, String arch, String name) throws IOException {
-		LOG.info(String.format("Extracting command %s for platform %s on arch %s", name, platform, arch));
+		LOG.info("Extracting command {} for platform {} on arch {}", name, platform, arch);
 		try(InputStream in = getClass().getResource("/" + platform + "-" + arch + "/" + name).openStream()) {
 			Path path = getTempCommandDir().resolve(name);
 			try(OutputStream out = Files.newOutputStream(path)) {
@@ -79,7 +79,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 			}
 			path.toFile().deleteOnExit();
 			Files.setPosixFilePermissions(path, new LinkedHashSet<>(Arrays.asList(PosixFilePermission.OWNER_EXECUTE, PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)));
-			LOG.info(String.format("Extracted command %s for platform %s on arch %s to %s", name, platform, arch, path));
+			LOG.info("Extracted command {} for platform {} on arch {} to {}", name, platform, arch, path);
 			return path;
 		}
 	}
@@ -97,7 +97,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 
         if(configuration.preUp().length > 0)  {
             var p = configuration.preUp();
-            LOG.info("Running pre-up commands.", String.join("; ", p).trim());
+            LOG.info("Running pre-up commands. {}", String.join("; ", p).trim());
             runHook(configuration, session, p);
         };
 	    
@@ -115,7 +115,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 
         if(configuration.postUp().length > 0)  {
 		    var p = configuration.postUp();
-            LOG.info("Running post-up commands.", String.join("; ", p).trim());
+            LOG.info("Running post-up commands. {}", String.join("; ", p).trim());
             runHook(configuration, session, p);
 		};
 		
@@ -162,17 +162,13 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 				LOG.info("No DNS servers configured for this connection.");
 		}
 		else {
-			LOG.info(String.format("Configuring DNS servers for %s as %s", ip.name(), configuration.dns()));
+			LOG.info("Configuring DNS servers for {} as {}", ip.name(), configuration.dns());
 		}
 		ip.dns(configuration.dns().toArray(new String[0]));
 		
 	}
 
 	protected abstract String getDefaultGateway() throws IOException;
-
-	public String getWGCommand() {
-		return "wg";
-	}
 
 	protected boolean isMatchesPrefix(NetworkInterface nif) {
 		return nif.getName().startsWith(getInterfacePrefix());
@@ -204,7 +200,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
             return;
 	    }
         
-        LOG.info(String.format("Waiting for handshake for %d seconds. Hand shake should be after %d", timeout.toSeconds(), connectionStarted.toEpochMilli()));
+        LOG.info("Waiting for handshake for {} seconds. Hand shake should be after {}", timeout.toSeconds(), connectionStarted.toEpochMilli());
         
 		for(int i = 0 ; i < timeout.toSeconds() ; i++) {
 			try {
@@ -307,7 +303,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
     							for(AbstractIp<?, ?> laddr : localAddresses) {
     								if(laddr instanceof Ipv4 && range.contains((Ipv4)laddr)) {
     									// Covered by route. 
-    									LOG.info(String.format("Filtering out route %s as it covers an existing local interface address.", route));
+    									LOG.info("Filtering out route {} as it covers an existing local interface address.", route);
     									allowedIps.remove(route);
     									break;
     								}
@@ -318,7 +314,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
     							Ipv4 routeIpv4 = Ipv4.of(route);
     							if(localAddresses.contains(routeIpv4)) {
     								// Covered by route. 
-    								LOG.info(String.format("Filtering out route %s as it covers an existing local interface address.", route));
+    								LOG.info("Filtering out route {} as it covers an existing local interface address.", route);
     								allowedIps.remove(route);
     								break;
     							}
@@ -330,7 +326,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
     							for(AbstractIp<?, ?> laddr : localAddresses) {
     								if(laddr instanceof Ipv6 && range.contains((Ipv6)laddr)) {
     									// Covered by route. 
-    									LOG.info(String.format("Filtering out route %s as it covers an existing local interface address.", route));
+    									LOG.info("Filtering out route {} as it covers an existing local interface address.", route);
     									allowedIps.remove(route);
     									break;
     								}
@@ -341,7 +337,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
     							Ipv6 routeIpv6 = Ipv6.of(route);
     							if(localAddresses.contains(routeIpv6)) {
     								// Covered by route. 
-    								LOG.info(String.format("Filtering out route %s as it covers an existing local interface address.", route));
+    								LOG.info("Filtering out route {} as it covers an existing local interface address.", route);
     								allowedIps.remove(route);
     								break;
     							}
@@ -373,7 +369,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 		if(LOG.isDebugEnabled()) {
 			LOG.debug("Executing hook");
 			for(String arg : args) {
-				LOG.debug(String.format("    %s", arg));
+				LOG.debug("    {}", arg);
 			}
 		}
 		Map<String, String> env = new HashMap<String, String>();
@@ -403,21 +399,21 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 		if(LOG.isDebugEnabled()) {
 			LOG.debug("Environment:-");
 			for(Map.Entry<String, String> en : env.entrySet()) {
-				LOG.debug("    %s = %s", en.getKey(), en.getValue());
+				LOG.debug("    {} = {}", en.getKey(), en.getValue());
 			}
 		}
 
         LOG.debug("Command Output: ");
         var errorMessage = new StringBuffer();
 		int ret = commands().privileged().logged().env(env).consume((line) -> {
-            LOG.debug(String.format("    %s", line));
+            LOG.debug("    {}", line);
             if(line.startsWith("[ERROR] ")) {
                 errorMessage.setLength(0); // TODO really only keep last error message. I'd like to change this, but may break any users of this (we know there is at least one)
                 errorMessage.append(line.substring(8));
             }
 		}, args);
 		
-		LOG.debug(String.format("Exit: %d", ret));
+		LOG.debug("Exit: {}", ret);
 		if(ret != 0) {
 			if(errorMessage.length() == 0)
 				throw new IOException(String.format("Hook exited with non-zero status of %d.", ret));

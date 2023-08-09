@@ -1,0 +1,14 @@
+[
+   {
+    "name":"java.lang.Integer"
+  },
+  {
+    "name":"java.lang.Number"
+  },
+  {
+    "name":"java.lang.String"
+  },
+  {
+    "name":"java.util.Collections$EmptyMap"
+  }
+]

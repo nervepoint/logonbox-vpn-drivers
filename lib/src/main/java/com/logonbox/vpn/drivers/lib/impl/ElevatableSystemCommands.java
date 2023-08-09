@@ -20,6 +20,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 
+import uk.co.bithatch.nativeimage.annotations.Serialization;
+
 public class ElevatableSystemCommands implements SystemCommands {
     
     private final Elevator elevator;
@@ -274,6 +276,7 @@ public class ElevatableSystemCommands implements SystemCommands {
     }
 
     @SuppressWarnings("serial")
+    @Serialization
     public final static class BasicRun implements ElevatedClosure<Serializable, Serializable> {
 
         String[] args;
@@ -305,6 +308,7 @@ public class ElevatableSystemCommands implements SystemCommands {
     }
 
     @SuppressWarnings("serial")
+    @Serialization
     public final static class WithResult implements ElevatedClosure<Integer, Serializable> {
 
         String[] args;
@@ -332,6 +336,7 @@ public class ElevatableSystemCommands implements SystemCommands {
     }
 
     @SuppressWarnings("serial")
+    @Serialization
     public final static class Output implements ElevatedClosure<String[], Serializable> {
 
         String[] args;
@@ -371,6 +376,7 @@ public class ElevatableSystemCommands implements SystemCommands {
     }
 
     @SuppressWarnings("serial")
+    @Serialization
     public final static class PipeTo implements ElevatedClosure<Serializable, Serializable> {
 
         String[] args;
@@ -411,6 +417,7 @@ public class ElevatableSystemCommands implements SystemCommands {
     }
 
     @SuppressWarnings("serial")
+    @Serialization
     public final static class WithConsume implements ElevatedClosure<Integer, String> {
 
         String[] args;
