@@ -63,23 +63,15 @@
             <version>1.8-SNAPSHOT</version>
         </dependency>-->
     </dependencies>
+   
     <repositories>
-        <!-- For Forker -->
         <repository>
-            <id>opensource-releases</id>
-            <url>https://artifactory.jadaptive.com/opensource-releases</url>
-            <releases />
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-        </repository>
-        <repository>
-            <id>opensource-snapshots</id>
-            <url>https://artifactory.jadaptive.com/opensource-snapshots</url>
+            <id>oss-snapshots</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+            <snapshots />
             <releases>
                 <enabled>false</enabled>
             </releases>
-            <snapshots />
         </repository>
     </repositories>
 </project>
