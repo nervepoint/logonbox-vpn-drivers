@@ -172,7 +172,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
         Path tempFile = Files.createTempFile("wg", ".cfg");
         try {
             try (Writer writer = Files.newBufferedWriter(tempFile)) {
-                write(configuration, writer);
+                transform(configuration);
             }
             LOG.info("Activating Wireguard configuration for {} (in {})", ip.name(), tempFile);
             commands().privileged().logged().result(nativeComponents().tool(Tool.WG), "setconf", ip.name(),

@@ -20,23 +20,9 @@
  */
 package com.logonbox.vpn.drivers.lib;
 
-import com.github.jgonian.ipmath.AbstractIp;
-import com.github.jgonian.ipmath.Ipv4;
-import com.github.jgonian.ipmath.Ipv4Range;
-import com.github.jgonian.ipmath.Ipv6;
-import com.github.jgonian.ipmath.Ipv6Range;
-import com.logonbox.vpn.drivers.lib.impl.ElevatableSystemCommands;
-import com.logonbox.vpn.drivers.lib.util.IpUtil;
-import com.logonbox.vpn.drivers.lib.util.Util;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.io.Writer;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
@@ -55,6 +41,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.github.jgonian.ipmath.AbstractIp;
+import com.github.jgonian.ipmath.Ipv4;
+import com.github.jgonian.ipmath.Ipv4Range;
+import com.github.jgonian.ipmath.Ipv6;
+import com.github.jgonian.ipmath.Ipv6Range;
+import com.logonbox.vpn.drivers.lib.impl.ElevatableSystemCommands;
+import com.logonbox.vpn.drivers.lib.util.IpUtil;
+import com.logonbox.vpn.drivers.lib.util.Util;
 
 public abstract class AbstractDesktopPlatformService<I extends VpnAddress> extends AbstractPlatformService<I> {
 
@@ -101,7 +99,13 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
             runHook(configuration, session, p);
         };
 	    
-        onStart(interfaceName, configuration, session, peer);
+        try {
+			onStart(interfaceName, configuration, session, peer);
+		} catch(IOException ioe) {
+			throw ioe;
+		} catch (Exception e) {
+			throw new IOException("Failed to start.", e);
+		}
     
         var gw = defaultGateway();
         if(gw.isPresent() && configuration.peers().contains(gw.get())) {
@@ -178,7 +182,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 		return isMatchesPrefix(nif);
 	}
 
-	protected abstract void onStart(Optional<String> interfaceName, VpnConfiguration configuration, VpnAdapter logonBoxVPNSession, Optional<VpnPeer> peer) throws IOException;
+	protected abstract void onStart(Optional<String> interfaceName, VpnConfiguration configuration, VpnAdapter logonBoxVPNSession, Optional<VpnPeer> peer) throws Exception;
 	
 	protected void waitForFirstHandshake(VpnConfiguration configuration, VpnAdapter session, Instant connectionStarted, Optional<VpnPeer> peerOr, Duration timeout)
 			throws IOException {
@@ -251,24 +255,19 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 		throw new NoHandshakeException(String.format("No handshake received from %s (%s) for %s within %d seconds.", endpointAddress, endpointName, ip.name(), timeout.toSeconds()));
 	}
 	
-	protected void write(VpnConfiguration configuration, Writer writer) {
-		var pw = new PrintWriter(writer, true);
+	protected final VpnConfiguration transform(VpnConfiguration configuration) {
+		var transformBldr = new VpnConfiguration.Builder();
+		
         var gw = defaultGateway();
         
-		pw.println("[Interface]");
-		pw.println(String.format("PrivateKey = %s", configuration.privateKey()));
-		writeInterface(configuration, writer);
+		transformBldr.withPrivateKey(configuration.privateKey());
+		transformInterface(configuration, transformBldr);
 		for(var peer : configuration.peers()) {
-    		pw.println();
-    		pw.println("[Peer]");
-    		pw.println(String.format("PublicKey = %s", peer.publicKey()));
-    		peer.endpointAddress().ifPresent(addr -> {
-    		    peer.endpointPort().ifPresentOrElse(port -> pw.format("Endpoint = %s:%d%n", addr, port), () -> pw.format("Endpoint = %s%n", addr));
-    		});
-    		peer.persistentKeepalive().ifPresent(ka ->pw.format("PersistentKeepalive = %d%n", ka) );
+			var transformPeerBldr = new VpnPeer.Builder();
+			transformPeerBldr.withPeer(peer);
     		var allowedIps = new ArrayList<>(peer.allowedIps());
     		if(gw.isPresent() && peer.equals(gw.get())) {
-    			pw.println("AllowedIPs = 0.0.0.0/0");
+    			transformPeerBldr.withAllowedIps("0.0.0.0/0");
     		}	
     		else {
     			if(context.configuration().ignoreLocalRoutes()) {
@@ -352,17 +351,18 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
     					allowedIps.remove(ignoreAddress);
     				}
     			}
-    			if (!allowedIps.isEmpty())
-    				pw.println(String.format("AllowedIPs = %s", String.join(", ", allowedIps)));
+    			transformPeerBldr.withAllowedIps(allowedIps);
     		}
-    		writePeer(configuration, peer, writer);
+    		transformPeer(configuration, peer, transformPeerBldr);
+    		transformBldr.addPeers(peer);
 		}
+		return transformBldr.build();
 	}
 	
-	protected void writeInterface(VpnConfiguration configuration, Writer writer) {
+	protected void transformInterface(VpnConfiguration configuration, VpnConfiguration.Builder writer) {
 	}
 
-	protected void writePeer(VpnConfiguration configuration, VpnPeer peer, Writer writer) {
+	protected void transformPeer(VpnConfiguration configuration, VpnPeer peer, VpnPeer.Builder writer) {
 	}
 
 	protected void runHookViaPipeToShell(VpnConfiguration connection, VpnAdapter session, String... args) throws IOException {

@@ -1,13 +1,18 @@
 package com.logonbox.vpn.drivers.lib;
 
+import java.io.Serializable;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-public interface VpnInterfaceInformation {
+import uk.co.bithatch.nativeimage.annotations.Serialization;
 
-    VpnInterfaceInformation EMPTY = new VpnInterfaceInformation() {
+@Serialization
+public interface VpnInterfaceInformation extends Serializable {
+
+    @SuppressWarnings("serial")
+	VpnInterfaceInformation EMPTY = new VpnInterfaceInformation() {
 
         @Override
         public long rx() {

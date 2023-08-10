@@ -98,9 +98,11 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	 */
     default Optional<VpnAdapter> getByPublicKey(String publicKey) throws IOException {
         for (VpnAdapter ip : adapters()) {
-            if (publicKey.equals(ip.information().publicKey())) {
-                return Optional.of(ip);
-            }
+        	if(ip.address().isUp()) {
+	            if (publicKey.equals(ip.information().publicKey())) {
+	                return Optional.of(ip);
+	            }
+        	}
         }
         return Optional.empty();
     }

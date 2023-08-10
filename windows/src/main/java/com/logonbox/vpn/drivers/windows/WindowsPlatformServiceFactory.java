@@ -33,7 +33,7 @@ public class WindowsPlatformServiceFactory implements PlatformServiceFactory {
 
     @Override
     public PlatformService<?> createPlatformService() {
-        return new WindowsPlatformServiceImpl();
+        return new WindowsPlatformService();
     }
 
 }

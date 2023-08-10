@@ -26,7 +26,7 @@ module com.logonbox.vpn.drivers.lib {
     requires transitive org.slf4j;
     requires commons.ip.math;
     requires com.sshtools.liftlib;
-    requires com.sshtools.jini;
+    requires transitive com.sshtools.jini;
     requires static uk.co.bithatch.nativeimage.annotations;
     
     uses PlatformServiceFactory;

@@ -3,6 +3,7 @@ package com.logonbox.vpn.drivers.lib;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.Reader;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.text.MessageFormat;
 import java.text.ParseException;
@@ -112,16 +113,11 @@ public final class Vpn implements Closeable {
             platformService.init(builder.systemContext.orElseGet(() -> new VpnSystemContext(builder.systemConfiguration)));
         }
         
-        VpnAdapter found = null;
-        var pk = cfg.publicKey();
-        for (var s : platformService.adapters()) {
-            VpnAdapterConfiguration ncfg = s.configuration();
-            if (ncfg.publicKey().equals(pk)) {
-                found = s;
-                break;
-            }
-        }
-        adapter = Optional.ofNullable(found);
+        try {
+			adapter = platformService.getByPublicKey(cfg.publicKey());
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
     }
     
     public boolean started() {

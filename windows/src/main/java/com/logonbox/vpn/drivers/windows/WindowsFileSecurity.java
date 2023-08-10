@@ -55,13 +55,13 @@ public class WindowsFileSecurity {
             var acl = new ArrayList<AclEntry>();
             if (OS.isAdministrator()) {
                 try {
-                    acl.add(set(true, path, "Administrators", WindowsPlatformServiceImpl.SID_ADMINISTRATORS_GROUP,
+                    acl.add(set(true, path, "Administrators", WindowsPlatformService.SID_ADMINISTRATORS_GROUP,
                             AclEntryType.ALLOW, AclEntryPermission.values()));
                 } catch (Throwable upnfe2) {
                     LOG.debug("Failed to add administrators permission.", upnfe2);
                 }
                 try {
-                    acl.add(set(true, path, "SYSTEM", WindowsPlatformServiceImpl.SID_SYSTEM, AclEntryType.ALLOW,
+                    acl.add(set(true, path, "SYSTEM", WindowsPlatformService.SID_SYSTEM, AclEntryType.ALLOW,
                             AclEntryPermission.values()));
                 } catch (Throwable upnfe2) {
                     LOG.debug("Failed to add administrators permission.", upnfe2);
@@ -82,26 +82,26 @@ public class WindowsFileSecurity {
         var acl = new ArrayList<AclEntry>();
         if (OS.isAdministrator()) {
             try {
-                acl.add(set(true, path, "Administrators", WindowsPlatformServiceImpl.SID_ADMINISTRATORS_GROUP,
+                acl.add(set(true, path, "Administrators", WindowsPlatformService.SID_ADMINISTRATORS_GROUP,
                         AclEntryType.ALLOW, AclEntryPermission.values()));
             } catch (Throwable upnfe2) {
                 LOG.debug("Failed to add administrators permission.", upnfe2);
             }
             try {
-                acl.add(set(true, path, "SYSTEM", WindowsPlatformServiceImpl.SID_SYSTEM, AclEntryType.ALLOW,
+                acl.add(set(true, path, "SYSTEM", WindowsPlatformService.SID_SYSTEM, AclEntryType.ALLOW,
                         AclEntryPermission.values()));
             } catch (Throwable upnfe2) {
                 LOG.debug("Failed to add administrators permission.", upnfe2);
             }
         }
         try {
-            acl.add(set(true, path, "Everyone", WindowsPlatformServiceImpl.SID_WORLD, AclEntryType.ALLOW,
+            acl.add(set(true, path, "Everyone", WindowsPlatformService.SID_WORLD, AclEntryType.ALLOW,
                     AclEntryPermission.READ_DATA, AclEntryPermission.WRITE_DATA));
         } catch (Throwable upnfe) {
             LOG.warn("Failed to set Everyone permission.", upnfe);
         }
         try {
-            acl.add(set(true, path, "Users", WindowsPlatformServiceImpl.SID_USERS, AclEntryType.ALLOW,
+            acl.add(set(true, path, "Users", WindowsPlatformService.SID_USERS, AclEntryType.ALLOW,
                     AclEntryPermission.READ_DATA, AclEntryPermission.WRITE_DATA));
         } catch (Throwable upnfe2) {
             LOG.warn("Failed to set Users permission.", upnfe2);
@@ -122,7 +122,7 @@ public class WindowsFileSecurity {
         try {
             LOG.debug("Trying to set {} or name of {} on {} as group {} : {} : {}", sid, name, path, asGroup, type,
                     Arrays.asList(perms));
-            var bestRealName = WindowsPlatformServiceImpl.getBestRealName(sid, name);
+            var bestRealName = WindowsPlatformService.getBestRealName(sid, name);
             LOG.debug("Best real name : " + bestRealName);
             return perms(asGroup, path, bestRealName, type, perms);
         } catch (Throwable t) {

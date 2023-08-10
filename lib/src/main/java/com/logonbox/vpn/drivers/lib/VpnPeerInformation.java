@@ -20,14 +20,20 @@
  */
 package com.logonbox.vpn.drivers.lib;
 
+import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-public interface VpnPeerInformation {
+import uk.co.bithatch.nativeimage.annotations.Serialization;
 
+@Serialization
+public interface VpnPeerInformation extends Serializable {
+
+	@SuppressWarnings("serial")
 	VpnPeerInformation EMPTY = new VpnPeerInformation() {
 
 		@Override
@@ -67,7 +73,8 @@ public interface VpnPeerInformation {
 
         @Override
         public List<String> allowedIps() {
-            return Collections.emptyList();
+            //return Collections.emptyList();
+        	return new ArrayList<>();
         }
 
 	};

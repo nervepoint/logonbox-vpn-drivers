@@ -1,11 +1,19 @@
 [
 {
   "name":"java.lang.Object",
-  "allDeclaredFields":true,
+  "allDeclaredConstructors" : true,
+  "allPublicConstructors" : true,
+  "allDeclaredMethods" : true,
+  "allPublicMethods" : true,
+  "allDeclaredClasses" : true,
+  "allPublicClasses" : true,
   "queryAllDeclaredMethods":true
 },
 {
   "name":"java.nio.file.Path"
+},
+{
+  "name":"java.util.Collections$EmptyList"
 },
 {
   "name":"java.nio.file.Paths",

@@ -29,10 +29,13 @@ import com.sshtools.jini.INIReader.DuplicateAction;
 import com.sshtools.jini.INIReader.MultiValueMode;
 import com.sshtools.jini.INIWriter.StringQuoteMode;
 
+import uk.co.bithatch.nativeimage.annotations.Serialization;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
+import java.io.Serializable;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
@@ -46,7 +49,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-public interface VpnAdapterConfiguration  {
+@Serialization
+public interface VpnAdapterConfiguration extends Serializable {
 
     public abstract static class AbstractBuilder<B extends AbstractBuilder<B>> {
 
@@ -54,7 +58,7 @@ public interface VpnAdapterConfiguration  {
         protected Optional<String> privateKey = Optional.empty();
         protected Optional<String> publicKey = Optional.empty();
         protected List<VpnPeer> peers = new ArrayList<>();
-        protected Optional<Integer> fwMark;
+        protected Optional<Integer> fwMark = Optional.empty();
 
         @SuppressWarnings("unchecked")
         public B fromConfiguration(VpnAdapterConfiguration configuration) {
@@ -184,25 +188,26 @@ public interface VpnAdapterConfiguration  {
         }
     }
     
-    class DefaultVpnAdapterConfiguration implements VpnAdapterConfiguration {
+    @SuppressWarnings("serial")
+	class DefaultVpnAdapterConfiguration implements VpnAdapterConfiguration {
 
-        private final Optional<Integer> listenPort;
+        private final int listenPort;
         private final String privateKey;
         private final String publicKey;
         private final List<VpnPeer> peers;
-        private final Optional<Integer> fwMark;
+        private final int fwMark;
 
         DefaultVpnAdapterConfiguration(AbstractBuilder<?> builder) {
-            listenPort = builder.listenPort;
+            listenPort = builder.listenPort.orElse(0);
             privateKey = builder.privateKey.orElse(Keys.genkey().getBase64PrivateKey());
             publicKey = builder.publicKey.orElse(Keys.pubkey(privateKey).getBase64PublicKey());
             peers = Collections.unmodifiableList(new ArrayList<>(builder.peers));
-            fwMark = builder.fwMark;
+            fwMark = builder.fwMark.orElse(0);
         }
 
         @Override
         public final Optional<Integer> listenPort() {
-            return listenPort;
+            return listenPort == 0 ? Optional.empty() : Optional.of(listenPort);
         }
 
         @Override
@@ -222,7 +227,7 @@ public interface VpnAdapterConfiguration  {
 
         @Override
         public final Optional<Integer> fwMark() {
-            return fwMark;
+            return fwMark == 0 ? Optional.empty() : Optional.of(fwMark);
         }
 
     }
@@ -263,7 +268,35 @@ public interface VpnAdapterConfiguration  {
     }
     
     default void write(Writer writer) {
-        var bldr = new INIWriter.Builder().
+        var doc = basicDocWithInterface(this);
+        
+        for(var peer : peers()) {
+            writePeer(doc, peer);
+        }
+        
+        writer().write(doc, writer);
+    }
+
+    static void writePeer(INI doc, VpnPeer peer) {
+		var peerSection = doc.create("Peer");
+		peerSection.put("PublicKey", peer.publicKey());
+		peer.endpointAddress().ifPresent(a -> 
+		    peerSection.put("Endpoint", String.format("%s:%d", a, peer.endpointPort().orElse(Vpn.DEFAULT_PORT))));
+		peerSection.putAll("AllowedIPs", peer.allowedIps().toArray(new String[0]));
+		peer.persistentKeepalive().ifPresent(p -> peerSection.put("PersistentKeepalive", p));
+		peer.presharedKey().ifPresent(p -> peerSection.put("PresharedKey", p));
+	}
+    
+    static INIWriter writer() {
+    	return new INIWriter.Builder().
+                withEmptyValues(false).
+                withCommentCharacter('#').
+                withStringQuoteMode(StringQuoteMode.NEVER).
+                withMultiValueMode(MultiValueMode.SEPARATED).build();
+    }
+    
+    static INI basicDocWithInterface(VpnAdapterConfiguration adapter ) {
+    	var bldr = new INIWriter.Builder().
                 withEmptyValues(false).
                 withCommentCharacter('#').
                 withStringQuoteMode(StringQuoteMode.NEVER).
@@ -272,21 +305,11 @@ public interface VpnAdapterConfiguration  {
         var doc = INI.create();
         
         var ifaceSection = doc.create("Interface");
-        ifaceSection.put("PrivateKey", privateKey());
-        listenPort().ifPresent(p -> ifaceSection.put("ListenPort", p));
-        fwMark().ifPresent(p -> ifaceSection.put("FwMark", p));
+        ifaceSection.put("PrivateKey", adapter.privateKey());
+        adapter.listenPort().ifPresent(p -> ifaceSection.put("ListenPort", p));
+        adapter.fwMark().ifPresent(p -> ifaceSection.put("FwMark", p));
         
-        for(var peer : peers()) {
-            var peerSection = doc.create("Peer");
-            peerSection.put("PublicKey", peer.publicKey());
-            peer.endpointAddress().ifPresent(a -> 
-                peerSection.put("Endpoint", String.format("%s:%d", a, peer.endpointPort().orElse(Vpn.DEFAULT_PORT))));
-            peerSection.putAll("AllowedIPs", peer.allowedIps().toArray(new String[0]));
-            peer.persistentKeepalive().ifPresent(p -> peerSection.put("PersistentKeepalive", p));
-            peer.presharedKey().ifPresent(p -> peerSection.put("PresharedKey", p));
-        }
-        
-        bldr.build().write(doc, writer);
+        return doc;
     }
 
 }

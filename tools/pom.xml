@@ -46,6 +46,7 @@ ACTION
         <graalvm.version>21.2.0</graalvm.version>
         <graalvm.pgo></graalvm.pgo>
         <graalvm.compatibility></graalvm.compatibility>
+        <graalvm.gc></graalvm.gc>
         <!-- Commented out quick build mode - has less optiisations, smaller
 		size, lower throuput -->
         <!--<graalvm.pgo>-Ob</graalvm.pgo>-->
@@ -123,6 +124,9 @@ ACTION
                     <family>linux</family>
                 </os>
             </activation>
+            <properties>
+				<graalvm.gc>--gc=G1</graalvm.gc>
+			</properties>
             <dependencies>
                 <dependency>
                     <groupId>com.logonbox</groupId>
@@ -196,11 +200,9 @@ ACTION
                                     <mainClass>com.logonbox.vpn.quick.Lbv</mainClass>
                                     <imageName>lbv</imageName>
                                     <buildArgs>
-                                        --gc=G1
                                         --report-unsupported-elements-at-runtime
-                                        -H:+BuildReport
                                         -R:MaxHeapSize=64m
-                                        ${graalvm.pgo} ${graalvm.compatibility}
+                                        ${graalvm.pgo} ${graalvm.compatibility} ${graalvm.gc}
                                     </buildArgs>
                                 </configuration>
                             </execution>
@@ -214,11 +216,9 @@ ACTION
                                     <mainClass>com.logonbox.vpn.quick.LbvQuick</mainClass>
                                     <imageName>lbv-quick</imageName>
                                     <buildArgs>
-                                        --gc=G1
                                         --report-unsupported-elements-at-runtime
-                                        -H:+BuildReport
                                         -R:MaxHeapSize=64m
-                                        ${graalvm.pgo} ${graalvm.compatibility}
+                                        ${graalvm.pgo} ${graalvm.compatibility} ${graalvm.gc}
                                     </buildArgs>
                                 </configuration>
                             </execution>

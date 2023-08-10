@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.Serializable;
+import java.io.UncheckedIOException;
 import java.lang.ProcessBuilder.Redirect;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -203,6 +204,8 @@ public class ElevatableSystemCommands implements SystemCommands {
         public <R extends Serializable> R task(ElevatedClosure<R, Serializable> task) throws Exception {
             try {
                 return elevator.call(task);
+            } catch(UncheckedIOException uioe) {
+            	throw uioe.getCause();
             } catch (IOException | RuntimeException e) {
                 throw e;
             }  catch (Exception e) {

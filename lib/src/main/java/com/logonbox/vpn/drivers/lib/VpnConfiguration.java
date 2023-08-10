@@ -2,6 +2,9 @@ package com.logonbox.vpn.drivers.lib;
 
 import com.sshtools.jini.INI.Section;
 
+import uk.co.bithatch.nativeimage.annotations.Serialization;
+
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -9,6 +12,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+@Serialization
 public interface VpnConfiguration extends VpnAdapterConfiguration {
 
     public final static class Builder extends VpnAdapterConfiguration.AbstractBuilder<Builder> {
@@ -158,21 +162,22 @@ public interface VpnConfiguration extends VpnAdapterConfiguration {
             return new DefaultVpnConfiguration(this);
         }
 
-        class DefaultVpnConfiguration extends DefaultVpnAdapterConfiguration implements VpnConfiguration {
+        @SuppressWarnings("serial")
+		static class DefaultVpnConfiguration extends DefaultVpnAdapterConfiguration implements VpnConfiguration {
 
-            private final Optional<Integer> mtu;
+            private final Integer mtu;
             private final List<String> dns;
             private final List<String> addresses;
             private final String[] postUp;
             private final String[] postDown;
             private final String[] preUp;
             private final String[] preDown;
-            private final Optional<String> table;
+            private final String table;
             private final boolean saveConfig;
 
             DefaultVpnConfiguration(VpnConfiguration.Builder builder) {
                 super(builder);
-                mtu = builder.mtu;
+                mtu = builder.mtu.orElse(0);
                 dns = Collections.unmodifiableList(new ArrayList<>(builder.dns));
                 addresses = Collections.unmodifiableList(new ArrayList<>(builder.addresses));
                 preUp = builder.preUp.toArray(new String[0]);
@@ -180,7 +185,7 @@ public interface VpnConfiguration extends VpnAdapterConfiguration {
                 postUp = builder.postUp.toArray(new String[0]);
                 postDown = builder.postDown.toArray(new String[0]);
                 saveConfig = builder.saveConfig;
-                table = builder.table;
+                table = builder.table.orElse(null);
             }
 
             @Override
@@ -190,7 +195,7 @@ public interface VpnConfiguration extends VpnAdapterConfiguration {
 
             @Override
             public Optional<Integer> mtu() {
-                return mtu;
+                return mtu == 0 ? Optional.empty() : Optional.of(mtu);
             }
 
             @Override
@@ -220,7 +225,7 @@ public interface VpnConfiguration extends VpnAdapterConfiguration {
 
             @Override
             public Optional<String> table() {
-                return table;
+                return Optional.ofNullable(table);
             }
 
             @Override
@@ -248,4 +253,26 @@ public interface VpnConfiguration extends VpnAdapterConfiguration {
     Optional<String> table();
 
     boolean saveConfig();
+    
+    @Override
+    default void write(Writer writer) {
+        var doc = VpnAdapterConfiguration.basicDocWithInterface(this);
+        var ifaceSection = doc.section("Interface");
+        ifaceSection.put("Address", addresses());
+        if(preUp().length >0)
+        	ifaceSection.putAll("PreUp", preUp());
+        if(preUp().length >0)
+        	ifaceSection.putAll("PreUp", postUp());
+        if(preUp().length >0)
+        	ifaceSection.putAll("PreDown", preDown());
+        if(preUp().length >0)
+        	ifaceSection.putAll("PostDown", postDown());
+        
+        
+        for(var peer : peers()) {
+        	VpnAdapterConfiguration.writePeer(doc, peer);
+        }
+        
+        VpnAdapterConfiguration.writer().write(doc, writer);
+    }
 }
