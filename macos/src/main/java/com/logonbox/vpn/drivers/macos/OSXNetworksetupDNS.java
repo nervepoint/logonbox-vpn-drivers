@@ -30,6 +30,7 @@ import com.logonbox.vpn.drivers.lib.util.OsUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,24 +39,33 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-public class OSXNetworksetupDNS {
+public class OSXNetworksetupDNS implements Closeable {
 	final static Logger LOG = LoggerFactory.getLogger(OSXNetworksetupDNS.class);
 
-    private final static OSXNetworksetupDNS INSTANCE = new OSXNetworksetupDNS();
-    private SystemCommands commands;
+    private final SystemCommands commands;
+    
+    private final Map<String, OSXService> defaultServices = new HashMap<>();
+    private final Map<String, InterfaceDNS> interfaceDns = new HashMap<>();
+    private final Map<String, OSXService> currentServices = new HashMap<>();
+    private final ScheduledFuture<?> task;
 	
-	public OSXNetworksetupDNS() {
+	OSXNetworksetupDNS(SystemCommands commands, SystemContext ctx) {
+	    this.commands = commands;
 		try {
 			collectNewServiceDns();
 		} catch (IOException e) {
 			throw new IllegalStateException("Failed to collect.", e);
 		}
-	}
-	
-	public static OSXNetworksetupDNS get() {
-		return INSTANCE;
+        task = ctx.queue().scheduleWithFixedDelay(() -> {
+            try {
+                collectNewServiceDns();
+            } catch (IOException e) {
+                LOG.warn("Failed to collect new DNS data.", e);
+            }
+        }, 1, 1, TimeUnit.MINUTES);
 	}
 	
 	public static class OSXService {
@@ -110,10 +120,6 @@ public class OSXNetworksetupDNS {
 			return domains;
 		}
 	}
-	
-	private Map<String, OSXService> defaultServices = new HashMap<>();
-	private Map<String, InterfaceDNS> interfaceDns = new HashMap<>();
-	private Map<String, OSXService> currentServices = new HashMap<>();
 
 
 	public void configure(InterfaceDNS dns) {
@@ -204,7 +210,10 @@ public class OSXNetworksetupDNS {
 		commands.privileged().logged().result("dscacheutil", "-flushcache");
 		commands.privileged().logged().result("killall", "-HUP", "mDNSResponder");
 		
-		currentServices = newServices;
+		synchronized(currentServices) {
+		    currentServices.clear();
+		    currentServices.putAll(newServices);
+		}
 	}
 	
 
@@ -301,16 +310,11 @@ public class OSXNetworksetupDNS {
 		}
 	}
 
-	public void start(SystemContext ctx, SystemCommands commands) {
-	    this.commands = commands;
-		ctx.queue().scheduleWithFixedDelay(() -> {
-			try {
-				collectNewServiceDns();
-			} catch (IOException e) {
-				LOG.warn("Failed to collect new DNS data.", e);
-			}
-		}, 1, 1, TimeUnit.MINUTES);
-		
-	}
+
+    @Override
+    public void close() throws IOException {
+        if(task != null)
+            task.cancel(false);
+    }
 	
 }

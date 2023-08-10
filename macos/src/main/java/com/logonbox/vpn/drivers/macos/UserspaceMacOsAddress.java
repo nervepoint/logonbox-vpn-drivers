@@ -54,10 +54,11 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 	private Set<String> addresses = new LinkedHashSet<>();
 	private boolean autoRoute4;
 	private boolean autoRoute6;
-    private OSXNetworksetupDNS osxDns;
+    private final OSXNetworksetupDNS osxDns;
 
-	public UserspaceMacOsAddress(String name, UserspaceMacOsPlatformService platform) throws IOException {
+	UserspaceMacOsAddress(String name, UserspaceMacOsPlatformService platform) throws IOException {
 		super(platform, name);
+		osxDns = platform.osxNetworksetupDNS();
 	}
 
 	public void addAddress(String address) throws IOException {
@@ -91,7 +92,7 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 				LOG.info("Setting DNS for {} to {} using {}", name(), String.join(", ", dns), method);
 				switch (method) {
 				case NETWORKSETUP:
-				    OSXNetworksetupDNS.get().changeDns(new InterfaceDNS(name(), dns));
+				    osxDns.changeDns(new InterfaceDNS(name(), dns));
 					break;
 				case SCUTIL_COMPATIBLE:
 					try (SCUtil scutil = new SCUtil(commands, name())) {
@@ -393,8 +394,8 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 		        platform.resolvconfIfacePrefix()));
 		switch (platform.calcDnsMethod()) {
 		case NETWORKSETUP:
-			if (OSXNetworksetupDNS.get().isSet(name())) {
-			    OSXNetworksetupDNS.get().popDns(name());
+			if (osxDns.isSet(name())) {
+			    osxDns.popDns(name());
 			}
 			break;
 		case SCUTIL_SPLIT:

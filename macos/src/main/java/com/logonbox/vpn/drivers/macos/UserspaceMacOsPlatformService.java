@@ -61,6 +61,8 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 
 	static Object lock = new Object();
 
+    private OSXNetworksetupDNS osxNetworkSetupDNS;
+
 	public UserspaceMacOsPlatformService() {
 		super(INTERFACE_PREFIX);
 	}
@@ -157,23 +159,36 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 	@Override
     protected VpnAdapter configureExistingSession(UserspaceMacOsAddress ip) {
 		switch(calcDnsMethod()) {
-//		case SCUTIL_COMPATIBLE:
-//			/* Should still be in correct state. State is also lost at reboot (good thing!) */
-//			break;
-//		case NETWORKSETUP:
-//			OSXNetworksetupDNS.get().configure(new InterfaceDNS(ip.getName(), connection.dns().toArray(new String[0])));
-//			break;
+		case SCUTIL_COMPATIBLE:
+        case SCUTIL_SPLIT:
+			/* Should still be in correct state. State is also lost at reboot (good thing!) */
+			break;
+		case NETWORKSETUP:
+		    System.out.println("TODO: Initial DNS state!");
+			//osxNetworkSetupDNS.configure(new InterfaceDNS(ip.name(), connection.dns().toArray(new String[0])));
+			break;
 		default:
 			// Should not happen
-			throw new UnsupportedOperationException("TODO");
+			throw new UnsupportedOperationException();
 		}
-//		return super.configureExistingSession(ip);
+		return super.configureExistingSession(ip);
 	}
 
 	@Override
 	protected void onInit(SystemContext ctx) {
-		OSXNetworksetupDNS.get().start(ctx, commands());
 		super.onInit(ctx);
+		switch(calcDnsMethod()) {
+        case SCUTIL_COMPATIBLE:
+        case SCUTIL_SPLIT:
+            /* Should still be in correct state. State is also lost at reboot (good thing!) */
+            break;
+        case NETWORKSETUP:
+            osxNetworkSetupDNS = new OSXNetworksetupDNS(commands(), context());
+            break;
+        default:
+            // Should not happen
+            throw new UnsupportedOperationException();
+        }
 	}
 
 	@Override
@@ -348,5 +363,9 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
     @Override
     protected void runCommand(List<String> commands) throws IOException {
         commands().privileged().logged().run(commands.toArray(new String[0]));
+    }
+
+    public OSXNetworksetupDNS osxNetworksetupDNS() {
+        return osxNetworkSetupDNS;
     }
 }
