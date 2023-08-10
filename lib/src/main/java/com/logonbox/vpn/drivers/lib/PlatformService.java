@@ -233,5 +233,20 @@ public interface PlatformService<ADDR extends VpnAddress> {
      * @return configuration
      */
     NativeComponents nativeComponents();
+
+    /**
+     * Get the actual DNS method to use. This takes whatever is configured in {@link SystemConfiguration#dnsIntegrationMethod()}.
+     * If this is {@link DNSIntegrationMethod#AUTO}, then {@link #dnsMethod()} will be used to get the best for this platform,
+     * otherwise the configured method will be returned.
+     * 
+     * @return dns method to use
+     */
+    default DNSIntegrationMethod calcDnsMethod() {
+        var method = context().configuration().dnsIntegrationMethod();
+        if (method == DNSIntegrationMethod.AUTO) {
+            return dnsMethod();
+        } else
+            return method;
+    }
  
 }

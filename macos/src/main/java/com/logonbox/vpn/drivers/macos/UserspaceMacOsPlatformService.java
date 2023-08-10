@@ -156,7 +156,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 
 	@Override
     protected VpnAdapter configureExistingSession(UserspaceMacOsAddress ip) {
-		switch(ip.calcDnsMethod()) {
+		switch(calcDnsMethod()) {
 //		case SCUTIL_COMPATIBLE:
 //			/* Should still be in correct state. State is also lost at reboot (good thing!) */
 //			break;

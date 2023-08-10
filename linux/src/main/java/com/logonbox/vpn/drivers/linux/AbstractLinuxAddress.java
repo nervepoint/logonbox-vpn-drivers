@@ -64,7 +64,6 @@ import java.util.StringTokenizer;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import uk.co.bithatch.nativeimage.annotations.Resource;
 import uk.co.bithatch.nativeimage.annotations.Serialization;
 
 public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<AbstractLinuxPlatformService> {
@@ -283,7 +282,7 @@ public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<Ab
             if (dnsSet)
                 unsetDns();
         } else {
-            var method = calcDnsMethod();
+            var method = platform.calcDnsMethod();
             LOG.info("Setting DNS for {} (iface prefix {}) to {} using {}", name(), platform.resolvconfIfacePrefix(),
                     String.join(", ", dns), method);
 
@@ -702,7 +701,7 @@ public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<Ab
     }
 
     private void initialDnsState() {
-        var method = calcDnsMethod();
+        var method = platform.calcDnsMethod();
         switch (method) {
         case NETWORK_MANAGER:
             dnsSet = getNetworkManagerState();
@@ -773,7 +772,7 @@ public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<Ab
                 LOG.info("unsetting DNS for {} (iface prefix {})", name(), platform.resolvconfIfacePrefix());
 
                 try {
-                    switch (calcDnsMethod()) {
+                    switch (platform.calcDnsMethod()) {
                     case NETWORK_MANAGER:
                         updateNetworkManager(new String[0]);
                         break;

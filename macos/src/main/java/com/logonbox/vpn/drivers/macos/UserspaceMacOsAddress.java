@@ -86,7 +86,7 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 		if (dns == null || dns.length == 0) {
 			unsetDns();
 		} else {
-			DNSIntegrationMethod method = calcDnsMethod();
+			DNSIntegrationMethod method = platform.calcDnsMethod();
 			try {
 				LOG.info("Setting DNS for {} to {} using {}", name(), String.join(", ", dns), method);
 				switch (method) {
@@ -391,7 +391,7 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 	private void unsetDns() throws IOException {
 		LOG.info(String.format("unsetting DNS for %s (iface prefix %s)", name(),
 		        platform.resolvconfIfacePrefix()));
-		switch (calcDnsMethod()) {
+		switch (platform.calcDnsMethod()) {
 		case NETWORKSETUP:
 			if (OSXNetworksetupDNS.get().isSet(name())) {
 			    OSXNetworksetupDNS.get().popDns(name());

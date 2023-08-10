@@ -94,13 +94,4 @@ public abstract class AbstractVirtualInetAddress<P extends PlatformService<?>> i
 	public final void mtu(int mtu) {
 		this.mtu = mtu;
 	}
-
-	@Override
-	public final DNSIntegrationMethod calcDnsMethod() {
-	    var method = platform.context().configuration().dnsIntegrationMethod();
-		if (method == DNSIntegrationMethod.AUTO) {
-			return platform.dnsMethod();
-		} else
-			return method;
-	}
 }

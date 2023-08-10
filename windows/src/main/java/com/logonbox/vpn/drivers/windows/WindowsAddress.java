@@ -154,7 +154,7 @@ public class WindowsAddress extends AbstractVirtualInetAddress<WindowsPlatformSe
 		if (dns == null || dns.length == 0) {
 			unsetDns();
 		} else {
-			var method = calcDnsMethod();
+			var method = platform.calcDnsMethod();
 			try {
 				LOG.info("Setting DNS for {} to {} using {}", name(), String.join(", ", dns), method);
 				switch (method) {

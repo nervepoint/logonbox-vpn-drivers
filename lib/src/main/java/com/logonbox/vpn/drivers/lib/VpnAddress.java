@@ -78,6 +78,4 @@ public interface VpnAddress {
 	
 	void dns(String[] dns) throws IOException;
 
-	DNSIntegrationMethod calcDnsMethod();
-
 }
