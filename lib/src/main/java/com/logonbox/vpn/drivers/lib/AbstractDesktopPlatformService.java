@@ -20,6 +20,18 @@
  */
 package com.logonbox.vpn.drivers.lib;
 
+import com.github.jgonian.ipmath.AbstractIp;
+import com.github.jgonian.ipmath.Ipv4;
+import com.github.jgonian.ipmath.Ipv4Range;
+import com.github.jgonian.ipmath.Ipv6;
+import com.github.jgonian.ipmath.Ipv6Range;
+import com.logonbox.vpn.drivers.lib.DNSProvider.DNSEntry;
+import com.logonbox.vpn.drivers.lib.util.IpUtil;
+import com.logonbox.vpn.drivers.lib.util.Util;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -40,19 +52,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.ServiceLoader;
 import java.util.Set;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.github.jgonian.ipmath.AbstractIp;
-import com.github.jgonian.ipmath.Ipv4;
-import com.github.jgonian.ipmath.Ipv4Range;
-import com.github.jgonian.ipmath.Ipv6;
-import com.github.jgonian.ipmath.Ipv6Range;
-import com.logonbox.vpn.drivers.lib.impl.ElevatableSystemCommands;
-import com.logonbox.vpn.drivers.lib.util.IpUtil;
-import com.logonbox.vpn.drivers.lib.util.Util;
 
 public abstract class AbstractDesktopPlatformService<I extends VpnAddress> extends AbstractPlatformService<I> {
 
@@ -60,13 +61,38 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 	
 	protected Path tempCommandDir;
 
-    private final SystemCommands commands;
+    private Optional<DNSProvider> dnsProvider;
 	
-	protected AbstractDesktopPlatformService(String interfacePrefix) {
-		super(interfacePrefix);
-		
-		commands = new ElevatableSystemCommands();
+	protected AbstractDesktopPlatformService(String interfacePrefix, SystemContext context) {
+		super(interfacePrefix, context);
 	}
+
+
+    @Override
+    public final Optional<DNSProvider> dns() {
+        if(dnsProvider == null) {
+            var srvs = ServiceLoader.load(DNSProvider.Factory.class).stream().toList();
+            if(srvs.size() == 0) {
+                LOG.warn("No DNS provider factories found for this platform, DNS settings will be ignored.");
+                dnsProvider = Optional.empty();
+            }
+            else {
+                if(srvs.size() > 1) {
+                    LOG.warn("Found multiple DNS provider factories, only the first will be used. This may be incorrect.");
+                }
+                try {
+                    // TODO configuration of preferred when set
+                    dnsProvider = Optional.of(srvs.get(0).get().create(Optional.empty()));
+                    dnsProvider.get().init(this);
+                }
+                catch(UnsupportedOperationException uoe) {
+                    LOG.warn("A DNS provider factory was found, but it could not detect any supported DNS providers.");
+                    dnsProvider = Optional.empty();
+                }
+            }
+        }
+        return dnsProvider;
+    }
 
 	protected Path extractCommand(String platform, String arch, String name) throws IOException {
 		LOG.info("Extracting command {} for platform {} on arch {}", name, platform, arch);
@@ -103,6 +129,8 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 			onStart(interfaceName, configuration, session, peer);
 		} catch(IOException ioe) {
 			throw ioe;
+		} catch(RuntimeException re) {
+		    throw (RuntimeException)re;
 		} catch (Exception e) {
 			throw new IOException("Failed to start.", e);
 		}
@@ -168,7 +196,9 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 		else {
 			LOG.info("Configuring DNS servers for {} as {}", ip.name(), configuration.dns());
 		}
-		ip.dns(configuration.dns().toArray(new String[0]));
+		var dnsOr = dns();
+		if(dnsOr.isPresent())
+		    dnsOr.get().set(new DNSEntry.Builder().fromConfiguration(configuration).withInterface(ip.name()).build());
 		
 	}
 
@@ -405,7 +435,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 
         LOG.debug("Command Output: ");
         var errorMessage = new StringBuffer();
-		int ret = commands().privileged().logged().env(env).consume((line) -> {
+		int ret = context.commands().privileged().logged().env(env).consume((line) -> {
             LOG.debug("    {}", line);
             if(line.startsWith("[ERROR] ")) {
                 errorMessage.setLength(0); // TODO really only keep last error message. I'd like to change this, but may break any users of this (we know there is at least one)
@@ -429,11 +459,6 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 		    runCommand(Util.parseQuotedString(cmd));
 		}
 	}
-	
-	@Override
-    public final SystemCommands commands() {
-        return commands;
-    }
 
 	protected abstract void runCommand(List<String> commands) throws IOException;
 	

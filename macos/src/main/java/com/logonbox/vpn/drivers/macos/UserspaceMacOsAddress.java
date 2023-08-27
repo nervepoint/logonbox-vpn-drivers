@@ -21,11 +21,9 @@
 package com.logonbox.vpn.drivers.macos;
 
 import com.logonbox.vpn.drivers.lib.AbstractVirtualInetAddress;
-import com.logonbox.vpn.drivers.lib.DNSIntegrationMethod;
 import com.logonbox.vpn.drivers.lib.util.IpUtil;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
 import com.logonbox.vpn.drivers.lib.util.Util;
-import com.logonbox.vpn.drivers.macos.OSXNetworksetupDNS.InterfaceDNS;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,11 +52,9 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 	private Set<String> addresses = new LinkedHashSet<>();
 	private boolean autoRoute4;
 	private boolean autoRoute6;
-    private final OSXNetworksetupDNS osxDns;
 
 	UserspaceMacOsAddress(String name, UserspaceMacOsPlatformService platform) throws IOException {
 		super(platform, name);
-		osxDns = platform.osxNetworksetupDNS();
 	}
 
 	public void addAddress(String address) throws IOException {
@@ -83,42 +79,7 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 	}
 
 	@Override
-    public void dns(String[] dns) throws IOException {
-		if (dns == null || dns.length == 0) {
-			unsetDns();
-		} else {
-			DNSIntegrationMethod method = platform.calcDnsMethod();
-			try {
-				LOG.info("Setting DNS for {} to {} using {}", name(), String.join(", ", dns), method);
-				switch (method) {
-				case NETWORKSETUP:
-				    osxDns.changeDns(new InterfaceDNS(name(), dns));
-					break;
-				case SCUTIL_COMPATIBLE:
-					try (SCUtil scutil = new SCUtil(commands, name())) {
-						scutil.compatible(IpUtil.filterAddresses(dns), IpUtil.filterNames(dns));
-					}
-					break;
-				case SCUTIL_SPLIT:
-					try (SCUtil scutil = new SCUtil(commands,name())) {
-						scutil.split(IpUtil.filterAddresses(dns), IpUtil.filterNames(dns));
-					}
-					break;
-				case NONE:
-					break;
-				default:
-					throw new UnsupportedOperationException(
-							String.format("DNS integration method %s not supported.", method));
-				}
-			} finally {
-				LOG.info("Done setting DNS");
-			}
-		}
-	}
-
-	@Override
 	public void down() throws IOException {
-		unsetDns();
 		/*
 		 * TODO
 		 *
@@ -387,27 +348,5 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 					OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-" + proto, route, "-interface", name()));
 		}
 
-	}
-
-	private void unsetDns() throws IOException {
-		LOG.info(String.format("unsetting DNS for %s (iface prefix %s)", name(),
-		        platform.resolvconfIfacePrefix()));
-		switch (platform.calcDnsMethod()) {
-		case NETWORKSETUP:
-			if (osxDns.isSet(name())) {
-			    osxDns.popDns(name());
-			}
-			break;
-		case SCUTIL_SPLIT:
-		case SCUTIL_COMPATIBLE:
-			try (SCUtil scutil = new SCUtil(commands, name())) {
-				scutil.remove();
-			}
-			break;
-		case NONE:
-			break;
-		default:
-			throw new UnsupportedOperationException();
-		}
 	}
 }

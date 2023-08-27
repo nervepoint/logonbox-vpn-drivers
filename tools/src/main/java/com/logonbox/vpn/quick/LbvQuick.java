@@ -1,6 +1,9 @@
 package com.logonbox.vpn.quick;
 
-import com.logonbox.vpn.drivers.lib.DNSIntegrationMethod;
+import com.logonbox.vpn.drivers.lib.DNSProvider;
+import com.logonbox.vpn.drivers.lib.ElevatableSystemCommands;
+import com.logonbox.vpn.drivers.lib.NativeComponents;
+import com.logonbox.vpn.drivers.lib.SystemCommands;
 import com.logonbox.vpn.drivers.lib.SystemConfiguration;
 import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.Vpn;
@@ -55,8 +58,8 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
         }
 
         @Override
-        public DNSIntegrationMethod dnsIntegrationMethod() {
-            return dns.orElse(DNSIntegrationMethod.AUTO);
+        public Optional<Class<? extends DNSProvider>> dnsIntegrationMethod() {
+            return dns;
         }
 
         @Override
@@ -88,7 +91,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 
     @Option(names = { "-d",
             "--dns" }, paramLabel = "METHOD", description = "The method of DNS integration to use. There should be no need to specify this option, but if you do it must be one of the methods supported by this operating system.")
-    private Optional<DNSIntegrationMethod> dns;
+    private Optional<Class<? extends DNSProvider>> dns;
 
     @Option(names = { "-m", "--mtu" }, paramLabel = "BYTES", description = "The default MTU. ")
     private Optional<Integer> mtu;
@@ -111,6 +114,8 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 
     private SystemConfiguration configuration;
     private ScheduledExecutorService queue;
+    private SystemCommands commands;
+    private NativeComponents nativeComponents;
 
     @Override
     protected Integer onCall() throws Exception {
@@ -164,6 +169,20 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
     }
 
     @Override
+    public SystemCommands commands() {
+        if(commands == null)
+            commands = new ElevatableSystemCommands();
+        return commands;
+    }
+
+    @Override
+    public NativeComponents nativeComponents() {
+        if(nativeComponents == null)
+            nativeComponents = new NativeComponents();
+        return nativeComponents;
+    }
+
+    @Override
     public void addScriptEnvironmentVariables(VpnAdapter connection, Map<String, String> env) {
     }
     
@@ -201,7 +220,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
             }
 
             var vpn = bldr.build();
-            vpn.platformService().commands().onLog(parent::logCommandLine);
+            vpn.platformService().context().commands().onLog(parent::logCommandLine);
             return onCall(vpn);
         }
         

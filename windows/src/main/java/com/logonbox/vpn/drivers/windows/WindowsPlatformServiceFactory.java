@@ -22,6 +22,7 @@ package com.logonbox.vpn.drivers.windows;
 
 import com.logonbox.vpn.drivers.lib.PlatformService;
 import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
+import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.sshtools.liftlib.OS;
 
 public class WindowsPlatformServiceFactory implements PlatformServiceFactory {
@@ -32,8 +33,8 @@ public class WindowsPlatformServiceFactory implements PlatformServiceFactory {
     }
 
     @Override
-    public PlatformService<?> createPlatformService() {
-        return new WindowsPlatformService();
+    public PlatformService<?> createPlatformService(SystemContext context) {
+        return new WindowsPlatformService(context);
     }
 
 }

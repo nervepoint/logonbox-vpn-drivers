@@ -12,6 +12,12 @@
     }, 
     {
       "pattern":"com/sun/jna/win32-x86-64/.*"
+    }, 
+    {
+      "pattern":".*/wireguard-go"
+    }, 
+    {
+      "pattern":".*/wg"
     }
   ]},
   "bundles":[]

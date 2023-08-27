@@ -43,7 +43,7 @@ ACTION
     <name>LogonBox VPN Drivers - Example Utility</name>
     <packaging>jar</packaging>
     <properties>
-        <graalvm.version>21.2.0</graalvm.version>
+        <graalvm.version>0.9.25</graalvm.version>
         <graalvm.pgo></graalvm.pgo>
         <graalvm.compatibility></graalvm.compatibility>
         <graalvm.gc></graalvm.gc>
@@ -52,10 +52,15 @@ ACTION
         <!--<graalvm.pgo>-Ob</graalvm.pgo>-->
     </properties>
     <dependencies>
+                <dependency>
+                    <groupId>com.logonbox</groupId>
+                    <artifactId>logonbox-vpn-linux</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
         <dependency>
             <groupId>com.sshtools</groupId>
             <artifactId>porter</artifactId>
-            <version>1.0.0</version>
+            <version>1.0.2</version>
         </dependency>
         <dependency>
             <groupId>info.picocli</groupId>
@@ -186,14 +191,14 @@ ACTION
             <build>
                 <plugins>
                     <plugin>
-                        <groupId>org.graalvm.nativeimage</groupId>
-                        <artifactId>native-image-maven-plugin</artifactId>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
                         <version>${graalvm.version}</version>
                         <executions>
                             <execution>
                                 <id>lbv-exe</id>
                                 <goals>
-                                    <goal>native-image</goal>
+                                    <goal>compile-no-fork</goal>
                                 </goals>
                                 <phase>package</phase>
                                 <configuration>
@@ -202,14 +207,18 @@ ACTION
                                     <buildArgs>
                                         --report-unsupported-elements-at-runtime
                                         -R:MaxHeapSize=64m
+                                        -H:+BuildReport
                                         ${graalvm.pgo} ${graalvm.compatibility} ${graalvm.gc}
                                     </buildArgs>
+                                     <metadataRepository>
+                                        <enabled>true</enabled>
+                                     </metadataRepository>
                                 </configuration>
                             </execution>
                             <execution>
                                 <id>lbvquick</id>
                                 <goals>
-                                    <goal>native-image</goal>
+                                    <goal>compile-no-fork</goal>
                                 </goals>
                                 <phase>package</phase>
                                 <configuration>
@@ -218,8 +227,12 @@ ACTION
                                     <buildArgs>
                                         --report-unsupported-elements-at-runtime
                                         -R:MaxHeapSize=64m
+                                        -H:+BuildReport
                                         ${graalvm.pgo} ${graalvm.compatibility} ${graalvm.gc}
                                     </buildArgs>
+                                     <metadataRepository>
+                                        <enabled>true</enabled>
+                                     </metadataRepository>
                                 </configuration>
                             </execution>
                         </executions>
@@ -240,7 +253,7 @@ ACTION
                             <transformers>
                                 <transformer
                                     implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>com.logonbox.vpn.quick.Lbv</mainClass>
+                                    <mainClass>com.logonbox.vpn.quick.LbvQuick</mainClass>
                                 </transformer>
                             </transformers>
                             <filters>

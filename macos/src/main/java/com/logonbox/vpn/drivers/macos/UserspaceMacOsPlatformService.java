@@ -21,7 +21,6 @@
 package com.logonbox.vpn.drivers.macos;
 
 import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
-import com.logonbox.vpn.drivers.lib.DNSIntegrationMethod;
 import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
 import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.VpnAdapter;
@@ -61,21 +60,19 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 
 	static Object lock = new Object();
 
-    private OSXNetworksetupDNS osxNetworkSetupDNS;
-
-	public UserspaceMacOsPlatformService() {
-		super(INTERFACE_PREFIX);
+	public UserspaceMacOsPlatformService(SystemContext context) {
+		super(INTERFACE_PREFIX, context);
 	}
 
 	protected UserspaceMacOsAddress add(String name, String type) throws IOException {
-	    commands().privileged().logged().result(nativeComponents().tool(Tool.WIREGUARD_GO), name);
+	    context().commands().privileged().logged().result(context().nativeComponents().tool(Tool.WIREGUARD_GO), name);
 		return find(name, addresses()).orElseThrow(() -> new IOException(MessageFormat.format("Could not find new network interface {0}", name)));
 	}
 
 	@Override
 	protected String getDefaultGateway() throws IOException {
 		String gw = null;
-		for (var line : commands().output("route", "get", "default")) {
+		for (var line : context().commands().output("route", "get", "default")) {
 			line = line.trim();
 			if (gw == null && line.startsWith("gateway:")) {
 				gw = InetAddress.getByName(line.substring(9)).getHostAddress();
@@ -93,7 +90,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 		UserspaceMacOsAddress lastLink = null;
 		try {
 			var state = IpAddressState.HEADER;
-			for (var r : commands().output("ifconfig")) {
+			for (var r : context().commands().output("ifconfig")) {
 				if (!r.startsWith(" ")) {
 					var a = r.split(":");
 					var name = a[0].trim();
@@ -157,41 +154,6 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 	}
 
 	@Override
-    protected VpnAdapter configureExistingSession(UserspaceMacOsAddress ip) {
-		switch(calcDnsMethod()) {
-		case SCUTIL_COMPATIBLE:
-        case SCUTIL_SPLIT:
-			/* Should still be in correct state. State is also lost at reboot (good thing!) */
-			break;
-		case NETWORKSETUP:
-		    System.out.println("TODO: Initial DNS state!");
-			//osxNetworkSetupDNS.configure(new InterfaceDNS(ip.name(), connection.dns().toArray(new String[0])));
-			break;
-		default:
-			// Should not happen
-			throw new UnsupportedOperationException();
-		}
-		return super.configureExistingSession(ip);
-	}
-
-	@Override
-	protected void onInit(SystemContext ctx) {
-		super.onInit(ctx);
-		switch(calcDnsMethod()) {
-        case SCUTIL_COMPATIBLE:
-        case SCUTIL_SPLIT:
-            /* Should still be in correct state. State is also lost at reboot (good thing!) */
-            break;
-        case NETWORKSETUP:
-            osxNetworkSetupDNS = new OSXNetworksetupDNS(commands(), context());
-            break;
-        default:
-            // Should not happen
-            throw new UnsupportedOperationException();
-        }
-	}
-
-	@Override
 	protected void onStart(Optional<String> interfaceName, VpnConfiguration configuration, VpnAdapter session, Optional<VpnPeer> peer) throws IOException {
 		UserspaceMacOsAddress ip = null;
 
@@ -247,7 +209,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 			}
 			log.info("Activating Wireguard configuration for {} (in {})", ip.name(), tempFile);
 			checkWGCommand();
-			commands().privileged().logged().result(nativeComponents().tool(Tool.WG), "setconf", ip.name(), tempFile.toString());
+			context().commands().privileged().logged().result(context().nativeComponents().tool(Tool.WG), "setconf", ip.name(), tempFile.toString());
 			log.info("Activated Wireguard configuration for {}", ip.name());
 		} finally {
 			Files.delete(tempFile);
@@ -323,7 +285,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 		session.allows().clear();
 
 		checkWGCommand();
-		for (String s : commands().privileged() .output(nativeComponents().tool(Tool.WG), "show", ip.name(), "allowed-ips")) {
+		for (String s : context().commands().privileged() .output(context().nativeComponents().tool(Tool.WG), "show", ip.name(), "allowed-ips")) {
 			StringTokenizer t = new StringTokenizer(s);
 			if (t.hasMoreTokens()) {
 				t.nextToken();
@@ -355,17 +317,8 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 		runHookViaPipeToShell(configuration, session, OsUtil.getPathOfCommandInPathOrFail("bash").toString(), "-c", String.join(" ; ",  hookScript).trim());
 	}
 
-	@Override
-	public DNSIntegrationMethod dnsMethod() {
-		return DNSIntegrationMethod.NETWORKSETUP;
-	}
-
     @Override
     protected void runCommand(List<String> commands) throws IOException {
-        commands().privileged().logged().run(commands.toArray(new String[0]));
-    }
-
-    public OSXNetworksetupDNS osxNetworksetupDNS() {
-        return osxNetworkSetupDNS;
+        context().commands().privileged().logged().run(commands.toArray(new String[0]));
     }
 }

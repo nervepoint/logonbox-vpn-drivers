@@ -20,11 +20,14 @@
  */
 package com.logonbox.vpn.drivers.lib;
 
+import static java.nio.file.Files.setPosixFilePermissions;
+
+import com.logonbox.vpn.drivers.lib.DNSProvider.DNSEntry;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.Arrays;
@@ -38,14 +41,16 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
 
 
 	private final String interfacePrefix;
-    private final NativeComponents nativeComponents;
 
     protected SystemContext context;
 	private Optional<VpnPeer> defaultGateway = Optional.empty();
 	
-	protected AbstractPlatformService(String interfacePrefix) {
+	protected AbstractPlatformService(String interfacePrefix, SystemContext context) {
 		this.interfacePrefix = interfacePrefix;
-		nativeComponents = new NativeComponents(this);
+        LOG.info("Starting platform services {}", getClass().getName());
+        this.context = context;
+        beforeStart(context);
+        onInit(context);
 	}
 	
 	protected void beforeStart(SystemContext ctx) {
@@ -58,14 +63,14 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
     public void openToEveryone(Path path) throws IOException {
         LOG.info("Setting permissions on {} to {}", path,
                 Arrays.asList(PosixFilePermission.values()));
-        Files.setPosixFilePermissions(path, new LinkedHashSet<>(Arrays.asList(PosixFilePermission.values())));
+        setPosixFilePermissions(path, new LinkedHashSet<>(Arrays.asList(PosixFilePermission.values())));
     }
 
     @Override
     public void restrictToUser(Path path) throws IOException {
         var prms = Arrays.asList(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
         LOG.info("Setting permissions on {} to {}", path, prms);
-        Files.setPosixFilePermissions(path, new LinkedHashSet<>(
+        setPosixFilePermissions(path, new LinkedHashSet<>(
                 prms));
     }
 
@@ -76,14 +81,6 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
         return context;
     }
 	
-	@Override
-	public final void init(SystemContext context) {
-		LOG.info("Starting platform services {}", getClass().getName());
-		this.context = context;
-		beforeStart(context);
-		onInit(context);
-	}
-
 	@Override
     public Optional<VpnPeer> defaultGateway() {
         return defaultGateway;
@@ -97,11 +94,6 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
     }
     
     @Override
-    public NativeComponents nativeComponents() {
-        return nativeComponents;
-    }
-
-    @Override
     public final void resetDefaulGateway() throws IOException {
         if(defaultGateway.isPresent())  {
             var gw =defaultGateway.get();
@@ -109,20 +101,37 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
             onResetDefaultGateway(gw); 
         };
     }
+
+    @Override
+    public Optional<DNSProvider> dns() {
+        return Optional.empty();
+    }
     
     @Override
     public final void stop(VpnConfiguration configuration, VpnAdapter session) throws IOException {
         try {
 
             LOG.info("Stopping VPN for {}", session.address().name());
-
-            if(configuration.preDown().length > 0) {
-                var p = configuration.preDown();
-                LOG.info("Running pre-down commands. {}", String.join(" ; ", p).trim());
-                runHook(configuration, session, p);
-            }
             
-            session.close();
+            try {
+                var dnsOr = dns();
+                if(dnsOr.isPresent()) {
+                    dnsOr.get().unset(new DNSEntry.Builder().fromConfiguration(configuration).withInterface(session.address().name()).build());
+                }
+            }
+            finally {
+
+                try {
+                    if(configuration.preDown().length > 0) {
+                        var p = configuration.preDown();
+                        LOG.info("Running pre-down commands. {}", String.join(" ; ", p).trim());
+                        runHook(configuration, session, p);
+                    }
+                }
+                finally {
+                    session.close();
+                }
+            }
         } finally {
             try {
                 onStop(configuration, session);

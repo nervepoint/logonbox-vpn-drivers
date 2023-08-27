@@ -21,19 +21,20 @@
 package com.logonbox.vpn.drivers.linux;
 
 import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
+import com.logonbox.vpn.drivers.lib.SystemContext;
 
 import java.io.IOException;
 import java.text.MessageFormat;
 
 public class UserspaceLinuxPlatformService extends AbstractLinuxPlatformService {
 
-    public UserspaceLinuxPlatformService() {
-        super();
+    public UserspaceLinuxPlatformService(SystemContext context) {
+        super(context);
     }
 
     @Override
     protected AbstractLinuxAddress add(String name, String type) throws IOException {
-        commands().privileged().logged().result(nativeComponents().tool(Tool.WIREGUARD_GO), name);
+        context().commands().privileged().logged().result(context().nativeComponents().tool(Tool.WIREGUARD_GO), name);
         return find(name, addresses()).orElseThrow(() -> new IOException(MessageFormat.format("Could not find new network interface {0}", name)));
     }
 

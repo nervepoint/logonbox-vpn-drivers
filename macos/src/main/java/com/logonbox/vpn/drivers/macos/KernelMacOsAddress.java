@@ -60,9 +60,4 @@ public class KernelMacOsAddress extends AbstractVirtualInetAddress<KernelMacOsPl
 		throw new UnsupportedOperationException("TODO");
 	}
 
-	@Override
-	public void dns(String[] dns) throws IOException {
-		throw new UnsupportedOperationException("TODO");
-	}
-
 }

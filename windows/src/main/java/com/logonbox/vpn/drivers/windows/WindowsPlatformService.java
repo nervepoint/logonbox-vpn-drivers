@@ -20,31 +20,7 @@
  */
 package com.logonbox.vpn.drivers.windows;
 
-import java.io.IOException;
-import java.io.Serializable;
-import java.io.UncheckedIOException;
-import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.text.MessageFormat;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.StringTokenizer;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.prefs.Preferences;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.logonbox.vpn.drivers.lib.AbstractDesktopPlatformService;
-import com.logonbox.vpn.drivers.lib.DNSIntegrationMethod;
 import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
 import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.VpnAdapter;
@@ -68,6 +44,29 @@ import com.sun.jna.platform.win32.WinDef.DWORD;
 import com.sun.jna.platform.win32.WinNT;
 import com.sun.jna.platform.win32.Winsvc;
 import com.sun.jna.ptr.PointerByReference;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.io.Serializable;
+import java.io.UncheckedIOException;
+import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.text.MessageFormat;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.StringTokenizer;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.prefs.Preferences;
 
 import uk.co.bithatch.nativeimage.annotations.Resource;
 import uk.co.bithatch.nativeimage.annotations.Serialization;
@@ -129,8 +128,8 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 		return PREFS;
 	}
 
-	public WindowsPlatformService() {
-		super(INTERFACE_PREFIX);
+	public WindowsPlatformService(SystemContext context) {
+		super(INTERFACE_PREFIX, context);
 	}
 
 	@FunctionalInterface
@@ -168,7 +167,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 
 		/* netsh first */
 		try {
-			for (var line : commands().privileged().output("netsh", "interface", "ip", "show", "interfaces")) {
+			for (var line : context().commands().privileged().output("netsh", "interface", "ip", "show", "interfaces")) {
 				line = line.trim();
 				if (line.equals("") || line.startsWith("Idx") || line.startsWith("---"))
 					continue;
@@ -206,7 +205,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 			 * active WireGuard interfaces for some reason, so use ipconfig /all to create a
 			 * merged list.
 			 */
-			for (var line : commands().privileged().output("ipconfig", "/all")) {
+			for (var line : context().commands().privileged().output("ipconfig", "/all")) {
 				line = line.trim();
 				if (line.startsWith("Unknown adapter")) {
 					var args = line.split("\\s+");
@@ -240,7 +239,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 		var gw = getDefaultGateway();
 		var addr = peer.endpointAddress().orElseThrow(() -> new IllegalArgumentException("Peer has no address."));
 		LOG.info("Routing traffic all through peer {}", addr);
-		commands().privileged().logged().run("route", "add", addr, gw);
+		context().commands().privileged().logged().run("route", "add", addr, gw);
 	}
 
 	@Override
@@ -248,13 +247,13 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 		var gw = getDefaultGateway();
 		var addr = peer.endpointAddress().orElseThrow(() -> new IllegalArgumentException("Peer has no address."));
 		LOG.info("Removing routing of all traffic  through peer {}", addr);
-		commands().privileged().logged().run("route", "delete", addr, gw);
+		context().commands().privileged().logged().run("route", "delete", addr, gw);
 	}
 
 	@Override
 	protected String getDefaultGateway() throws IOException {
 		String gw = null;
-		for (var line : commands().privileged().output("ipconfig")) {
+		for (var line : context().commands().privileged().output("ipconfig")) {
 			if (gw == null) {
 				line = line.trim();
 				if (line.startsWith("Default Gateway ")) {
@@ -355,7 +354,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 
 		session.attachToInterface(ip);
 
-		var cwd = nativeComponents().binDir();
+		var cwd = context().nativeComponents().binDir();
 		var confDir = cwd.resolve("conf").resolve("connections");
 		if (!Files.exists(confDir))
 			Files.createDirectories(confDir);
@@ -364,8 +363,8 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 		var transformedConfiguration = transform(configuration);
 
 		/* Install service for the network interface */
-		var tool = Paths.get(nativeComponents().tool(Tool.NETWORK_CONFIGURATION_SERVICE));
-		var install = commands().privileged().logged().task(new InstallService(ip.name(), cwd.toAbsolutePath().toString(), confDir.toAbsolutePath().toString(), tool.toAbsolutePath().toString(), transformedConfiguration)).booleanValue();
+		var tool = Paths.get(context().nativeComponents().tool(Tool.NETWORK_CONFIGURATION_SERVICE));
+		var install = context().commands().privileged().logged().task(new InstallService(ip.name(), cwd.toAbsolutePath().toString(), confDir.toAbsolutePath().toString(), tool.toAbsolutePath().toString(), transformedConfiguration)).booleanValue();
 		/*
 		 * About to start connection. The "last handshake" should be this value or later
 		 * if we get a valid connection
@@ -424,7 +423,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 		 * should either be running or not exist
 		 */
 		try {
-			commands().privileged().task(new CleanUpStaleInterfaces());
+		    context().commands().privileged().task(new CleanUpStaleInterfaces());
 		} catch (Exception e) {
 			LOG.error("Failed to clean up stale interfaces.", e);
 		}
@@ -467,19 +466,14 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 	}
 
 	@Override
-	public DNSIntegrationMethod dnsMethod() {
-		return DNSIntegrationMethod.NETSH;
-	}
-
-	@Override
 	protected void runCommand(List<String> commands) throws IOException {
-		commands().privileged().logged().run(commands.toArray(new String[0]));
+	    context().commands().privileged().logged().run(commands.toArray(new String[0]));
 	}
 
 	@Override
 	public VpnInterfaceInformation information(VpnAdapter vpnAdapter) {
 		try {
-			return commands().privileged().logged().task(new GetInformation(vpnAdapter.address().name()));
+			return context().commands().privileged().logged().task(new GetInformation(vpnAdapter.address().name()));
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		} catch (Exception e) {
@@ -490,7 +484,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 	@Override
 	public VpnAdapterConfiguration configuration(VpnAdapter vpnAdapter) {
 		try {
-			return commands().privileged().logged().task(new GetConfiguration(vpnAdapter.address().name()));
+			return context().commands().privileged().logged().task(new GetConfiguration(vpnAdapter.address().name()));
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		} catch (Exception e) {

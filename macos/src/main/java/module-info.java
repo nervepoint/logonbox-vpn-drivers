@@ -18,7 +18,9 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+import com.logonbox.vpn.drivers.lib.DNSProvider;
 import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
+import com.logonbox.vpn.drivers.macos.MacOsDNSProviderFactory;
 import com.logonbox.vpn.drivers.macos.MacOsPlatformServiceFactory;
 
 module com.logonbox.vpn.drivers.os {
@@ -28,4 +30,5 @@ module com.logonbox.vpn.drivers.os {
     requires com.sshtools.liftlib;
     provides PlatformServiceFactory with MacOsPlatformServiceFactory;
     requires static uk.co.bithatch.nativeimage.annotations;
+    provides DNSProvider.Factory with MacOsDNSProviderFactory;
 }

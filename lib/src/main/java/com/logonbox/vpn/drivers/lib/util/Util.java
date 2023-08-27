@@ -26,6 +26,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetAddress;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.security.MessageDigest;
 import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
@@ -125,8 +127,15 @@ public class Util {
 	}
 
 	public static int byteSwap(int a) {
-		return ((a & 0xff000000) >>> 24) | ((a & 0x00ff0000) >>> 8) | ((a & 0x0000ff00) << 8)
-				| ((a & 0x000000ff) << 24);
+	    return Integer.reverseBytes(a);
+//	    var b = ByteBuffer.allocate(4);
+//	    b.putInt(a);
+//	    b.flip();
+//        b.order(ByteOrder.LITTLE_ENDIAN);
+//	    return b.get();
+	    
+//		return ((a & 0xff000000) >>> 24) | ((a & 0x00ff0000) >>> 8) | ((a & 0x0000ff00) << 8)
+//				| ((a & 0x000000ff) << 24);
 	}
 
 	/**

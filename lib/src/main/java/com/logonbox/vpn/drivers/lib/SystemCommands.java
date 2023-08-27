@@ -78,6 +78,11 @@ public interface SystemCommands {
             public <R extends Serializable> R task(ElevatedClosure<R, Serializable> task) throws Exception {
                 return delegate.task(task);
             }
+
+            @Override
+            public Collection<String> silentOutput(String... args) {
+                return delegate.silentOutput(args);
+            }
         };
     }
     
@@ -100,6 +105,8 @@ public interface SystemCommands {
     void run(String... args) throws IOException;
 
     Collection<String> output(String... args) throws IOException;
+
+    Collection<String> silentOutput(String... args);
 
     int result(String... args) throws IOException;
     

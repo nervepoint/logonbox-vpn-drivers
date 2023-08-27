@@ -21,8 +21,8 @@
 package com.logonbox.vpn.drivers.linux;
 
 import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
-import com.logonbox.vpn.drivers.lib.DNSIntegrationMethod;
 import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
+import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.VpnAdapter;
 import com.logonbox.vpn.drivers.lib.VpnConfiguration;
 import com.logonbox.vpn.drivers.lib.VpnPeer;
@@ -61,8 +61,8 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 
     static Object lock = new Object();
 
-    public AbstractLinuxPlatformService() {
-        super(INTERFACE_PREFIX);
+    public AbstractLinuxPlatformService(SystemContext context) {
+        super(INTERFACE_PREFIX, context);
     }
 
     @Override
@@ -71,7 +71,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
         AbstractLinuxAddress lastLink = null;
         try {
             IpAddressState state = IpAddressState.HEADER;
-            for (String r : commands().output("ip", "address")) {
+            for (String r : context().commands().output("ip", "address")) {
                 if (!r.startsWith(" ")) {
                     String[] a = r.split(":");
                     String name = a[1].trim();
@@ -107,25 +107,6 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
     }
 
     @Override
-    public DNSIntegrationMethod dnsMethod() {
-        File f = new File("/etc/resolv.conf");
-        try {
-            String p = f.getCanonicalFile().getAbsolutePath();
-            if (p.equals(f.getAbsolutePath())) {
-                return DNSIntegrationMethod.RAW;
-            } else if (p.equals("/run/NetworkManager/resolv.conf")) {
-                return DNSIntegrationMethod.NETWORK_MANAGER;
-            } else if (p.equals("/run/systemd/resolve/stub-resolv.conf")) {
-                return DNSIntegrationMethod.SYSTEMD;
-            } else if (p.equals("/run/resolvconf/resolv.conf")) {
-                return DNSIntegrationMethod.RESOLVCONF;
-            }
-        } catch (IOException ioe) {
-        }
-        return DNSIntegrationMethod.RAW;
-    }
-
-    @Override
     public void runHook(VpnConfiguration configuration, VpnAdapter session, String... hookScript) throws IOException {
         runHookViaPipeToShell(configuration, session, OsUtil.getPathOfCommandInPathOrFail("bash").toString(), "-c",
                 String.join(" ; ", hookScript).trim());
@@ -147,7 +128,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
     @Override
     protected String getDefaultGateway() throws IOException {
         String gw = null;
-        for (String line : commands().privileged().output("ip", "route")) {
+        for (String line : context().commands().privileged().output("ip", "route")) {
             if (gw == null && line.startsWith("default via")) {
                 String[] args = line.split("\\s+");
                 if (args.length > 2)
@@ -172,10 +153,10 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
         Path tempFile = Files.createTempFile("wg", ".cfg");
         try {
             try (Writer writer = Files.newBufferedWriter(tempFile)) {
-                transform(configuration);
+                transform(configuration).write(writer);
             }
             LOG.info("Activating Wireguard configuration for {} (in {})", ip.name(), tempFile);
-            commands().privileged().logged().result(nativeComponents().tool(Tool.WG), "setconf", ip.name(),
+            context().commands().privileged().logged().result(context().nativeComponents().tool(Tool.WG), "setconf", ip.name(),
                     tempFile.toString());
             LOG.info("Activated Wireguard configuration for {}", ip.name());
         } finally {
@@ -304,7 +285,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
     protected void rebuildAllows(VpnAdapter session, AbstractLinuxAddress ip) throws IOException {
         session.allows().clear();
 
-        for (var s : commands().privileged().output(nativeComponents().tool(Tool.WG), "show", ip.name(),
+        for (var s : context().commands().privileged().output(context().nativeComponents().tool(Tool.WG), "show", ip.name(),
                 "allowed-ips")) {
             var t = new StringTokenizer(s);
             if (t.hasMoreTokens()) {
@@ -322,7 +303,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 
     @Override
     protected void runCommand(List<String> commands) throws IOException {
-        commands().privileged().logged().run(commands.toArray(new String[0]));
+        context(). commands().privileged().logged().run(commands.toArray(new String[0]));
     }
 
     String resolvconfIfacePrefix() {
@@ -364,6 +345,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
                 return r * -1;
         });
         /* Actually add routes */
+        LOG.info("Will set routes {}", String.join(",", session.allows()));
         ip.setRoutes(session.allows());
     }
 }

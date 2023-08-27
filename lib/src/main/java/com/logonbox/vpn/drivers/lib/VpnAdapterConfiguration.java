@@ -296,12 +296,6 @@ public interface VpnAdapterConfiguration extends Serializable {
     }
     
     static INI basicDocWithInterface(VpnAdapterConfiguration adapter ) {
-    	var bldr = new INIWriter.Builder().
-                withEmptyValues(false).
-                withCommentCharacter('#').
-                withStringQuoteMode(StringQuoteMode.NEVER).
-                withMultiValueMode(MultiValueMode.SEPARATED);
-        
         var doc = INI.create();
         
         var ifaceSection = doc.create("Interface");

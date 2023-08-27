@@ -35,14 +35,14 @@ public abstract class AbstractVirtualInetAddress<P extends PlatformService<?>> i
 	public AbstractVirtualInetAddress(P platform) {
 		super();
 		this.platform = platform;
-	    commands = platform.commands();
+	    commands = platform.context().commands();
 	}
 
 	public AbstractVirtualInetAddress(P platform, String name) {
 		super();
 		this.name = name;
 		this.platform = platform;
-	    commands = platform.commands();
+	    commands = platform.context().commands();
 	}
 
 	@Override

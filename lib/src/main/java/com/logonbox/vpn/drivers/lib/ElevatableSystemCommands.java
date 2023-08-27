@@ -1,6 +1,5 @@
-package com.logonbox.vpn.drivers.lib.impl;
+package com.logonbox.vpn.drivers.lib;
 
-import com.logonbox.vpn.drivers.lib.SystemCommands;
 import com.sshtools.liftlib.ElevatedClosure;
 import com.sshtools.liftlib.Elevator;
 import com.sshtools.liftlib.Elevator.ReauthorizationPolicy;
@@ -61,6 +60,17 @@ public class ElevatableSystemCommands implements SystemCommands {
             throw e;
         }  catch (Exception e) {
             throw new IOException("Failed to run command.", e);
+        }
+    }
+
+    @Override
+    public Collection<String> silentOutput(String... args) {
+        try {
+            return Arrays.asList(new SilentOutput(env(), args).call());
+        } catch (RuntimeException e) {
+            throw e;
+        }  catch (Exception e) {
+            throw new UncheckedIOException(new IOException("Failed to run command.", e));
         }
     }
 
@@ -138,6 +148,17 @@ public class ElevatableSystemCommands implements SystemCommands {
                 throw e;
             }  catch (Exception e) {
                 throw new IOException("Failed to run command.", e);
+            }
+        }
+
+        @Override
+        public Collection<String> silentOutput(String... args) {
+            try {
+                return Arrays.asList(elevator.call(new SilentOutput(env(), args)));
+            } catch (RuntimeException e) {
+                throw e;
+            }  catch (Exception e) {
+                throw new UncheckedIOException(new IOException("Failed to run command.", e));
             }
         }
 
@@ -257,6 +278,12 @@ public class ElevatableSystemCommands implements SystemCommands {
         }
 
         @Override
+        public Collection<String> silentOutput(String... args){
+            onLog.ifPresent(c -> c.accept(args));
+            return delegate.silentOutput(args);
+        }
+
+        @Override
         public void onLog(Consumer<String[]> onLog) {
             delegate.onLog(onLog);
         }
@@ -371,6 +398,44 @@ public class ElevatableSystemCommands implements SystemCommands {
                 int ret = process.waitFor();
                 if (ret != 0)
                     throw new IllegalStateException("Unexpected return code. " + ret);
+            } catch (InterruptedException ie) {
+                throw new IOException("Interrupted.", ie);
+            }
+            return lines.toArray(new String[0]);
+        }
+    }
+
+    @SuppressWarnings("serial")
+    @Serialization
+    public final static class SilentOutput implements ElevatedClosure<String[], Serializable> {
+
+        String[] args;
+        Map<String, String> env;
+
+        public SilentOutput() {
+        }
+
+        SilentOutput(Map<String, String> env, String... args) {
+            this.args = args;
+            this.env = env;
+        }
+
+        @Override
+        public String[] call(ElevatedClosure<String[], Serializable> proxy) throws Exception {
+            var bldr = new ProcessBuilder(args);
+            if (!env.isEmpty())
+                bldr.environment().putAll(env);
+            bldr.redirectError(Redirect.DISCARD);
+            bldr.redirectInput(Redirect.INHERIT);
+            var process = bldr.start();
+            String line = null;
+            var reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            var lines = new ArrayList<String>();
+            while ((line = reader.readLine()) != null) {
+                lines.add(line);
+            }
+            try {
+                process.waitFor();
             } catch (InterruptedException ie) {
                 throw new IOException("Interrupted.", ie);
             }

@@ -24,10 +24,26 @@ import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 
 public interface SystemContext {
-    
+
     ScheduledExecutorService queue();
-    
+
     SystemConfiguration configuration();
 
     void addScriptEnvironmentVariables(VpnAdapter connection, Map<String, String> env);
+
+    /**
+     * Get an instance of {@link SystemCommands}, used to execute system commands.
+     * 
+     * @param args
+     */
+    SystemCommands commands();
+
+    /**
+     * {@link NativeComponents} manages locating, or potentially (temporarily)
+     * installing various native tools, such as the <code>wg</code> command, the
+     * userspace <code>wireguard-go</code> implementation and more.
+     * 
+     * @return configuration
+     */
+    NativeComponents nativeComponents();
 }

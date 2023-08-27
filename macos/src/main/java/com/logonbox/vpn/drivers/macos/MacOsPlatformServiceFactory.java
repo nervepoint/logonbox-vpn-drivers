@@ -22,6 +22,7 @@ package com.logonbox.vpn.drivers.macos;
 
 import com.logonbox.vpn.drivers.lib.PlatformService;
 import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
+import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.sshtools.liftlib.OS;
 
 import uk.co.bithatch.nativeimage.annotations.Resource;
@@ -35,8 +36,8 @@ public class MacOsPlatformServiceFactory implements PlatformServiceFactory {
     }
 
     @Override
-    public PlatformService<?> createPlatformService() {
-        return new UserspaceMacOsPlatformService();
+    public PlatformService<?> createPlatformService(SystemContext context) {
+        return new UserspaceMacOsPlatformService(context);
     }
 
 }

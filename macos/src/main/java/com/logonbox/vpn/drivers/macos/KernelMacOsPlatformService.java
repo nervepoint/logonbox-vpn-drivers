@@ -21,7 +21,7 @@
 package com.logonbox.vpn.drivers.macos;
 
 import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
-import com.logonbox.vpn.drivers.lib.DNSIntegrationMethod;
+import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.VpnAdapter;
 import com.logonbox.vpn.drivers.lib.VpnConfiguration;
 import com.logonbox.vpn.drivers.lib.VpnPeer;
@@ -40,13 +40,13 @@ public class KernelMacOsPlatformService extends AbstractUnixDesktopPlatformServi
 
 	private static final String INTERFACE_PREFIX = "wg";
 
-	public KernelMacOsPlatformService() {
-		super(INTERFACE_PREFIX);
+	public KernelMacOsPlatformService(SystemContext context) {
+		super(INTERFACE_PREFIX, context);
 	}
 
 	@Override
 	protected String getDefaultGateway() throws IOException {
-		for(String line : commands().privileged().output("route", "-n", "get", "default")) {
+		for(String line : context().commands().privileged().output("route", "-n", "get", "default")) {
 			line = line.trim();
 			if(line.startsWith("gateway:")) {
 				String[] args = line.split(":");
@@ -68,14 +68,9 @@ public class KernelMacOsPlatformService extends AbstractUnixDesktopPlatformServi
 		throw new UnsupportedOperationException("TODO");
 	}
 
-	@Override
-	public DNSIntegrationMethod dnsMethod() {
-		return DNSIntegrationMethod.SCUTIL_COMPATIBLE;
-	}
-
     @Override
     protected void runCommand(List<String> commands) throws IOException {
-        commands().privileged().logged().run(commands.toArray(new String[0]));
+        context().commands().privileged().logged().run(commands.toArray(new String[0]));
     }
 
     @Override

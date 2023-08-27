@@ -20,18 +20,20 @@
  */
 package com.logonbox.vpn.drivers.linux;
 
+import com.logonbox.vpn.drivers.lib.SystemContext;
+
 import java.io.IOException;
 import java.text.MessageFormat;
 
 public class KernelLinuxPlatformService extends AbstractLinuxPlatformService {
 
-    public KernelLinuxPlatformService() {
-        super();
+    public KernelLinuxPlatformService(SystemContext context) {
+        super(context);
     }
 
     @Override
     protected AbstractLinuxAddress add(String name, String type) throws IOException {
-        commands().privileged().logged().result("ip", "link", "add", "dev", name, "type", type);
+        context().commands().privileged().logged().result("ip", "link", "add", "dev", name, "type", type);
         return find(name, addresses()).orElseThrow(() -> new IOException(MessageFormat.format("Could not find new network interface {0}", name)));
     }
 

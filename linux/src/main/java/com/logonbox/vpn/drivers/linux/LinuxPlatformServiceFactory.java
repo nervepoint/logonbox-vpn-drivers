@@ -22,6 +22,7 @@ package com.logonbox.vpn.drivers.linux;
 
 import com.logonbox.vpn.drivers.lib.PlatformService;
 import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
+import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.VpnAddress;
 import com.sshtools.liftlib.OS;
 
@@ -29,12 +30,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.List;
 
 import uk.co.bithatch.nativeimage.annotations.Resource;
 
-@Resource("linux-x84-64/.*")
+@Resource({ "linux-x84-64/.*" })
 public class LinuxPlatformServiceFactory implements PlatformServiceFactory {
     final static Logger LOG = LoggerFactory.getLogger(LinuxPlatformServiceFactory.class);
 
@@ -44,33 +49,47 @@ public class LinuxPlatformServiceFactory implements PlatformServiceFactory {
     }
 
     @Override
-    public PlatformService<? extends VpnAddress> createPlatformService() {
-        if(Boolean.getBoolean("logonbox.vpn.forceUserspace")) {
+    public PlatformService<? extends VpnAddress> createPlatformService(SystemContext context) {
+        PlatformService<? extends VpnAddress> ps = null;
+        if (Boolean.getBoolean("logonbox.vpn.forceUserspace")) {
             LOG.warn("Forcing use of userspace implementation through system property.");
-        }
-        else if(Boolean.getBoolean("logonbox.vpn.forceKernel")) {
+        } else if (Boolean.getBoolean("logonbox.vpn.forceKernel")) {
             LOG.warn("Forcing use of kernel implementation through system property.");
-            return new KernelLinuxPlatformService();
+            ps = new KernelLinuxPlatformService(context);
         } else {
-            var modulesPath = Paths.get("/proc/modules");
-            if(Files.exists(modulesPath)) {
-                try(var in = Files.newBufferedReader(modulesPath)) {
-                    String line;
-                    while( ( line = in.readLine() ) != null) {
-                        if(line.split("\\s+")[0].equals("wireguard")) {
-                            LOG.info("Found wireguard module, using kernel implementation");
-                            return new KernelLinuxPlatformService();
-                        }
+            var modulesPath = Paths.get("/sys/module/wireguard");
+            if (Files.exists(modulesPath)) {
+                LOG.info("Found wireguard module, using kernel implementation");
+                ps = new KernelLinuxPlatformService(context);
+            } else {
+                LOG.info("Wireguard module not loaded, trying to load");
+                try {
+                    if(context.commands().privileged().logged().result("modprobe", "wireguard") == 0) {
+                        LOG.info("Wireguard loaded, using kernel driver");
+                        ps = new KernelLinuxPlatformService(context);
                     }
+                    else
+                        LOG.info("Cannot load wireguard, assuming userspace implementation");
+                } catch (IOException e) {
+                    LOG.info("Cannot detect if wireguard module is available, assuming userspace implementation");
                 }
-                catch(IOException ioe) {
-                }
-                LOG.info("Cannot detect wireguard module, using userspace implementation");
             }
-            else
-                LOG.info("Cannot detect if wireguard module is available, assuming userspace implementation");
         }
-        return new UserspaceLinuxPlatformService();
+        if(ps == null) {
+            ps = new UserspaceLinuxPlatformService(context);
+        }
+        return ps;
+    }
+
+    static String bytesToIpAddress(List<Byte> addr) {
+        var b = new byte[addr.size()];
+        for (int i = 0; i < addr.size(); i++)
+            b[i] = addr.get(i);
+        try {
+            return InetAddress.getByAddress(b).getHostAddress();
+        } catch (UnknownHostException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
 }

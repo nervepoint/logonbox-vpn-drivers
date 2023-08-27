@@ -79,17 +79,6 @@ public interface Resolve1Manager extends DBusInterface {
 		public List<Byte> getAddress() {
 			return address;
 		}
-
-		static Byte[] toObjects(byte[] bytesPrim) {
-			Byte[] bytes = new Byte[bytesPrim.length];
-			Arrays.setAll(bytes, n -> bytesPrim[n]);
-
-			return bytes;
-		}
-
-		static  byte[] intToBytes(int myInteger){
-		    return ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(myInteger).array();
-		}
 	}
 
     @Reflectable
@@ -114,6 +103,82 @@ public interface Resolve1Manager extends DBusInterface {
 		}
 
 	}
+    
+    @Reflectable
+    @TypeReflect(fields = true)
+    public class RootDNSPropertyStruct extends Struct {
+
+        @Position(0)
+        private int index;
+
+        @Position(1)
+        private int addressFamily;
+
+        @Position(2)
+        private List<Byte> address;
+
+
+        public RootDNSPropertyStruct(int index, int addressFamily, List<Byte> address) {
+            this.index = index;
+            this.addressFamily = addressFamily;
+            this.address = address;
+        }
+
+        @SuppressWarnings("unchecked")
+        public RootDNSPropertyStruct(Object[] arr) {
+            index = (Integer)arr[0];
+            addressFamily = (Integer)arr[1];
+            address = (List<Byte>)arr[2];
+        }
+
+        public int getIndex() {
+            return index;
+        }
+
+        public int getAddressFamily() {
+            return addressFamily;
+        }
+
+        public List<Byte> getAddress() {
+            return address;
+        }
+    }
+
+    @Reflectable
+    @TypeReflect(fields = true)
+    public class RootDomainsPropertyStruct extends Struct {
+        @Position(0)
+        private final int index;
+        @Position(1)
+        private final String domain;
+        @Position(2)
+        private final boolean searchDomain;
+
+        public RootDomainsPropertyStruct(int index, String domain, boolean searchDomain) {
+            this.index = index;
+            this.domain = domain;
+            this.searchDomain = searchDomain;
+        }
+        
+        public RootDomainsPropertyStruct(Object[] arr) {
+            index = (Integer) arr[0];
+            domain = (String)arr[1];
+            searchDomain = (Boolean)arr[2];
+        }
+
+        public int getIndex() {
+            return index;
+        }
+
+        public String getDomain() {
+            return domain;
+        }
+
+        public boolean getMember1() {
+            return searchDomain;
+        }
+
+    }
 
 	/**
 	 * The SetLinkDNS() method sets the DNS servers to use on a specific interface.
@@ -169,4 +234,15 @@ public interface Resolve1Manager extends DBusInterface {
 	void FlushCaches();
 	
 	DBusPath GetLink(int index);
+
+    static Byte[] toObjects(byte[] bytesPrim) {
+        Byte[] bytes = new Byte[bytesPrim.length];
+        Arrays.setAll(bytes, n -> bytesPrim[n]);
+
+        return bytes;
+    }
+
+    static  byte[] intToBytes(int myInteger){
+        return ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(myInteger).array();
+    }
 }

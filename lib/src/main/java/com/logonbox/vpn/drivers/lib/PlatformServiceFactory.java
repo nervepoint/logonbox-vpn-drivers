@@ -31,5 +31,5 @@ public interface PlatformServiceFactory {
     
     boolean isSupported();
 
-	PlatformService<? extends VpnAddress> createPlatformService();
+	PlatformService<? extends VpnAddress> createPlatformService(SystemContext context);
 }

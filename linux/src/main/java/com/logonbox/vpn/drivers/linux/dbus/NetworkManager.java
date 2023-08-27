@@ -38,6 +38,8 @@ import uk.co.bithatch.nativeimage.annotations.TypeReflect;
 @Proxy
 public interface NetworkManager extends DBusInterface {
 	DBusPath GetDeviceByIpIface(String iface);
+	
+    DBusPath[] GetAllDevices();
 
 	@DBusInterfaceName("org.freedesktop.NetworkManager.Settings")
 	@Proxy

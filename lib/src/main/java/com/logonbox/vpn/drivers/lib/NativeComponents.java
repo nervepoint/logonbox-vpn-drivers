@@ -45,11 +45,11 @@ public class NativeComponents {
 		String resourcePath(Arch arch) {
 			switch (this) {
 			case LINUX:
-				return "/linux-" + arch.resourcePathSuffix();
+				return "linux-" + arch.resourcePathSuffix();
 			case MAC_OS:
-				return "/macosx-" + arch.resourcePathSuffix();
+				return "macosx-" + arch.resourcePathSuffix();
 			case WINDOWS:
-				return "/win32-" + arch.resourcePathSuffix();
+				return "win32-" + arch.resourcePathSuffix();
 			default:
 				throw new UnsupportedOperationException();
 			}
@@ -145,11 +145,6 @@ public class NativeComponents {
 
 	private Path tempCommandDir;
 	private Map<Tool, Path> cache = new HashMap<>();
-	private final PlatformService<?> platform;
-
-	NativeComponents(PlatformService<?> platform) {
-		this.platform = platform;
-	}
 
 	public String tool(Tool tool) {
 		try {
@@ -215,19 +210,20 @@ public class NativeComponents {
 
 	private Path extractCommand(OsName os, Arch arch, Tool tool) throws IOException {
 		var toolFilename = tool.exeFilename(os);
-		var resourcePath = tool.resourcePath(os, arch);
+        var resourcePath = tool.resourcePath(os, arch);
 		LOG.info("Extracting tool {} for platform {} on arch {} from {}", tool, os.name(), arch.name(), resourcePath);
-		var res = platform.getClass().getResource(resourcePath);
-		if (res == null)
-			throw new UnsupportedOperationException(
-					MessageFormat.format("The tool {0} is not supported on {1} {2}", tool, os, arch));
+		
+		var res = find(os, arch, tool, resourcePath);
+        if (res == null)
+            throw new UnsupportedOperationException(
+                    MessageFormat.format("The tool {0} is not supported on {1} {2}", tool, os, arch));
 		var toolPath = extractFile(os, arch, tool, toolFilename, res, true);
 
 		for (var dep : tool.dependencies()) {
 			LOG.info("Extracting tool dependency {} for platform {} on arch {} from {}", dep, os.name(), arch.name(),
 					resourcePath);
 			var depPath = tool.libraryPath(dep, os, arch);
-			res = platform.getClass().getResource(depPath);
+	        res = find(os, arch, tool, depPath);
 			if (res == null)
 				throw new UnsupportedOperationException(
 						MessageFormat.format("The tool dependency {0} is not supported on {1} {2}", tool, os, arch));
@@ -236,6 +232,23 @@ public class NativeComponents {
 
 		return toolPath;
 	}
+
+    protected URL find(OsName os, Arch arch, Tool tool, String resourcePath) {
+        var loader = Thread.currentThread().getContextClassLoader();
+        if(loader != null) {
+            LOG.info("Trying resource {} from context loader.", resourcePath, loader.getName());
+        }
+        var res = loader == null ? null : loader.getResource(resourcePath);
+		if(res == null) {
+            LOG.info("Trying resource {} from platform class loader.", resourcePath, NativeComponents.class.getName());
+		    res = NativeComponents.class.getClassLoader().getResource(resourcePath);
+		}
+		if(res == null) {
+            LOG.info("Trying resource {} from system class loader.", resourcePath, ClassLoader.getSystemClassLoader().getName());
+            res = ClassLoader.getSystemClassLoader().getResource(resourcePath);
+        }
+        return res;
+    }
 
 	private Path extractFile(OsName os, Arch arch, Tool tool, String toolFilename, URL res, boolean execute)
 			throws IOException {

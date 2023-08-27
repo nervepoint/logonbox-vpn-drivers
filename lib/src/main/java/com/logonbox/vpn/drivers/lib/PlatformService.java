@@ -21,6 +21,7 @@
 package com.logonbox.vpn.drivers.lib;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
@@ -33,8 +34,8 @@ public interface PlatformService<ADDR extends VpnAddress> {
      * 
      * @return instance
      */
-    public static PlatformService<? extends VpnAddress> create() {
-        return PlatformServiceFactory.get().createPlatformService();
+    public static PlatformService<? extends VpnAddress> create(SystemContext context) {
+        return PlatformServiceFactory.get().createPlatformService(context);
     }
 
     /**
@@ -70,13 +71,6 @@ public interface PlatformService<ADDR extends VpnAddress> {
      * @return context
      */
     SystemContext context();
-
-	/**
-	 * Start the services for this platform.
-	 * 
-	 * @param ctx context
-	 */
-	void init(SystemContext ctx);
 
 	/**
 	 * Connect, optionally waiting for the first handshake from the given peer.
@@ -132,20 +126,6 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	 * @param hookScript script
 	 */
 	void runHook(VpnConfiguration configuration, VpnAdapter session, String... hookScript) throws IOException;
-	
-	/**
-	 * Detect the default DNS integration method to use given the current platform and platform configuration. Will NOT return {@link DNSIntegrationMethod#AUTO}.
-	 * 
-	 * @return method
-	 */
-	DNSIntegrationMethod dnsMethod();
-    
-    /**
-     * Get an instance of {@link SystemCommands}, used to execute system commands.
-     * 
-     * @param args
-     */
-    SystemCommands commands();
     
     /**
      * Get whether or not a particular peer is being used as the default gateway,
@@ -223,30 +203,13 @@ public interface PlatformService<ADDR extends VpnAddress> {
      * @return configuration
      * @throws UncheckedIOException on error
      */
-    VpnAdapterConfiguration configuration(VpnAdapter adapter);
-
+    VpnAdapterConfiguration configuration(VpnAdapter adapter); 
+    
     /**
-     * {@link NativeComponents} manages locating, or potentially (temporarily)
-     * installing various native tools, such as the <code>wg</code> command,
-     * the userspace <code>wireguard-go</code> implementation and more. 
+     * Get the configured {@link DNSProvider}, or {@link Optional#empty()}.
      * 
-     * @return configuration
+     * @return DNS provider
      */
-    NativeComponents nativeComponents();
-
-    /**
-     * Get the actual DNS method to use. This takes whatever is configured in {@link SystemConfiguration#dnsIntegrationMethod()}.
-     * If this is {@link DNSIntegrationMethod#AUTO}, then {@link #dnsMethod()} will be used to get the best for this platform,
-     * otherwise the configured method will be returned.
-     * 
-     * @return dns method to use
-     */
-    default DNSIntegrationMethod calcDnsMethod() {
-        var method = context().configuration().dnsIntegrationMethod();
-        if (method == DNSIntegrationMethod.AUTO) {
-            return dnsMethod();
-        } else
-            return method;
-    }
+    Optional<DNSProvider> dns();
  
 }

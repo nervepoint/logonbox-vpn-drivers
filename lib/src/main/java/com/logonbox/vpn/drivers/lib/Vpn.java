@@ -109,8 +109,7 @@ public final class Vpn implements Closeable {
         if (builder.platformService.isPresent()) {
             platformService = builder.platformService.get();
         } else {
-            platformService = PlatformService.create();
-            platformService.init(builder.systemContext.orElseGet(() -> new VpnSystemContext(builder.systemConfiguration)));
+            platformService = PlatformService.create(builder.systemContext.orElseGet(() -> new VpnSystemContext(builder.systemConfiguration)));
         }
         
         try {
@@ -159,7 +158,7 @@ public final class Vpn implements Closeable {
             ((VpnSystemContext)platformService.context()).close();
     }
     
-    class VpnSystemContext implements SystemContext, Closeable {
+    class VpnSystemContext extends AbstractSystemContext implements Closeable {
         private final ScheduledExecutorService queue = Executors.newSingleThreadScheduledExecutor();
         private final SystemConfiguration configuration;
         
