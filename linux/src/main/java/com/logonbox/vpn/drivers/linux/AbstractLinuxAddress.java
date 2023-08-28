@@ -43,7 +43,7 @@ import java.util.regex.Pattern;
 
 public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<AbstractLinuxPlatformService> {
 
-    private static final String NFT_COMMAND = "nftXXXXXXX";
+    private static final String NFT_COMMAND = "nft";
 
     private static final String TABLE_PREFIX = "logonbox-vpn-";
 
