@@ -112,7 +112,7 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
                 ip = add(name, "wireguard");
                 if (ip == null)
                     throw new IOException("Failed to create virtual IP address.");
-                LOG.info("Created {}", name);
+                LOG.info("Created {}", ip.shortName());
             } else {
                 var publicKey = getPublicKey(name);
                 if (failIfInUse && publicKey.isPresent()) {

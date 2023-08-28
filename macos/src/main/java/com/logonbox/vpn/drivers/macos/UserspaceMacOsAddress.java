@@ -20,15 +20,6 @@
  */
 package com.logonbox.vpn.drivers.macos;
 
-import com.logonbox.vpn.drivers.lib.AbstractVirtualInetAddress;
-import com.logonbox.vpn.drivers.lib.util.IpUtil;
-import com.logonbox.vpn.drivers.lib.util.OsUtil;
-import com.logonbox.vpn.drivers.lib.util.Util;
-import com.sshtools.liftlib.ElevatedClosure;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
@@ -36,7 +27,6 @@ import java.io.UncheckedIOException;
 import java.net.NetworkInterface;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -44,6 +34,15 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.logonbox.vpn.drivers.lib.AbstractVirtualInetAddress;
+import com.logonbox.vpn.drivers.lib.util.IpUtil;
+import com.logonbox.vpn.drivers.lib.util.OsUtil;
+import com.logonbox.vpn.drivers.lib.util.Util;
+import com.sshtools.liftlib.ElevatedClosure;
 
 import uk.co.bithatch.nativeimage.annotations.Serialization;
 
@@ -384,8 +383,6 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
             UserspaceMacOsPlatformService platformService) {
         try {
             var name = platformService.context().commands().task(new GetName(nativeName));
-            if(name == null)
-                throw new IllegalArgumentException(MessageFormat.format("Could not find name for real interface {0}", nativeName));
             return new UserspaceMacOsAddress(name, nativeName, platformService);
         } catch(IOException ioe) {
             throw new UncheckedIOException(ioe);
@@ -458,7 +455,7 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
                     }
                 }
             }
-            return null;
+            return realInterace;
         }
     }
 }
