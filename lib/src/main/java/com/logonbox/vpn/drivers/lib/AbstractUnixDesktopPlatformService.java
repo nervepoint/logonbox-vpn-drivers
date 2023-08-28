@@ -9,11 +9,11 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
+import java.text.MessageFormat;
 import java.text.ParseException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.StringTokenizer;
@@ -93,6 +93,80 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
             else
                 throw ioe;
         }
+    } 
+
+    protected abstract I add(String name, String type) throws IOException;
+    
+    protected final I findAddress(Optional<String> interfaceName, VpnConfiguration configuration,
+            boolean failIfInUse) throws IOException {
+        I ip = null;
+
+        var addresses = addresses();
+
+        if (interfaceName.isPresent()) {
+            var name = interfaceName.get();
+            var addr = find(name, addresses);
+            if (addr.isEmpty()) {
+                LOG.info("No existing unused interfaces, creating new one {} for public key .", name,
+                        configuration.publicKey());
+                ip = add(name, "wireguard");
+                if (ip == null)
+                    throw new IOException("Failed to create virtual IP address.");
+                LOG.info("Created {}", name);
+            } else {
+                var publicKey = getPublicKey(name);
+                if (failIfInUse && publicKey.isPresent()) {
+                    throw new IOException(MessageFormat.format("{0} is already in use", name));
+                }
+            }
+        }
+
+        /*
+         * Look for wireguard interfaces that are available but not connected. If we
+         * find none, try to create one.
+         */
+        if (ip == null) {
+            int maxIface = -1;
+            for (var i = 0; i < MAX_INTERFACES; i++) {
+                var name = getInterfacePrefix() + i;
+                LOG.info("Looking for {}", name);
+                if (exists(name, addresses)) {
+                    /* Interface exists, is it connected? */
+                    var publicKey = getPublicKey(name);
+                    if (publicKey.isEmpty()) {
+                        /* No addresses, wireguard not using it */
+                        LOG.info("{} is free.", name);
+                        ip = address(name);
+                        maxIface = i;
+                        break;
+                    } else if (publicKey.get().equals(configuration.publicKey())) {
+                        throw new IllegalStateException(String
+                                .format("Peer with public key %s on %s is already active.", publicKey.get(), name));
+                    } else {
+                        LOG.info("{} is already in use.", name);
+                    }
+                } else if (maxIface == -1) {
+                    /* This one is the next free number */
+                    maxIface = i;
+                    LOG.info("{} is next free interface.", name);
+                    break;
+                }
+            }
+            if (maxIface == -1)
+                throw new IOException(String.format("Exceeds maximum of %d interfaces.", MAX_INTERFACES));
+
+            if (ip == null) {
+                var name = getInterfacePrefix() + maxIface;
+                LOG.info("No existing unused interfaces, creating new one {} for public key .", name,
+                        configuration.publicKey());
+                ip = add(name, "wireguard");
+                if (ip == null)
+                    throw new IOException("Failed to create virtual IP address.");
+                LOG.info("Created {}", name);
+            } else
+                LOG.info("Using {}", ip.name());
+        }
+        return ip;
     }
 
     protected void checkWGCommand() throws IOException {

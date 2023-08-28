@@ -78,5 +78,10 @@ public class KernelMacOsPlatformService extends AbstractUnixDesktopPlatformServi
         throw new UnsupportedOperationException("TODO");
     }
 
+    @Override
+    protected KernelMacOsAddress add(String name, String type) throws IOException {
+        throw new UnsupportedOperationException("TODO");
+    }
+
 
 }

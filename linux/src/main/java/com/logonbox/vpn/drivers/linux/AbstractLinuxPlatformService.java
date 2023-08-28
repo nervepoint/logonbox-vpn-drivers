@@ -41,7 +41,6 @@ import java.net.InterfaceAddress;
 import java.net.NetworkInterface;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.text.MessageFormat;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -66,7 +65,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
     }
 
     @Override
-    public List<AbstractLinuxAddress> addresses() {
+    public final List<AbstractLinuxAddress> addresses() {
         List<AbstractLinuxAddress> l = new ArrayList<>();
         AbstractLinuxAddress lastLink = null;
         try {
@@ -107,15 +106,13 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
     }
 
     @Override
-    public void runHook(VpnConfiguration configuration, VpnAdapter session, String... hookScript) throws IOException {
+    public final void runHook(VpnConfiguration configuration, VpnAdapter session, String... hookScript) throws IOException {
         runHookViaPipeToShell(configuration, session, OsUtil.getPathOfCommandInPathOrFail("bash").toString(), "-c",
                 String.join(" ; ", hookScript).trim());
     }
 
-    protected abstract AbstractLinuxAddress add(String name, String type) throws IOException;
-
     @Override
-    protected AbstractLinuxAddress createVirtualInetAddress(NetworkInterface nif) throws IOException {
+    protected final AbstractLinuxAddress createVirtualInetAddress(NetworkInterface nif) throws IOException {
         var ip = createAddress(nif.getName());
         for (InterfaceAddress addr : nif.getInterfaceAddresses()) {
             ip.getAddresses().add(addr.getAddress().toString());
@@ -126,7 +123,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
     protected abstract AbstractLinuxAddress createAddress(String name);
 
     @Override
-    protected String getDefaultGateway() throws IOException {
+    protected final String getDefaultGateway() throws IOException {
         String gw = null;
         for (String line : context().commands().privileged().output("ip", "route")) {
             if (gw == null && line.startsWith("default via")) {
@@ -142,7 +139,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
     }
 
     @Override
-    protected void onStart(Optional<String> interfaceName, VpnConfiguration configuration, VpnAdapter session,
+    protected final void onStart(Optional<String> interfaceName, VpnConfiguration configuration, VpnAdapter session,
             Optional<VpnPeer> peer) throws IOException {
         var ip = findAddress(interfaceName, configuration, true);
 
@@ -210,79 +207,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 
     }
 
-    protected AbstractLinuxAddress findAddress(Optional<String> interfaceName, VpnConfiguration configuration,
-            boolean failIfInUse) throws IOException {
-        AbstractLinuxAddress ip = null;
-
-        var addresses = addresses();
-
-        if (interfaceName.isPresent()) {
-            var name = interfaceName.get();
-            var addr = find(name, addresses);
-            if (addr.isEmpty()) {
-                LOG.info("No existing unused interfaces, creating new one {} for public key .", name,
-                        configuration.publicKey());
-                ip = add(name, "wireguard");
-                if (ip == null)
-                    throw new IOException("Failed to create virtual IP address.");
-                LOG.info("Created {}", name);
-            } else {
-                var publicKey = getPublicKey(name);
-                if (failIfInUse && publicKey.isPresent()) {
-                    throw new IOException(MessageFormat.format("{0} is alread in use", name));
-                }
-            }
-        }
-
-        /*
-         * Look for wireguard interfaces that are available but not connected. If we
-         * find none, try to create one.
-         */
-        if (ip == null) {
-            int maxIface = -1;
-            for (var i = 0; i < MAX_INTERFACES; i++) {
-                var name = getInterfacePrefix() + i;
-                LOG.info("Looking for {}", name);
-                if (exists(name, addresses)) {
-                    /* Interface exists, is it connected? */
-                    var publicKey = getPublicKey(name);
-                    if (publicKey.isEmpty()) {
-                        /* No addresses, wireguard not using it */
-                        LOG.info("{} is free.", name);
-                        ip = address(name);
-                        maxIface = i;
-                        break;
-                    } else if (publicKey.get().equals(configuration.publicKey())) {
-                        throw new IllegalStateException(String
-                                .format("Peer with public key %s on %s is already active.", publicKey.get(), name));
-                    } else {
-                        LOG.info("{} is already in use.", name);
-                    }
-                } else if (maxIface == -1) {
-                    /* This one is the next free number */
-                    maxIface = i;
-                    LOG.info("{} is next free interface.", name);
-                    break;
-                }
-            }
-            if (maxIface == -1)
-                throw new IOException(String.format("Exceeds maximum of %d interfaces.", MAX_INTERFACES));
-
-            if (ip == null) {
-                var name = getInterfacePrefix() + maxIface;
-                LOG.info("No existing unused interfaces, creating new one {} for public key .", name,
-                        configuration.publicKey());
-                ip = add(name, "wireguard");
-                if (ip == null)
-                    throw new IOException("Failed to create virtual IP address.");
-                LOG.info("Created {}", name);
-            } else
-                LOG.info("Using {}", ip.name());
-        }
-        return ip;
-    }
-
-    protected void rebuildAllows(VpnAdapter session, AbstractLinuxAddress ip) throws IOException {
+    protected final void rebuildAllows(VpnAdapter session, AbstractLinuxAddress ip) throws IOException {
         session.allows().clear();
 
         for (var s : context().commands().privileged().output(context().nativeComponents().tool(Tool.WG), "show", ip.name(),
@@ -302,7 +227,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
     }
 
     @Override
-    protected void runCommand(List<String> commands) throws IOException {
+    protected final void runCommand(List<String> commands) throws IOException {
         context(). commands().privileged().logged().run(commands.toArray(new String[0]));
     }
 

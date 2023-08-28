@@ -64,6 +64,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 		super(INTERFACE_PREFIX, context);
 	}
 
+	@Override
 	protected UserspaceMacOsAddress add(String name, String type) throws IOException {
 	    context().commands().privileged().logged().result(context().nativeComponents().tool(Tool.WIREGUARD_GO), name);
 		return find(name, addresses()).orElseThrow(() -> new IOException(MessageFormat.format("Could not find new network interface {0}", name)));
@@ -155,52 +156,11 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 
 	@Override
 	protected void onStart(Optional<String> interfaceName, VpnConfiguration configuration, VpnAdapter session, Optional<VpnPeer> peer) throws IOException {
-		UserspaceMacOsAddress ip = null;
+	    var ip = findAddress(interfaceName, configuration, true);
 
-		/*
-		 * Look for wireguard interfaces that are available but not connected. If we
-		 * find none, try to create one.
-		 */
-		int maxIface = -1;
-
-		var ips = addresses();
-		for (int i = 0; i < MAX_INTERFACES; i++) {
-			var name = getInterfacePrefix() + i;
-			log.info("Looking for {}.", name);
-			if (exists(name, ips)) {
-				/* Interface exists, is it connected? */
-				var publicKey = getPublicKey(name);
-				if (publicKey.isEmpty() && new File("/var/run/wireguard/" + name + ".sock").exists()) {
-					/* No addresses, wireguard not using it */
-					log.info("{} is free.", name);
-					ip = find(name, ips).orElseThrow(() -> new IOException(MessageFormat.format("Could not find network interface {0}", name)));;
-					maxIface = i;
-					break;
-				} else if (publicKey.isPresent() && publicKey.get().equals(configuration.publicKey())) {
-					throw new IllegalStateException(
-							String.format("Peer with public key %s on %s is already active.", publicKey, name));
-				} else {
-					log.info("{} is already in use.", name);
-				}
-			} else if (maxIface == -1) {
-				/* This one is the next free number */
-				maxIface = i;
-				log.info("{} is next free interface.", name);
-				break;
-			}
-		}
-		if (maxIface == -1)
-			throw new IOException(String.format("Exceeds maximum of %d interfaces.", MAX_INTERFACES));
-		if (ip == null) {
-			var name = getInterfacePrefix() + maxIface;
-			log.info("No existing unused interfaces, creating new one ({}) for public key {}.", name,
-					configuration.publicKey());
-			ip = add(name, "wireguard");
-			if (ip == null) 
-				throw new IOException("Failed to create virtual IP address.");
-			log.info("Created {}", name);
-		} else
-			log.info("Using {}", ip.name());
+        /* Set the address reserved */
+        if (configuration.addresses().size() > 0)
+            ip.setAddresses(configuration.addresses().get(0));
 
 		var tempFile = Files.createTempFile("wg", "cfg");
 		try {
