@@ -24,19 +24,28 @@ import com.logonbox.vpn.drivers.lib.AbstractVirtualInetAddress;
 import com.logonbox.vpn.drivers.lib.util.IpUtil;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
 import com.logonbox.vpn.drivers.lib.util.Util;
+import com.sshtools.liftlib.ElevatedClosure;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.Serializable;
+import java.io.UncheckedIOException;
 import java.net.NetworkInterface;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
+import uk.co.bithatch.nativeimage.annotations.Serialization;
 
 public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceMacOsPlatformService> {
 	enum IpAddressState {
@@ -52,30 +61,37 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 	private Set<String> addresses = new LinkedHashSet<>();
 	private boolean autoRoute4;
 	private boolean autoRoute6;
+    private final String nativeName;
 
-	UserspaceMacOsAddress(String name, UserspaceMacOsPlatformService platform) throws IOException {
+	private UserspaceMacOsAddress(String name, String nativeName, UserspaceMacOsPlatformService platform) throws IOException {
 		super(platform, name);
+		this.nativeName = nativeName;
+	}
+	
+	@Override
+	public String nativeName() {
+	    return nativeName;
 	}
 
 	public void addAddress(String address) throws IOException {
 		if (addresses.contains(address))
-			throw new IllegalStateException(String.format("Interface %s already has address %s", name(), address));
+			throw new IllegalStateException(String.format("Interface %s already has address %s", nativeName, address));
 		if (addresses.size() > 0 && Util.isNotBlank(peer()))
 			throw new IllegalStateException(String.format(
-					"Interface %s is configured to have a single peer %s, so cannot add a second address %s", name(),
+					"Interface %s is configured to have a single peer %s, so cannot add a second address %s", nativeName,
 					peer(), address));
 
 		if (address.matches(".*:.*"))
-			commands.privileged().logged().result(OsUtil.debugCommandArgs("ifconfig", name(), "inet6", address, "alias"));
+			commands.privileged().logged().result(OsUtil.debugCommandArgs("ifconfig", nativeName, "inet6", address, "alias"));
 		else
-			commands.privileged().logged().result(OsUtil.debugCommandArgs("ifconfig", name(), "inet", address,
+			commands.privileged().logged().result(OsUtil.debugCommandArgs("ifconfig", nativeName, "inet", address,
 					address.replace("/*", ""), "alias"));
 		addresses.add(address);
 	}
 
 	@Override
 	public void delete() throws IOException {
-		commands.privileged().logged().result(OsUtil.debugCommandArgs("rm", "-f", getSocketFile().getAbsolutePath()));
+        commands.privileged().logged().result(OsUtil.debugCommandArgs("rm", "-f", getSocketFile().getAbsolutePath()));
 	}
 
 	@Override
@@ -109,7 +125,7 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 	@Override
 	public String displayName() {
 		try {
-			NetworkInterface iface = getByName(name());
+			NetworkInterface iface = getByName(nativeName());
 			return iface == null ? "Unknown" : iface.getDisplayName();
 		} catch (IOException ioe) {
 			return "Unknown";
@@ -119,7 +135,7 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 	@Override
 	public String getMac() {
 		try {
-			NetworkInterface iface = getByName(name());
+			NetworkInterface iface = getByName(nativeName());
 			return iface == null ? null : IpUtil.toIEEE802(iface.getHardwareAddress());
 		} catch (IOException ioe) {
 			return null;
@@ -145,13 +161,13 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 
 	public void removeAddress(String address) throws IOException {
 		if (!addresses.contains(address))
-			throw new IllegalStateException(String.format("Interface %s not not have address %s", name(), address));
+			throw new IllegalStateException(String.format("Interface %s not not have address %s", shortName(), address));
 		if (addresses.size() > 0 && Util.isNotBlank(peer()))
 			throw new IllegalStateException(String.format(
-					"Interface %s is configured to have a single peer %s, so cannot add a second address %s", name(),
+					"Interface %s is configured to have a single peer %s, so cannot add a second address %s", shortName(),
 					peer(), address));
 
-		commands.privileged().logged().result(OsUtil.debugCommandArgs("ifconfig", name(), "-alias", address));
+		commands.privileged().logged().result(OsUtil.debugCommandArgs("ifconfig", nativeName(), "-alias", address));
 		addresses.remove(address);
 	}
 
@@ -204,7 +220,7 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 //	}
 
 	public void setRoutes(Collection<String> allows) throws IOException {
-
+	    
 		/* Remove all the current routes for this interface */
 		var ipv6 = false;
 		for (var row : commands.privileged().output(OsUtil.debugCommandArgs("netstat", "-nr"))) {
@@ -213,21 +229,21 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 				continue;
 			if (l.length > 0 && l[0].equals("Internet6:")) {
 				ipv6 = true;
-			} else if (l.length > 3 && l[3].equals(name())) {
+			} else if (l.length > 3 && l[3].equals(nativeName)) {
 				var gateway = l[1];
-				if (gateway.equals(name())) {
+				if (gateway.equals(nativeName)) {
 					if (getAddresses().isEmpty())
 						continue;
 					else
 						gateway = getAddresses().iterator().next();
 				}
-				LOG.info("Removing route {} {} for {}", l[0], gateway, name());
+				LOG.info("Removing route {} {} for {}", l[0], gateway, nativeName);
 				if (ipv6) {
 					commands.privileged().logged().result(OsUtil.debugCommandArgs("route", "-qn", "delete", "-inet6", "-ifp",
-							name(), l[0], gateway));
+					        nativeName, l[0], gateway));
 				} else {
 					commands.privileged().logged().result(
-							OsUtil.debugCommandArgs("route", "-qn", "delete", "-ifp", name(), l[0], gateway));
+							OsUtil.debugCommandArgs("route", "-qn", "delete", "-ifp", nativeName, l[0], gateway));
 				}
 			}
 		}
@@ -246,17 +262,17 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 	public void up() throws IOException {
 		setMtu();
 
-		commands.privileged().logged().result(OsUtil.debugCommandArgs("ifconfig", name(), "up"));
+		commands.privileged().logged().result(OsUtil.debugCommandArgs("ifconfig", nativeName(), "up"));
 	}
 
 	protected File getSocketFile() {
-		return new File("/var/run/wireguard/" + name() + ".sock");
+		return new File("/var/run/wireguard/" + nativeName + ".sock");
 	}
 
 	protected void setMtu() throws IOException {
 
 		int currentMtu = 0;
-		for (var line : commands.output(OsUtil.debugCommandArgs("ifconfig", name()))) {
+		for (var line : commands.output(OsUtil.debugCommandArgs("ifconfig", nativeName))) {
 			var parts = Arrays.asList(line.split("\\s+"));
 			var idx = parts.indexOf("mtu");
 			if (idx == -1 && idx < parts.size() - 1)
@@ -303,7 +319,7 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 		/* Bring it up! */
 		if (currentMtu > 0 && tmtu != currentMtu) {
 			LOG.info("Setting MTU to {}", tmtu);
-			commands.privileged().logged().result(OsUtil.debugCommandArgs("ifconfig", name(), "mtu", String.valueOf(tmtu)));
+			commands.privileged().logged().result(OsUtil.debugCommandArgs("ifconfig", nativeName(), "mtu", String.valueOf(tmtu)));
 		} else
 			LOG.info("MTU already set to {}", tmtu);
 	}
@@ -319,15 +335,15 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 			if (route.matches(".*:.*")) {
 				autoRoute6 = true;
 				commands.privileged().logged().result(OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-inet6", "::/1:",
-						"-interface", name()));
+						"-interface", nativeName()));
 				commands.privileged().logged().result(OsUtil.debugCommandArgs("route", "-q", "-m", "add", "-inet6", "8000::/1",
-						"-interface", name()));
+						"-interface", nativeName()));
 			} else {
 				autoRoute4 = true;
 				commands.privileged().logged().result(OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-inet", "0.0.0.0/1",
-						"-interface", name()));
+						"-interface", nativeName()));
 				commands.privileged().logged().result(OsUtil.debugCommandArgs("route", "-q", "-m", "add", "-inet", "128.0.0.1/1",
-						"-interface", name()));
+						"-interface", nativeName()));
 			}
 		} else {
 			if (!TABLE_MAIN.equals(table()) && !TABLE_AUTO.equals(table()) && !Util.isBlank(table())) {
@@ -337,16 +353,112 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 			for (var line : commands.output(OsUtil.debugCommandArgs("route", "-n", "get", "-" + proto, route))) {
 				line = line.trim();
 				String[] args = line.split(":");
-				if (args.length > 1 && args[0].equals("interface:") && args[1].equals(name())) {
+				if (args.length > 1 && args[0].equals("interface:") && args[1].equals(nativeName())) {
 					// Already have route
 					return;
 				}
 			}
 
-			LOG.info(String.format("Adding route %s to %s for %s", route, name(), proto));
+			LOG.info(String.format("Adding route %s to %s for %s", route, shortName(), proto));
 			commands.privileged().logged().result(
-					OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-" + proto, route, "-interface", name()));
+					OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-" + proto, route, "-interface", nativeName()));
 		}
 
 	}
+    
+
+    public static UserspaceMacOsAddress ofName(String name,
+            UserspaceMacOsPlatformService platformService) {
+        try {
+            return new UserspaceMacOsAddress(name, platformService.context().commands().task(new GetNativeName(name)), platformService);
+        } catch(IOException ioe) {
+            throw new UncheckedIOException(ioe);
+        } catch(RuntimeException re) {
+            throw re;
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    public static UserspaceMacOsAddress ofNativeName(String nativeName,
+            UserspaceMacOsPlatformService platformService) {
+        try {
+            var name = platformService.context().commands().task(new GetName(nativeName));
+            if(name == null)
+                throw new IllegalArgumentException(MessageFormat.format("Could not find name for real interface {0}", nativeName));
+            return new UserspaceMacOsAddress(name, nativeName, platformService);
+        } catch(IOException ioe) {
+            throw new UncheckedIOException(ioe);
+        } catch(RuntimeException re) {
+            throw re;
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+    
+    @SuppressWarnings("serial")
+    @Serialization
+    public final static class GetNativeName implements ElevatedClosure<String, Serializable> {
+
+        private String name;
+
+        public GetNativeName() {
+        }
+
+        GetNativeName(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public String call(ElevatedClosure<String, Serializable> proxy) throws Exception {
+            var namePath = Paths.get(String.format("/var/run/wireguard/%s.name", name));
+            if(!Files.exists(namePath))
+                return name;
+            
+            String iface;
+            try(var in = Files.newBufferedReader(namePath)) {
+                iface = in.readLine();
+            }
+            var socketPath = Paths.get(String.format("/var/run/wireguard/%s.sock", iface));
+            if(!Files.exists(socketPath))
+                return name;
+            
+            var secDiff = Files.getLastModifiedTime(socketPath).to(TimeUnit.SECONDS) - Files.getLastModifiedTime(namePath).to(TimeUnit.SECONDS) ;
+            if(secDiff > 2 || secDiff < -2)
+                return name;
+            
+            return iface;
+        }
+    }
+    
+    @SuppressWarnings("serial")
+    @Serialization
+    public final static class GetName implements ElevatedClosure<String, Serializable> {
+
+        private String realInterace;
+
+        public GetName() {
+        }
+
+        GetName(String realInterace) {
+            this.realInterace = realInterace;
+        }
+
+        @Override
+        public String call(ElevatedClosure<String, Serializable> proxy) throws Exception {
+            try(var nameFiles = Files.newDirectoryStream(Paths.get("/var/run/wireguard"), f->f.getFileName().endsWith(".name"))) {
+                for(var f : nameFiles) {
+                    String iface;
+                    try(var in = Files.newBufferedReader(f)) {
+                        iface = in.readLine();
+                    }       
+                    if(realInterace.equals(iface)) {
+                        var n = f.getFileName().toString();
+                        return n.substring(0, n.lastIndexOf('.'));
+                    }
+                }
+            }
+            return null;
+        }
+    }
 }

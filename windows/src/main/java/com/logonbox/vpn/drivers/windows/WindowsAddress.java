@@ -87,7 +87,7 @@ public class WindowsAddress extends AbstractVirtualInetAddress<WindowsPlatformSe
 	}
 
 	protected String getServiceName() {
-		return WindowsPlatformService.TUNNEL_SERVICE_NAME_PREFIX + "$" + name();
+		return WindowsPlatformService.TUNNEL_SERVICE_NAME_PREFIX + "$" + nativeName();
 	}
 
 	@Override
@@ -114,7 +114,7 @@ public class WindowsAddress extends AbstractVirtualInetAddress<WindowsPlatformSe
 					tmtu -= 80;
 				}
 
-				commands.privileged().logged().result("netsh", "interface", "ipv4", "set", "subinterface", name(),
+				commands.privileged().logged().result("netsh", "interface", "ipv4", "set", "subinterface", nativeName(),
 						"mtu=" + String.valueOf(tmtu), "store=persistent");
 			} catch (IOException e) {
 				throw e;

@@ -152,10 +152,10 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
             try (Writer writer = Files.newBufferedWriter(tempFile)) {
                 transform(configuration).write(writer);
             }
-            LOG.info("Activating Wireguard configuration for {} (in {})", ip.name(), tempFile);
+            LOG.info("Activating Wireguard configuration for {} (in {})", ip.shortName(), tempFile);
             context().commands().privileged().logged().result(context().nativeComponents().tool(Tool.WG), "setconf", ip.name(),
                     tempFile.toString());
-            LOG.info("Activated Wireguard configuration for {}", ip.name());
+            LOG.info("Activated Wireguard configuration for {}", ip.shortName());
         } finally {
             Files.delete(tempFile);
         }
@@ -168,7 +168,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 
         /* Bring up the interface (will set the given MTU) */
         ip.mtu(configuration.mtu().or(() -> context.configuration().defaultMTU()).orElse(0));
-        LOG.info("Bringing up {}", ip.name());
+        LOG.info("Bringing up {}", ip.shortName());
         ip.up();
         session.attachToInterface(ip);
 
@@ -195,7 +195,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 
         /* Set the routes */
         try {
-            LOG.info("Setting routes for {}", ip.name());
+            LOG.info("Setting routes for {}", ip.shortName());
             setRoutes(session, ip);
         } catch (IOException | RuntimeException ioe) {
             try {

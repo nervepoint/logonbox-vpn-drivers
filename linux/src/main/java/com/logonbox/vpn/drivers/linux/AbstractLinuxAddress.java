@@ -61,16 +61,16 @@ public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<Ab
 
     public void addAddress(String address) throws IOException {
         if (addresses.contains(address))
-            throw new IllegalStateException(String.format("Interface %s already has address %s", name(), address));
+            throw new IllegalStateException(String.format("Interface %s already has address %s", shortName(), address));
         if (addresses.size() > 0 && Util.isNotBlank(peer()))
             throw new IllegalStateException(String.format(
-                    "Interface %s is configured to have a single peer %s, so cannot add a second address %s", name(),
+                    "Interface %s is configured to have a single peer %s, so cannot add a second address %s", shortName(),
                     peer(), address));
 
         if (Util.isNotBlank(peer())) {
-            commands.privileged().logged().result("ip", "address", "add", "dev", name(), address, "peer", peer());
+            commands.privileged().logged().result("ip", "address", "add", "dev", nativeName(), address, "peer", peer());
         } else
-            commands.privileged().logged().result("ip", "address", "add", "dev", name(), address);
+            commands.privileged().logged().result("ip", "address", "add", "dev", nativeName(), address);
         addresses.add(address);
     }
 
@@ -108,7 +108,7 @@ public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<Ab
     @Override
     public String displayName() {
         try {
-            var iface = getByName(name());
+            var iface = getByName(nativeName());
             return iface == null ? "Unknown" : iface.getDisplayName();
         } catch (IOException ioe) {
             return "Unknown";
@@ -132,7 +132,7 @@ public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<Ab
     @Override
     public String getMac() {
         try {
-            var iface = getByName(name());
+            var iface = getByName(nativeName());
             return iface == null ? null : IpUtil.toIEEE802(iface.getHardwareAddress());
         } catch (IOException ioe) {
             return null;
@@ -156,13 +156,13 @@ public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<Ab
 
     public void removeAddress(String address) throws IOException {
         if (!addresses.contains(address))
-            throw new IllegalStateException(String.format("Interface %s not not have address %s", name(), address));
+            throw new IllegalStateException(String.format("Interface %s not not have address %s", shortName(), address));
         if (addresses.size() > 0 && Util.isNotBlank(peer()))
             throw new IllegalStateException(String.format(
-                    "Interface %s is configured to have a single peer %s, so cannot add a second address %s", name(),
+                    "Interface %s is configured to have a single peer %s, so cannot add a second address %s", shortName(),
                     peer(), address));
 
-        commands.privileged().logged().result("ip", "address", "del", address, "dev", name());
+        commands.privileged().logged().result("ip", "address", "del", address, "dev", nativeName());
         addresses.remove(address);
     }
 
@@ -202,13 +202,13 @@ public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<Ab
 
         /* Remove all the current routes for this interface */
         var have = new HashSet<>();
-        for (var row : commands.privileged().output("ip", "route", "show", "dev", name())) {
+        for (var row : commands.privileged().output("ip", "route", "show", "dev", nativeName())) {
             String[] l = row.split("\\s+");
             if (l.length > 0) {
                 have.add(l[0]);
                 if (!allows.contains(l[0])) {
-                    LOG.info("Removing route {} for {}", l[0], name());
-                    commands.privileged().logged().result("ip", "route", "del", l[0], "dev", name());
+                    LOG.info("Removing route {} for {}", l[0], shortName());
+                    commands.privileged().logged().result("ip", "route", "del", l[0], "dev", nativeName());
                 }
             }
         }
@@ -228,7 +228,7 @@ public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<Ab
     public void up() throws IOException {
         if (getMtu() > 0) {
             commands.privileged().logged().result("ip", "link", "set", "mtu", String.valueOf(getMtu()), "up", "dev",
-                    name());
+                    nativeName());
         } else {
             /*
              * First detect MTU, then bring up. First try from existing Wireguard
@@ -277,15 +277,15 @@ public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<Ab
 
             /* Bring it up! */
             commands.privileged().logged().result("ip", "link", "set", "mtu", String.valueOf(tmtu), "up", "dev",
-                    name());
+                    nativeName());
         }
     }
     
     private boolean calcFirewallSet() {
-        var nftable = TABLE_PREFIX + name();
+        var nftable = TABLE_PREFIX + nativeName();
         if (OsUtil.doesCommandExist(NFT_COMMAND)) {
             if(LOG.isDebugEnabled()) {
-                LOG.debug("Checking if firewall already setup for {} using nft", name());
+                LOG.debug("Checking if firewall already setup for {} using nft", shortName());
             }
             for(var line : commands.privileged().silentOutput("nft", "list", "ruleset")) {
                 if(line.startsWith("table ip " + nftable + "{")) {
@@ -295,10 +295,10 @@ public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<Ab
             }
         } else {
             if(LOG.isDebugEnabled()) {
-                LOG.debug("Checking if firewall already setup for {} using iptables", name());
+                LOG.debug("Checking if firewall already setup for {} using iptables", shortName());
             }
             for(var line : commands.privileged().silentOutput("iptables-save")) {
-                if(line.contains("LogonBoxVPN rule for " + name())) {
+                if(line.contains("LogonBoxVPN rule for " + nativeName())) {
                     LOG.info("Firewall is configured using iptables");
                    return true;
                 }
@@ -330,16 +330,16 @@ public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<Ab
             pf = "ip6";
         }
 
-        commands.privileged().logged().result("ip", proto, "route", "add", route, "dev", name(), "table",
+        commands.privileged().logged().result("ip", proto, "route", "add", route, "dev", nativeName(), "table",
                 String.valueOf(table));
         commands.privileged().logged().result("ip", proto, "rule", "add", "not", "fwmark", String.valueOf(table),
                 "table", String.valueOf(table));
         commands.privileged().logged().result("ip", proto, "rule", "add", "table", "main", "suppress_prefixlength",
                 "0");
 
-        var marker = String.format("-m comment --comment \"LogonBoxVPN rule for %s\"", name());
+        var marker = String.format("-m comment --comment \"LogonBoxVPN rule for %s\"", nativeName());
         var restore = "*raw\n";
-        var nftable = TABLE_PREFIX + name();
+        var nftable = TABLE_PREFIX + nativeName();
 
         var nftcmd = new StringBuilder();
         nftcmd.append(String.format("add table %s %s\n", pf, nftable));
@@ -351,16 +351,16 @@ public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<Ab
                 nftable));
 
         var pattern = Pattern.compile(".*inet6?\\ ([0-9a-f:.]+)/[0-9]+.*");
-        for (var line : commands.privileged().output("ip", "-o", proto, "addr", "show", "dev", name())) {
+        for (var line : commands.privileged().output("ip", "-o", proto, "addr", "show", "dev", nativeName())) {
             var m = pattern.matcher(line);
             if (!m.matches()) {
                 continue;
             }
 
-            restore += String.format("-I PREROUTING ! -i %s -d %s -m addrtype ! --src-type LOCAL -j DROP %s\n", name(),
+            restore += String.format("-I PREROUTING ! -i %s -d %s -m addrtype ! --src-type LOCAL -j DROP %s\n", nativeName(),
                     m.group(1), marker);
             nftcmd.append(String.format("add rule %s %s preraw iifname != \"%s\" %s daddr %s fib saddr type != local drop\n", pf,
-                    nftable, name(), pf, m.group(1)));
+                    nftable, nativeName(), pf, m.group(1)));
         }
 
         restore += String.format(
@@ -399,12 +399,12 @@ public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<Ab
         if (TABLE_OFF.equals(table()))
             return;
         if (!TABLE_AUTO.equals(table())) {
-            commands.privileged().logged().result("ip", proto, "route", "add", route, "dev", name(), "table", table());
+            commands.privileged().logged().result("ip", proto, "route", "add", route, "dev", nativeName(), "table", table());
         } else if (route.endsWith("/0")) {
             addDefault(route);
         } else {
             try {
-                var res = commands.privileged().output("ip", proto, "route", "show", "dev", name(), "match", route)
+                var res = commands.privileged().output("ip", proto, "route", "show", "dev", nativeName(), "match", route)
                         .iterator().next();
                 if (Util.isNotBlank(res)) {
                     // Already have
@@ -412,8 +412,8 @@ public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<Ab
                 }
             } catch (Exception e) {
             }
-            LOG.info("Adding route {} to {} for {}", route, name(), proto);
-            commands.privileged().logged().result("ip", proto, "route", "add", route, "dev", name());
+            LOG.info("Adding route {} to {} for {}", route, shortName(), proto);
+            commands.privileged().logged().result("ip", proto, "route", "add", route, "dev", nativeName());
         }
     }
 
@@ -459,7 +459,7 @@ public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<Ab
                     var found = false;
                     for (var line : commands.privileged().output(iptables + "-save")) {
                         if (line.startsWith("*") || line.equals("COMMIT")
-                                || line.matches("-A .*-m comment --comment \"LogonBoxVPN rule for " + name() + ".*"))
+                                || line.matches("-A .*-m comment --comment \"LogonBoxVPN rule for " + nativeName() + ".*"))
                             continue;
                         if (line.startsWith("-A"))
                             found = true;

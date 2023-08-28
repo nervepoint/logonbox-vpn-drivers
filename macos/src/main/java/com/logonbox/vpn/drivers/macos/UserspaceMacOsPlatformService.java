@@ -38,7 +38,6 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.nio.file.Files;
-import java.text.MessageFormat;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -66,8 +65,10 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 
 	@Override
 	protected UserspaceMacOsAddress add(String name, String type) throws IOException {
-	    context().commands().privileged().logged().result(context().nativeComponents().tool(Tool.WIREGUARD_GO), name);
-		return find(name, addresses()).orElseThrow(() -> new IOException(MessageFormat.format("Could not find new network interface {0}", name)));
+	    var priv = context().commands().privileged();
+        priv.result("mkdir", "/var/run/wireguard");
+	    priv.logged().result(context().nativeComponents().tool(Tool.WIREGUARD_GO), "utun");
+		return UserspaceMacOsAddress.ofName(name, this);
 	}
 
 	@Override
@@ -95,7 +96,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 				if (!r.startsWith(" ")) {
 					var a = r.split(":");
 					var name = a[0].trim();
-					l.add(lastLink = new UserspaceMacOsAddress(name, this));
+					l.add(lastLink = UserspaceMacOsAddress.ofNativeName(name, this));
 					state = IpAddressState.MAC;
 				} else if (lastLink != null) {
 					r = r.trim();
@@ -147,7 +148,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 
 	@Override
 	protected UserspaceMacOsAddress createVirtualInetAddress(NetworkInterface nif) throws IOException {
-		var ip = new UserspaceMacOsAddress(nif.getName(), this);
+		var ip = UserspaceMacOsAddress.ofNativeName(nif.getName(), this);
 		for (var addr : nif.getInterfaceAddresses()) {
 			ip.getAddresses().add(addr.getAddress().toString());
 		}
@@ -167,10 +168,10 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 			try (var writer = Files.newBufferedWriter(tempFile)) {
 				transform(configuration).write(writer);
 			}
-			log.info("Activating Wireguard configuration for {} (in {})", ip.name(), tempFile);
+			log.info("Activating Wireguard configuration for {} (in {})", ip.shortName(), tempFile);
 			checkWGCommand();
 			context().commands().privileged().logged().result(context().nativeComponents().tool(Tool.WG), "setconf", ip.name(), tempFile.toString());
-			log.info("Activated Wireguard configuration for {}", ip.name());
+			log.info("Activated Wireguard configuration for {}", ip.shortName());
 		} finally {
 			Files.delete(tempFile);
 		}
@@ -184,13 +185,13 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 		/* Set the address reserved */
 		if(configuration.addresses().size() > 0) {
 		    var addr = configuration.addresses().get(0);
-    		log.info("Setting address {} on {}", addr, ip.name());
+    		log.info("Setting address {} on {}", addr, ip.shortName());
     		ip.setAddresses(addr);
 		}
 
 		/* Bring up the interface (will set the given MTU) */
 		ip.mtu(configuration.mtu().or(() -> context.configuration().defaultMTU()).orElse(0));
-		log.info("Bringing up {}", ip.name());
+		log.info("Bringing up {}", ip.shortName());
 		ip.up();
 		session.attachToInterface(ip);
 
@@ -205,7 +206,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 
 		/* Set the routes */
 		try {
-			log.info("Setting routes for {}", ip.name());
+			log.info("Setting routes for {}", ip.shortName());
 			setRoutes(session, ip);
 		}
 		catch(IOException | RuntimeException ioe) {

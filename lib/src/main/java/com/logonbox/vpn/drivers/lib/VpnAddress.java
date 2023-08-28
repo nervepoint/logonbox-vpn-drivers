@@ -59,8 +59,21 @@ public interface VpnAddress {
 	int getMtu();
 
 	String name();
-	
-	String displayName();
+
+    String displayName();
+
+    default String shortName() {
+        var name = name();
+        var nativeName = nativeName();
+        if(nativeName.equals(name))
+            return name;
+        else
+            return String.format("%s (%s)", name, nativeName);
+    }
+
+    default String nativeName() {
+        return name();
+    }
 
 	String peer();
 

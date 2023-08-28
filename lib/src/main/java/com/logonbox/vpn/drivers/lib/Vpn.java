@@ -126,7 +126,7 @@ public final class Vpn implements Closeable {
     public void open() throws IOException {
  /* Either start a new session, or find an existing one */
         if(adapter.isPresent())
-            throw new IllegalStateException(MessageFormat.format("`{0}` already exists", adapter().address().name()));
+            throw new IllegalStateException(MessageFormat.format("`{0}` already exists", adapter().address().shortName()));
         
         adapter = Optional.of(platformService.start(interfaceName, cfg, peer));
     }

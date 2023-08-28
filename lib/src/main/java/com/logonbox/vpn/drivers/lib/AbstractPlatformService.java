@@ -111,12 +111,12 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
     public final void stop(VpnConfiguration configuration, VpnAdapter session) throws IOException {
         try {
 
-            LOG.info("Stopping VPN for {}", session.address().name());
+            LOG.info("Stopping VPN for {}", session.address().shortName());
             
             try {
                 var dnsOr = dns();
                 if(dnsOr.isPresent()) {
-                    dnsOr.get().unset(new DNSEntry.Builder().fromConfiguration(configuration).withInterface(session.address().name()).build());
+                    dnsOr.get().unset(new DNSEntry.Builder().fromConfiguration(configuration).withInterface(session.address().nativeName()).build());
                 }
             }
             finally {

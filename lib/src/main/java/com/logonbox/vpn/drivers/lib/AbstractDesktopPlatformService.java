@@ -194,11 +194,11 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 				LOG.info("No DNS servers configured for this connection.");
 		}
 		else {
-			LOG.info("Configuring DNS servers for {} as {}", ip.name(), configuration.dns());
+			LOG.info("Configuring DNS servers for {} as {}", ip.shortName(), configuration.dns());
 		}
 		var dnsOr = dns();
 		if(dnsOr.isPresent())
-		    dnsOr.get().set(new DNSEntry.Builder().fromConfiguration(configuration).withInterface(ip.name()).build());
+		    dnsOr.get().set(new DNSEntry.Builder().fromConfiguration(configuration).withInterface(ip.nativeName()).build());
 		
 	}
 
@@ -240,7 +240,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 			try {
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {
-				throw new IOException(String.format("Interrupted connecting to %s", ip.name()));
+				throw new IOException(String.format("Interrupted connecting to %s", ip.shortName()));
 			}
 			try {
 				var lastHandshake = getLatestHandshake(ip.name(), peer.publicKey());
@@ -282,7 +282,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 	            return endpointAddress;
 	        }   
 		}).orElse(endpointAddress);
-		throw new NoHandshakeException(String.format("No handshake received from %s (%s) for %s within %d seconds.", endpointAddress, endpointName, ip.name(), timeout.toSeconds()));
+		throw new NoHandshakeException(String.format("No handshake received from %s (%s) for %s within %d seconds.", endpointAddress, endpointName, ip.shortName(), timeout.toSeconds()));
 	}
 	
 	protected final VpnConfiguration transform(VpnConfiguration configuration) {

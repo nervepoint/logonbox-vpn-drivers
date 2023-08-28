@@ -30,7 +30,7 @@ public class KernelLinuxAddress extends AbstractLinuxAddress {
 
     @Override
     protected void onDelete() throws IOException {
-        commands.privileged().logged().result("ip", "link", "del", "dev", name());
+        commands.privileged().logged().result("ip", "link", "del", "dev", nativeName());
     } 
     
     @Override

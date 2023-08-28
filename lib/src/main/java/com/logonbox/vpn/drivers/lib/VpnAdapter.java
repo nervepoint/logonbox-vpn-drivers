@@ -63,7 +63,7 @@ public final class VpnAdapter implements Closeable {
                 return peer;
         }
         throw new IllegalArgumentException(
-                MessageFormat.format("No such peer {0} on interface {1}", publicKey, address().name()));
+                MessageFormat.format("No such peer {0} on interface {1}", publicKey, address().shortName()));
     }
 
     /**
@@ -111,7 +111,7 @@ public final class VpnAdapter implements Closeable {
     public void close() throws IOException {
         if (ip.isPresent()) {
             VpnAddress ipVal = ip.get();
-            LOG.info(String.format("Closing VPN session for %s", ipVal.name()));
+            LOG.info(String.format("Closing VPN session for %s", ipVal.shortName()));
             try {
                 ipVal.down();
             } finally {

@@ -350,7 +350,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 			ip = new WindowsAddress(name, "WireGuard Tunnel", this);
 			LOG.info("Created {}", name);
 		} else
-			LOG.info("Using {}", ip.name());
+			LOG.info("Using {}", ip.shortName());
 
 		session.attachToInterface(ip);
 
@@ -364,7 +364,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 
 		/* Install service for the network interface */
 		var tool = Paths.get(context().nativeComponents().tool(Tool.NETWORK_CONFIGURATION_SERVICE));
-		var install = context().commands().privileged().logged().task(new InstallService(ip.name(), cwd.toAbsolutePath().toString(), confDir.toAbsolutePath().toString(), tool.toAbsolutePath().toString(), transformedConfiguration)).booleanValue();
+		var install = context().commands().privileged().logged().task(new InstallService(ip.nativeName(), cwd.toAbsolutePath().toString(), confDir.toAbsolutePath().toString(), tool.toAbsolutePath().toString(), transformedConfiguration)).booleanValue();
 		/*
 		 * About to start connection. The "last handshake" should be this value or later
 		 * if we get a valid connection
@@ -379,9 +379,9 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 		LOG.info("Service should be settled.");
 
 		if (ip.isUp()) {
-			LOG.info("Service for {} is already up.", ip.name());
+			LOG.info("Service for {} is already up.", ip.shortName());
 		} else {
-			LOG.info("Bringing up {}", ip.name());
+			LOG.info("Bringing up {}", ip.shortName());
 			try {
 				ip.mtu(configuration.mtu().or(() -> context.configuration().defaultMTU()).orElse(0));
 				ip.up();

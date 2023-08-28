@@ -164,7 +164,7 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
                     throw new IOException("Failed to create virtual IP address.");
                 LOG.info("Created {}", name);
             } else
-                LOG.info("Using {}", ip.name());
+                LOG.info("Using {}", ip.shortName());
         }
         return ip;
     }
