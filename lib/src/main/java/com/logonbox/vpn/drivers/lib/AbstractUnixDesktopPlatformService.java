@@ -13,6 +13,7 @@ import java.text.ParseException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.StringTokenizer;
@@ -78,8 +79,8 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
     protected Optional<String> getPublicKey(String interfaceName) throws IOException {
         try {
             checkWGCommand();
-            String pk = context.commands().privileged().output(context.nativeComponents().tool(Tool.WG), "show", interfaceName, "public-key").iterator()
-                    .next().trim();
+            var iterator = context.commands().privileged().silentOutput(context.nativeComponents().tool(Tool.WG), "show", interfaceName, "public-key").iterator();
+			var pk = iterator.hasNext() ? iterator.next().trim() : "";
             if (pk.equals("(none)") || pk.equals(""))
                 return Optional.empty();
             else

@@ -205,7 +205,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 		var tempFile = Files.createTempFile("wg", "cfg");
 		try {
 			try (var writer = Files.newBufferedWriter(tempFile)) {
-				transform(configuration);
+				transform(configuration).write(writer);
 			}
 			log.info("Activating Wireguard configuration for {} (in {})", ip.name(), tempFile);
 			checkWGCommand();
