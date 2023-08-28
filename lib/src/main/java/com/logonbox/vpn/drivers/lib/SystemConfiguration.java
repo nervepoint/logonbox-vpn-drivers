@@ -39,7 +39,7 @@ public interface SystemConfiguration {
             
             @Override
             public boolean ignoreLocalRoutes() {
-                return true;
+                return false;
             }
             
             @Override
