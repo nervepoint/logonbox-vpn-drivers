@@ -20,17 +20,6 @@
  */
 package com.logonbox.vpn.drivers.macos;
 
-import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
-import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
-import com.logonbox.vpn.drivers.lib.SystemContext;
-import com.logonbox.vpn.drivers.lib.VpnAdapter;
-import com.logonbox.vpn.drivers.lib.VpnConfiguration;
-import com.logonbox.vpn.drivers.lib.VpnPeer;
-import com.logonbox.vpn.drivers.lib.util.OsUtil;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -40,11 +29,20 @@ import java.net.NetworkInterface;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.StringTokenizer;
 import java.util.regex.Pattern;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
+import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
+import com.logonbox.vpn.drivers.lib.SystemContext;
+import com.logonbox.vpn.drivers.lib.VpnAdapter;
+import com.logonbox.vpn.drivers.lib.VpnConfiguration;
+import com.logonbox.vpn.drivers.lib.VpnPeer;
+import com.logonbox.vpn.drivers.lib.util.OsUtil;
 
 public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformService<UserspaceMacOsAddress> {
 
@@ -169,7 +167,6 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 				transform(configuration).write(writer);
 			}
 			log.info("Activating Wireguard configuration for {} (in {})", ip.shortName(), tempFile);
-			checkWGCommand();
 			context().commands().privileged().logged().result(context().nativeComponents().tool(Tool.WG), "setconf", ip.name(), tempFile.toString());
 			log.info("Activated Wireguard configuration for {}", ip.shortName());
 		} finally {
@@ -207,7 +204,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 		/* Set the routes */
 		try {
 			log.info("Setting routes for {}", ip.shortName());
-			setRoutes(session, ip);
+			setRoutes(session);
 		}
 		catch(IOException | RuntimeException ioe) {
 			try {
@@ -238,39 +235,6 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 //		monitor_daemon
 //		execute_hooks "${POST_UP[@]}"
 
-	}
-
-	void setRoutes(VpnAdapter session, UserspaceMacOsAddress ip) throws IOException {
-
-		/* Set routes from the known allowed-ips supplies by Wireguard. */
-		session.allows().clear();
-
-		checkWGCommand();
-		for (String s : context().commands().privileged() .output(context().nativeComponents().tool(Tool.WG), "show", ip.name(), "allowed-ips")) {
-			StringTokenizer t = new StringTokenizer(s);
-			if (t.hasMoreTokens()) {
-				t.nextToken();
-				while (t.hasMoreTokens())
-					session.allows().add(t.nextToken());
-			}
-		}
-
-		/*
-		 * Sort by network subnet size (biggest first)
-		 */
-		Collections.sort(session.allows(), (a, b) -> {
-			String[] sa = a.split("/");
-			String[] sb = b.split("/");
-			Integer ia = Integer.parseInt(sa[1]);
-			Integer ib = Integer.parseInt(sb[1]);
-			int r = ia.compareTo(ib);
-			if (r == 0) {
-				return a.compareTo(b);
-			} else
-				return r * -1;
-		});
-		/* Actually add routes */
-		ip.setRoutes(session.allows());
 	}
 
 	@Override

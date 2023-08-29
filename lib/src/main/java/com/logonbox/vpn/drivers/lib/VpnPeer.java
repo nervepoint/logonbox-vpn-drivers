@@ -21,7 +21,7 @@ public interface VpnPeer extends Serializable {
 		private Optional<String> publicKey = Optional.empty();
 		private List<String> allowedIps = new ArrayList<>();
 		private Optional<Integer> persistentKeepalive = Optional.empty();
-		private Optional<String> presharedKey;
+		private Optional<String> presharedKey = Optional.empty();
 
 
 		public Builder withPeer(VpnPeer peer) {

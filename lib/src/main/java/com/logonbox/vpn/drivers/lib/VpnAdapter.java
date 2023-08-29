@@ -91,6 +91,18 @@ public final class VpnAdapter implements Closeable {
         return service.configuration(this);
     }
 
+	public void reconfigure(VpnAdapterConfiguration cfg) throws IOException {
+		service.reconfigure(this, cfg);
+	}
+
+	public void append(VpnAdapterConfiguration cfg) throws IOException {
+		service.append(this, cfg);
+	}
+
+	public void sync(VpnAdapterConfiguration cfg) throws IOException {
+		service.sync(this, cfg);
+	}
+
     public VpnInterfaceInformation information() {
         return service.information(this);
     }
@@ -119,4 +131,8 @@ public final class VpnAdapter implements Closeable {
             }
         }
     }
+
+	public void remove(String publicKey) throws IOException {
+		service.remove(this, publicKey);
+	}
 }

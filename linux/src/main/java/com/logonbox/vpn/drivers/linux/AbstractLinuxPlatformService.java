@@ -20,17 +20,6 @@
  */
 package com.logonbox.vpn.drivers.linux;
 
-import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
-import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
-import com.logonbox.vpn.drivers.lib.SystemContext;
-import com.logonbox.vpn.drivers.lib.VpnAdapter;
-import com.logonbox.vpn.drivers.lib.VpnConfiguration;
-import com.logonbox.vpn.drivers.lib.VpnPeer;
-import com.logonbox.vpn.drivers.lib.util.OsUtil;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -43,11 +32,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.StringTokenizer;
 import java.util.regex.Pattern;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
+import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
+import com.logonbox.vpn.drivers.lib.SystemContext;
+import com.logonbox.vpn.drivers.lib.VpnAdapter;
+import com.logonbox.vpn.drivers.lib.VpnConfiguration;
+import com.logonbox.vpn.drivers.lib.VpnPeer;
+import com.logonbox.vpn.drivers.lib.util.OsUtil;
 
 public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPlatformService<AbstractLinuxAddress> {
 
@@ -196,7 +194,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
         /* Set the routes */
         try {
             LOG.info("Setting routes for {}", ip.shortName());
-            setRoutes(session, ip);
+            setRoutes(session);
         } catch (IOException | RuntimeException ioe) {
             try {
                 session.close();
@@ -205,25 +203,6 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
             throw ioe;
         }
 
-    }
-
-    protected final void rebuildAllows(VpnAdapter session, AbstractLinuxAddress ip) throws IOException {
-        session.allows().clear();
-
-        for (var s : context().commands().privileged().output(context().nativeComponents().tool(Tool.WG), "show", ip.name(),
-                "allowed-ips")) {
-            var t = new StringTokenizer(s);
-            if (t.hasMoreTokens()) {
-                t.nextToken();
-                while (t.hasMoreTokens()) {
-                    var r = t.nextToken();
-                    if (r.equals("(none)")) {
-                        return;
-                    }
-                    session.allows().add(r);
-                }
-            }
-        }
     }
 
     @Override
@@ -248,29 +227,5 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
             }
         }
         return "";
-    }
-
-    void setRoutes(VpnAdapter session, AbstractLinuxAddress ip) throws IOException {
-
-        /* Set routes from the known allowed-ips supplied by Wireguard. */
-        rebuildAllows(session, ip);
-
-        /*
-         * Sort by network subnet size (biggest first)
-         */
-        Collections.sort(session.allows(), (a, b) -> {
-            String[] sa = a.split("/");
-            String[] sb = b.split("/");
-            Integer ia = Integer.parseInt(sa[1]);
-            Integer ib = Integer.parseInt(sb[1]);
-            int r = ia.compareTo(ib);
-            if (r == 0) {
-                return a.compareTo(b);
-            } else
-                return r * -1;
-        });
-        /* Actually add routes */
-        LOG.info("Will set routes {}", String.join(",", session.allows()));
-        ip.setRoutes(session.allows());
     }
 }

@@ -1,5 +1,19 @@
 package com.logonbox.vpn.quick;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintStream;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.stream.Collectors;
+
 import com.logonbox.vpn.drivers.lib.ElevatableSystemCommands;
 import com.logonbox.vpn.drivers.lib.NativeComponents;
 import com.logonbox.vpn.drivers.lib.PlatformService;
@@ -8,20 +22,9 @@ import com.logonbox.vpn.drivers.lib.SystemConfiguration;
 import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.Vpn;
 import com.logonbox.vpn.drivers.lib.VpnAdapter;
+import com.logonbox.vpn.drivers.lib.VpnAdapterConfiguration;
 import com.logonbox.vpn.drivers.lib.util.Keys;
 import com.logonbox.vpn.drivers.lib.util.Util;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.Callable;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -29,7 +32,7 @@ import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 
 @Command(name = "lbv", description = "Set and retrieve configuration of wireguard interfaces, a Java clone of the 'wg' command.", mixinStandardHelpOptions = true, subcommands = {
-        Lbv.Show.class, Lbv.ShowConf.class, Lbv.GenKey.class, Lbv.PubKey.class })
+        Lbv.Show.class, Lbv.ShowConf.class, Lbv.SetConf.class, Lbv.SyncConf.class, Lbv.AddConf.class, Lbv.GenKey.class, Lbv.PubKey.class })
 public class Lbv extends AbstractCommand implements SystemContext {
 
     final static PrintStream out = System.out;
@@ -254,7 +257,7 @@ public class Lbv extends AbstractCommand implements SystemContext {
                 parent.parent.initCommand();
                 var ips = parent.parent.platform().adapters();
                 if (!ips.isEmpty()) {
-                    out.println(String.join(" ", ips.stream().map(a -> a.address().name()).toList()));
+                    out.println(String.join(" ", ips.stream().map(a -> a.address().name()).collect(Collectors.toList())));
                 }
                 return 0;
             }
@@ -485,6 +488,66 @@ public class Lbv extends AbstractCommand implements SystemContext {
         public Integer call() throws Exception {
             parent.initCommand();
             parent.platform().adapter(iface).configuration().write(out);
+            return 0;
+        }
+    }
+
+    @Command(name = "setconf", description = "Set the current configuration of a given WireGuard interface to the contents of the given configuration file.")
+    public final static class SetConf implements Callable<Integer> {
+
+        @ParentCommand
+        private Lbv parent;
+
+        @Parameters(index = "0", arity = "1")
+        private String iface;
+
+        @Parameters(index = "1", arity = "1")
+        private Path configuration;
+
+        @Override
+        public Integer call() throws Exception {
+            parent.initCommand();
+            parent.platform().adapter(iface).reconfigure(new VpnAdapterConfiguration.Builder().fromFile(configuration).build());
+            return 0;
+        }
+    }
+
+    @Command(name = "syncconf", description = "Like setconf, but reads back the existing configuration first and only makes changes that are explicitly different between the configuration file and the interface")
+    public final static class SyncConf implements Callable<Integer> {
+
+        @ParentCommand
+        private Lbv parent;
+
+        @Parameters(index = "0", arity = "1")
+        private String iface;
+
+        @Parameters(index = "1", arity = "1")
+        private Path configuration;
+
+        @Override
+        public Integer call() throws Exception {
+            parent.initCommand();
+            parent.platform().adapter(iface).sync(new VpnAdapterConfiguration.Builder().fromFile(configuration).build());
+            return 0;
+        }
+    }
+
+    @Command(name = "addconf", description = "Like setconf, but reads back the existing configuration first and only makes changes that are explicitly different between the configuration file and the interface.")
+    public final static class AddConf implements Callable<Integer> {
+
+        @ParentCommand
+        private Lbv parent;
+
+        @Parameters(index = "0", arity = "1")
+        private String iface;
+
+        @Parameters(index = "1", arity = "1")
+        private Path configuration;
+
+        @Override
+        public Integer call() throws Exception {
+            parent.initCommand();
+            parent.platform().adapter(iface).append(new VpnAdapterConfiguration.Builder().fromFile(configuration).build());
             return 0;
         }
     }

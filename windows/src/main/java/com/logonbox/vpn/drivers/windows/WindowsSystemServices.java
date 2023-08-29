@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ScheduledFuture;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -685,18 +686,18 @@ public class WindowsSystemServices implements Closeable {
 		public final static DWORD SERVICE_SID_TYPE_UNRESTRICTED = new DWORD(0x00000001);
 	}
 
+	public enum Status {
+		STARTED, STARTING, STOPPED, STOPPING, PAUSING, PAUSED, UNPAUSING, UNKNOWN;
+
+		public boolean isRunning() {
+			return this == STARTED || this == STARTING || this == PAUSED || this == PAUSING || this == PAUSED;
+		}
+	}
+
 	public final class Win32Service {
 
 		private String nativeName;
 		private Status status = null;
-
-		public enum Status {
-			STARTED, STARTING, STOPPED, STOPPING, PAUSING, PAUSED, UNPAUSING, UNKNOWN;
-
-			public boolean isRunning() {
-				return this == STARTED || this == STARTING || this == PAUSED || this == PAUSING || this == PAUSED;
-			}
-		}
 
 		public Win32Service(String nativeName) {
 			this(nativeName, null);
@@ -984,7 +985,7 @@ public class WindowsSystemServices implements Closeable {
 				smgr.open(Winsvc.SC_MANAGER_ALL_ACCESS);
 				return Arrays
 						.asList(smgr.enumServicesStatusExProcess(WinNT.SERVICE_WIN32, Winsvc.SERVICE_STATE_ALL, null))
-						.stream().map(s -> new Win32Service(s.lpServiceName)).toList();
+						.stream().map(s -> new Win32Service(s.lpServiceName)).collect(Collectors.toList());
 			} finally {
 				smgr.close();
 			}

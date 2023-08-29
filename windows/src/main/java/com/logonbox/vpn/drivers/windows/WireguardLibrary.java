@@ -71,6 +71,8 @@ public interface WireguardLibrary extends Library {
 
     boolean WireGuardGetConfiguration(PointerByReference handle, Memory memory, IntByReference bytes);
 
+    boolean WireGuardSetConfiguration(PointerByReference handle, Memory memory, IntByReference bytes);
+
     public static class Adapter implements Closeable {
 
         private final IntByReference lastGetGuess;

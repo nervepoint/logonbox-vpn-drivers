@@ -20,18 +20,6 @@
  */
 package com.logonbox.vpn.drivers.lib;
 
-import com.github.jgonian.ipmath.AbstractIp;
-import com.github.jgonian.ipmath.Ipv4;
-import com.github.jgonian.ipmath.Ipv4Range;
-import com.github.jgonian.ipmath.Ipv6;
-import com.github.jgonian.ipmath.Ipv6Range;
-import com.logonbox.vpn.drivers.lib.DNSProvider.DNSEntry;
-import com.logonbox.vpn.drivers.lib.util.IpUtil;
-import com.logonbox.vpn.drivers.lib.util.Util;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -54,6 +42,20 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.github.jgonian.ipmath.AbstractIp;
+import com.github.jgonian.ipmath.Ipv4;
+import com.github.jgonian.ipmath.Ipv4Range;
+import com.github.jgonian.ipmath.Ipv6;
+import com.github.jgonian.ipmath.Ipv6Range;
+import com.logonbox.vpn.drivers.lib.DNSProvider.DNSEntry;
+import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
+import com.logonbox.vpn.drivers.lib.util.IpUtil;
+import com.logonbox.vpn.drivers.lib.util.Util;
 
 public abstract class AbstractDesktopPlatformService<I extends VpnAddress> extends AbstractPlatformService<I> {
 
@@ -67,11 +69,52 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 		super(interfacePrefix, context);
 	}
 
+    @Override 
+    public void remove(VpnAdapter adapter, String publicKey) throws IOException {
+    	context.commands().privileged().run(context.nativeComponents().tool(Tool.WG), "set", adapter.address().name(), "peer", publicKey, "remove");
+    }
+
+    @Override
+	public void reconfigure(VpnAdapter adapter, VpnAdapterConfiguration configuration) throws IOException {
+    	var path = Files.createTempFile("wg", ".cfg");
+    	try {
+    		configuration.write(path);
+        	context.commands().privileged().run(context.nativeComponents().tool(Tool.WG), "setconf", adapter.address().name(), path.toString());
+    	}
+    	finally {
+    		Files.delete(path);
+    	}
+	}
+
+	@Override
+	public void sync(VpnAdapter adapter, VpnAdapterConfiguration configuration) throws IOException {
+		var path = Files.createTempFile("wg", ".cfg");
+    	try {
+    		configuration.write(path);
+        	context.commands().privileged().run(context.nativeComponents().tool(Tool.WG), "syncconf", adapter.address().name(), path.toString());
+    	}
+    	finally {
+    		Files.delete(path);
+    	}
+		
+	}
+
+	@Override
+	public void append(VpnAdapter adapter, VpnAdapterConfiguration configuration) throws IOException {
+		var path = Files.createTempFile("wg", ".cfg");
+    	try {
+    		configuration.write(path);
+        	context.commands().privileged().run(context.nativeComponents().tool(Tool.WG), "addconf", adapter.address().name(), path.toString());
+    	}
+    	finally {
+    		Files.delete(path);
+    	}
+	}
 
     @Override
     public final Optional<DNSProvider> dns() {
         if(dnsProvider == null) {
-            var srvs = ServiceLoader.load(DNSProvider.Factory.class).stream().toList();
+            var srvs = ServiceLoader.load(DNSProvider.Factory.class).stream().collect(Collectors.toList());
             if(srvs.size() == 0) {
                 LOG.warn("No DNS provider factories found for this platform, DNS settings will be ignored.");
                 dnsProvider = Optional.empty();

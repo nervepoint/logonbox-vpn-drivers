@@ -20,16 +20,6 @@
  */
 package com.logonbox.vpn.drivers.linux;
 
-import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
-import com.logonbox.vpn.drivers.lib.AbstractVirtualInetAddress;
-import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
-import com.logonbox.vpn.drivers.lib.util.IpUtil;
-import com.logonbox.vpn.drivers.lib.util.OsUtil;
-import com.logonbox.vpn.drivers.lib.util.Util;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -41,7 +31,17 @@ import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.regex.Pattern;
 
-public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<AbstractLinuxPlatformService> {
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.logonbox.vpn.drivers.lib.AbstractUnixAddress;
+import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
+import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
+import com.logonbox.vpn.drivers.lib.util.IpUtil;
+import com.logonbox.vpn.drivers.lib.util.OsUtil;
+import com.logonbox.vpn.drivers.lib.util.Util;
+
+public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractLinuxPlatformService> {
 
     private static final String NFT_COMMAND = "nft";
 
@@ -198,6 +198,7 @@ public abstract class AbstractLinuxAddress extends AbstractVirtualInetAddress<Ab
         }
     }
 
+    @Override
     public void setRoutes(Collection<String> allows) throws IOException {
 
         /* Remove all the current routes for this interface */

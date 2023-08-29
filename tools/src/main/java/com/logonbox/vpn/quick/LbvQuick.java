@@ -208,23 +208,24 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
             parent.initCommand();
 
             var bldr = new Vpn.Builder().withSystemContext(parent);
-
+            Path file;
             if (Files.exists(configFileOrInterface)) {
-                bldr.withInterfaceName(parent.toInterfaceName(configFileOrInterface)); 
-                bldr.withVpnConfiguration(configFileOrInterface);
+                bldr.withInterfaceName(parent.toInterfaceName(configFileOrInterface));
+                file = configFileOrInterface;
             }
             else {
                 var iface = configFileOrInterface.toString();
                 bldr.withInterfaceName(iface);
-                bldr.withVpnConfiguration(parent.findConfig(iface));
+                file = parent.findConfig(iface);
             }
+            bldr.withVpnConfiguration(file);
 
             var vpn = bldr.build();
             vpn.platformService().context().commands().onLog(parent::logCommandLine);
-            return onCall(vpn);
+            return onCall(vpn, file);
         }
         
-        protected abstract Integer onCall(Vpn vpn) throws Exception;
+        protected abstract Integer onCall(Vpn vpn, Path configFile) throws Exception;
 
     }
 
@@ -232,7 +233,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
     public final static class Up extends AbstractQuickCommand {
 
         @Override
-        protected Integer onCall(Vpn vpn) throws Exception {
+        protected Integer onCall(Vpn vpn, Path configFile) throws Exception {
             vpn.open();
             return 0;
         }
@@ -243,7 +244,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
     public final static class Down extends AbstractQuickCommand {
 
         @Override
-        protected Integer onCall(Vpn vpn) throws Exception {
+        protected Integer onCall(Vpn vpn, Path configFile) throws Exception {
             if(!vpn.started())
                 throw new IOException(MessageFormat.format("`{0}` is not a VPN interface.", vpn.interfaceName().get()));
             vpn.close();
@@ -256,7 +257,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
     public final static class Strip extends AbstractQuickCommand {
 
         @Override
-        protected Integer onCall(Vpn vpn) throws Exception {
+        protected Integer onCall(Vpn vpn, Path configFile) throws Exception {
             vpn.adapter().configuration().write(System.out);
             return 0;
         }
@@ -267,7 +268,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
     public final static class Save extends AbstractQuickCommand {
 
         @Override
-        protected Integer onCall(Vpn vpn) throws Exception {
+        protected Integer onCall(Vpn vpn, Path configFile) throws Exception {
             
             var bldr = new VpnConfiguration.Builder().
                     fromConfiguration(vpn.configuration());
@@ -276,9 +277,8 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
             bldr.withPeers(vpn.adapter().configuration().peers());
             
             var cfg = bldr.build();
-            cfg.write(System.out);
+            cfg.write(configFile);
             
-            // TODO write to file
             return 0;
         }
 

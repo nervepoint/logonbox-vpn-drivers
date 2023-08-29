@@ -20,34 +20,6 @@
  */
 package com.logonbox.vpn.drivers.windows;
 
-import com.logonbox.vpn.drivers.lib.AbstractDesktopPlatformService;
-import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
-import com.logonbox.vpn.drivers.lib.SystemContext;
-import com.logonbox.vpn.drivers.lib.VpnAdapter;
-import com.logonbox.vpn.drivers.lib.VpnAdapterConfiguration;
-import com.logonbox.vpn.drivers.lib.VpnConfiguration;
-import com.logonbox.vpn.drivers.lib.VpnInterfaceInformation;
-import com.logonbox.vpn.drivers.lib.VpnPeer;
-import com.logonbox.vpn.drivers.lib.VpnPeerInformation;
-import com.logonbox.vpn.drivers.lib.util.OsUtil;
-import com.logonbox.vpn.drivers.windows.WindowsSystemServices.Win32Service;
-import com.logonbox.vpn.drivers.windows.WindowsSystemServices.Win32Service.Status;
-import com.logonbox.vpn.drivers.windows.WindowsSystemServices.XAdvapi32;
-import com.logonbox.vpn.drivers.windows.WindowsSystemServices.XWinsvc;
-import com.sshtools.liftlib.ElevatedClosure;
-import com.sun.jna.Native;
-import com.sun.jna.platform.win32.Advapi32;
-import com.sun.jna.platform.win32.Advapi32Util;
-import com.sun.jna.platform.win32.Kernel32;
-import com.sun.jna.platform.win32.Kernel32Util;
-import com.sun.jna.platform.win32.WinDef.DWORD;
-import com.sun.jna.platform.win32.WinNT;
-import com.sun.jna.platform.win32.Winsvc;
-import com.sun.jna.ptr.PointerByReference;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.io.Serializable;
 import java.io.UncheckedIOException;
@@ -67,6 +39,35 @@ import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.prefs.Preferences;
+import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.logonbox.vpn.drivers.lib.AbstractDesktopPlatformService;
+import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
+import com.logonbox.vpn.drivers.lib.SystemContext;
+import com.logonbox.vpn.drivers.lib.VpnAdapter;
+import com.logonbox.vpn.drivers.lib.VpnAdapterConfiguration;
+import com.logonbox.vpn.drivers.lib.VpnConfiguration;
+import com.logonbox.vpn.drivers.lib.VpnInterfaceInformation;
+import com.logonbox.vpn.drivers.lib.VpnPeer;
+import com.logonbox.vpn.drivers.lib.VpnPeerInformation;
+import com.logonbox.vpn.drivers.lib.util.OsUtil;
+import com.logonbox.vpn.drivers.windows.WindowsSystemServices.Status;
+import com.logonbox.vpn.drivers.windows.WindowsSystemServices.Win32Service;
+import com.logonbox.vpn.drivers.windows.WindowsSystemServices.XAdvapi32;
+import com.logonbox.vpn.drivers.windows.WindowsSystemServices.XWinsvc;
+import com.sshtools.liftlib.ElevatedClosure;
+import com.sun.jna.Native;
+import com.sun.jna.platform.win32.Advapi32;
+import com.sun.jna.platform.win32.Advapi32Util;
+import com.sun.jna.platform.win32.Kernel32;
+import com.sun.jna.platform.win32.Kernel32Util;
+import com.sun.jna.platform.win32.WinDef.DWORD;
+import com.sun.jna.platform.win32.WinNT;
+import com.sun.jna.platform.win32.Winsvc;
+import com.sun.jna.ptr.PointerByReference;
 
 import uk.co.bithatch.nativeimage.annotations.Resource;
 import uk.co.bithatch.nativeimage.annotations.Serialization;
@@ -159,7 +160,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 
 	@Override
 	public List<VpnAdapter> adapters() {
-		return ips(true).stream().map(addr -> configureExistingSession(addr)).toList();
+		return ips(true).stream().map(addr -> configureExistingSession(addr)).collect(Collectors.toList());
 	}
 
 	private List<WindowsAddress> ips(boolean wireguardInterface) {
@@ -561,7 +562,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 					tx.addAndGet(peer.txBytes);
 					rx.addAndGet(peer.rxBytes);
 					var allowedIps = Arrays.asList(peer.allowedIPs).stream()
-							.map(a -> String.format("%s/%d", a.address.getHostAddress(), a.cidr)).toList();
+							.map(a -> String.format("%s/%d", a.address.getHostAddress(), a.cidr)).collect(Collectors.toList());
 					var pTx = peer.txBytes;
 					var pRx = peer.rxBytes;
 					var peerPublicKey = peer.publicKey.toString();

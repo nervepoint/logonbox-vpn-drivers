@@ -25,43 +25,45 @@ import java.util.Optional;
 
 public interface SystemConfiguration {
     
-    Duration HANDSHAKE_TIMEOUT = Duration.ofSeconds(Integer.parseInt(System.getProperty("logonbox.vpn.handshakeTimeout", "180")));
+    public static class DefaultSystemConfiguration implements SystemConfiguration {
+		@Override
+		public Duration serviceWait() {
+		    return SERVICE_WAIT_TIMEOUT;
+		}
+
+		@Override
+		public boolean ignoreLocalRoutes() {
+		    return false;
+		}
+
+		@Override
+		public Duration handshakeTimeout() {
+		    return HANDSHAKE_TIMEOUT;
+		}
+
+		@Override
+		public Optional<Integer> defaultMTU() {
+		    return Optional.empty();
+		}
+
+		@Override
+		public Optional<Duration> connectTimeout() {
+		    return Optional.of(CONNECT_TIMEOUT);
+		}
+
+		@Override
+		public Optional<Class<? extends DNSProvider>> dnsIntegrationMethod() {
+		    return Optional.empty();
+		}
+	}
+
+	Duration HANDSHAKE_TIMEOUT = Duration.ofSeconds(Integer.parseInt(System.getProperty("logonbox.vpn.handshakeTimeout", "180")));
     Duration SERVICE_WAIT_TIMEOUT = Duration.ofSeconds(Integer.parseInt(System.getProperty("logonbox.vpn.serviceWaitTimeout", "2")));
     Duration CONNECT_TIMEOUT = Duration.ofSeconds(Integer.parseInt(System.getProperty("logonbox.vpn.connectTimeout", "12")));
+    SystemConfiguration DEFAULT = new DefaultSystemConfiguration();
     
     public static SystemConfiguration defaultConfiguration() {
-        return new SystemConfiguration() {
-            
-            @Override
-            public Duration serviceWait() {
-                return SERVICE_WAIT_TIMEOUT;
-            }
-            
-            @Override
-            public boolean ignoreLocalRoutes() {
-                return false;
-            }
-            
-            @Override
-            public Duration handshakeTimeout() {
-                return HANDSHAKE_TIMEOUT;
-            }
-            
-            @Override
-            public Optional<Integer> defaultMTU() {
-                return Optional.empty();
-            }
-            
-            @Override
-            public Optional<Duration> connectTimeout() {
-                return Optional.of(CONNECT_TIMEOUT);
-            }
-
-            @Override
-            public Optional<Class<? extends DNSProvider>> dnsIntegrationMethod() {
-                return Optional.empty();
-            }
-        };
+        return DEFAULT;
     }
 
     Optional<Integer> defaultMTU();

@@ -72,7 +72,7 @@ public class NetworkManagerDNSProvider implements DNSProvider {
                         if (settingsMap.containsKey("Nameservers")) {
                             var ns = (ArrayList<UInt32>) settingsMap.get("Nameservers").getValue();
                             bldr.withIpv4Servers(
-                                    ns.stream().map(addr -> uint32ToIpv4Address(addr)).toList().toArray(new String[0]));
+                                    ns.stream().map(addr -> uint32ToIpv4Address(addr)).collect(Collectors.toList()).toArray(new String[0]));
                         }
                     }
 
@@ -88,7 +88,7 @@ public class NetworkManagerDNSProvider implements DNSProvider {
                         if (settingsMap.containsKey("Nameservers")) {
                             var ns = (ArrayList<ArrayList<Byte>>) settingsMap.get("Nameservers").getValue();
                             bldr.withIpv6Servers(
-                                    ns.stream().map(addr -> LinuxPlatformServiceFactory.bytesToIpAddress(addr)).toList()
+                                    ns.stream().map(addr -> LinuxPlatformServiceFactory.bytesToIpAddress(addr)).collect(Collectors.toList())
                                             .toArray(new String[0]));
                         }
                     }
