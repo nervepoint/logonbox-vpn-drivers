@@ -28,7 +28,7 @@ module com.logonbox.vpn.drivers.os {
     requires transitive com.logonbox.vpn.drivers.lib;
     requires org.slf4j;
     requires com.sshtools.liftlib;
-    provides PlatformServiceFactory with MacOsPlatformServiceFactory;
     requires static uk.co.bithatch.nativeimage.annotations;
+    provides PlatformServiceFactory with MacOsPlatformServiceFactory;
     provides DNSProvider.Factory with MacOsDNSProviderFactory;
 }

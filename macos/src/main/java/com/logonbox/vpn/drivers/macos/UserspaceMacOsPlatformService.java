@@ -157,10 +157,6 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 	protected void onStart(Optional<String> interfaceName, VpnConfiguration configuration, VpnAdapter session, Optional<VpnPeer> peer) throws IOException {
 	    var ip = findAddress(interfaceName, configuration, true);
 
-        /* Set the address reserved */
-        if (configuration.addresses().size() > 0)
-            ip.setAddresses(configuration.addresses().get(0));
-
 		var tempFile = Files.createTempFile("wg", "cfg");
 		try {
 			try (var writer = Files.newBufferedWriter(tempFile)) {
@@ -172,6 +168,10 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 		} finally {
 			Files.delete(tempFile);
 		}
+
+        /* Set the address reserved */
+        if (configuration.addresses().size() > 0)
+            ip.setAddresses(configuration.addresses().get(0));
 
 		/*
 		 * About to start connection. The "last handshake" should be this value or later
