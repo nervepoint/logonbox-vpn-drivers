@@ -65,8 +65,9 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 		var env = Map.of("WG_TUN_NAME_FILE", String.format("/var/run/wireguard/%s.name", name));
 		var tool = context().nativeComponents().tool(Tool.WIREGUARD_GO);
 		priv.logged().env(env).result(tool, "utun");
+        var addr = UserspaceMacOsAddress.ofName(name, this);
         context.alert(addr, String.format("Interface for %s is %s", addr.name(), addr.nativeName()));
-		return UserspaceMacOsAddress.ofName(name, this);
+		return addr;
 	}
 
 	@Override
