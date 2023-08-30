@@ -1,34 +1,28 @@
 package com.logonbox.vpn.drivers.linux;
 
-import com.logonbox.vpn.drivers.lib.DNSProvider;
-import com.logonbox.vpn.drivers.lib.PlatformService;
-import com.sshtools.liftlib.ElevatedClosure;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Serializable;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.stream.Collectors;
+
+import com.logonbox.vpn.drivers.lib.DNSProvider;
+import com.logonbox.vpn.drivers.lib.PlatformService;
+import com.logonbox.vpn.drivers.lib.util.IpUtil;
+import com.sshtools.liftlib.ElevatedClosure;
 
 import uk.co.bithatch.nativeimage.annotations.Serialization;
 
 /**
  * Very dumb {@link DNSProvider} that edits /etc/resolv.conf directly, using
- * marker lines to determine what was added by us. It does not support search
- * domains, and it does not support querying of current state.
+ * marker lines to determine what was added by us.
  */
 public class RawDNSProvider implements DNSProvider {
-    private final static Logger LOG = LoggerFactory.getLogger(RawDNSProvider.class);
     private PlatformService<?> platform;
 
     private static final String END_LOGONBOX_VPN_RESOLVCONF = "###### END-LOGONBOX-VPN ######";
@@ -41,14 +35,64 @@ public class RawDNSProvider implements DNSProvider {
 
     @Override
     public List<DNSEntry> entries() throws IOException {
-        throw new UnsupportedOperationException("This DNS provider cannot query current configuration.");
+        var file = Paths.get("/etc/resolv.conf");
+        String line;
+        var dns = new ArrayList<DNSEntry.Builder>();
+        DNSEntry.Builder systemBldr = null;
+        DNSEntry.Builder vpnBldr = null;
+        String iface = "wg0";
+        try (var r = Files.newBufferedReader(file)) {
+            var inLbVpn = false;
+            while ((line = r.readLine()) != null) {
+                if (line.startsWith(START_LOGONBOX_VPN__RESOLVECONF)) {
+                    inLbVpn = true;
+                } else if (line.startsWith(END_LOGONBOX_VPN_RESOLVCONF)) {
+                    inLbVpn = false;
+                } else {
+                    line = line.trim();
+                    
+                    if(inLbVpn && line.startsWith("# net: ")) {
+                    	iface = line.substring(7);
+                    	vpnBldr = null;
+                    }
+                    else if(line.isEmpty() || line.startsWith("#")) {
+                    	continue;
+                    }
+
+                    var l = Arrays.asList(line.split("\\s+"));
+                    if(inLbVpn) {
+                    	if(vpnBldr == null) {
+                    		vpnBldr = new DNSEntry.Builder();
+                    		vpnBldr.withInterface(iface);
+	                		dns.add(vpnBldr);
+	                	}
+                        if (l.get(0).equals("nameserver")) 
+                        	vpnBldr.addServers(l.subList(1, l.size()));
+                        if (l.get(0).equals("search")) 
+                        	vpnBldr.addDomains(l.subList(1, l.size()));
+                    }
+                    else {
+                    	if(systemBldr == null) {
+                    		systemBldr = new DNSEntry.Builder();
+                    		systemBldr.withInterface(IpUtil.getBestLocalNic().getName());
+                    		dns.add(0, systemBldr);
+                    	}
+                        if (l.get(0).equals("nameserver")) 
+                        	systemBldr.addServers(l.subList(1, l.size()));
+                        if (l.get(0).equals("search")) 
+                        	systemBldr.addDomains(l.subList(1, l.size()));
+                    }
+                }
+            }
+        } 
+        return dns.stream().map(bldr -> bldr.build()).collect(Collectors.toList());
     }
 
     @Override
     public void set(DNSEntry entry) throws IOException {
         synchronized (AbstractLinuxPlatformService.lock) {
             try {
-                platform.context().commands().privileged().logged().task(new UpdateResolvDotConf(entry.servers(), true));
+                platform.context().commands().privileged().logged().task(new UpdateResolvDotConf(entry.servers(), entry.iface(), entry.domains(), true));
             } catch (IOException ioe) {
                 throw ioe;
             } catch (Exception e) {
@@ -62,7 +106,7 @@ public class RawDNSProvider implements DNSProvider {
 
         synchronized (AbstractLinuxPlatformService.lock) {
             try {
-                platform.context().commands().privileged().logged().task(new UpdateResolvDotConf(entry.servers(), false));
+                platform.context().commands().privileged().logged().task(new UpdateResolvDotConf(entry.servers(), entry.iface(), entry.domains(), false));
             } catch (IOException ioe) {
                 throw ioe;
             } catch (Exception e) {
@@ -77,88 +121,85 @@ public class RawDNSProvider implements DNSProvider {
 
         String[] dns;
         boolean add;
+        String iface;
+        String[] search;
 
         public UpdateResolvDotConf() {
         }
 
-        UpdateResolvDotConf(String[] dns, boolean add) {
+        UpdateResolvDotConf(String[] dns, String iface, String[] search, boolean add) {
             this.dns = dns;
             this.add = add;
+            this.iface = iface;
+            this.search = search;
         }
 
         @Override
         public Serializable call(ElevatedClosure<Serializable, Serializable> proxy) throws Exception {
-            List<String> headlines = new ArrayList<>();
-            List<String> bodylines = new ArrayList<>();
-            List<String> taillines = new ArrayList<>();
-            List<String> dnslist = new ArrayList<>();
-            File file = new File("/etc/resolv.conf");
+        	
+        	var file = Paths.get("/etc/resolv.conf");
+        	var outfile = Paths.get("/etc/resolv.conf.out");
+            var inIface = "wg0";
+            var haveEnd = false;
+            var haveStart = false;
             String line;
-            int sidx = -1;
-            int eidx = -1;
-            Set<String> rowdns = new HashSet<>();
-            try (BufferedReader r = new BufferedReader(new FileReader(file))) {
-                int lineNo = 0;
-                while ((line = r.readLine()) != null) {
-                    if (line.startsWith(START_LOGONBOX_VPN__RESOLVECONF)) {
-                        sidx = lineNo;
-                    } else if (line.startsWith(END_LOGONBOX_VPN_RESOLVCONF)) {
-                        eidx = lineNo;
-                    } else {
-                        line = line.trim();
-                        if (line.startsWith("nameserver")) {
-                            List<String> l = Arrays.asList(line.split("\\s+"));
-                            rowdns.addAll(l.subList(1, l.size()));
-                        }
-                        dnslist.addAll(rowdns);
-                        if (sidx != -1 && eidx == -1)
-                            bodylines.add(line);
-                        else {
-                            if (sidx == -1 && eidx == -1)
-                                headlines.add(line);
-                            else
-                                taillines.add(line);
-                        }
-                    }
-                    lineNo++;
-                }
-            } catch (IOException ioe) {
-                throw new IllegalStateException("Failed to read resolv.conf", ioe);
-            }
+            try (var r = Files.newBufferedReader(file)) {
 
-            File oldfile = new File("/etc/resolv.conf");
-            oldfile.delete();
-
-            if (file.renameTo(oldfile)) {
-                LOG.info(String.format("Failed to backup resolv.conf by moving %s to %s", file, oldfile));
-            }
-
-            try (PrintWriter pw = new PrintWriter(new FileWriter(file, true))) {
-                for (String l : headlines) {
-                    pw.println(l);
+                try (var w = new PrintWriter(Files.newBufferedWriter(outfile), true)) {
+            	
+	                var inLbVpn = false;
+	                while ((line = r.readLine()) != null) {
+	                    if (line.startsWith(START_LOGONBOX_VPN__RESOLVECONF)) {
+	                    	haveStart = true;
+	                        inLbVpn = true;
+	                    } else if (line.startsWith(END_LOGONBOX_VPN_RESOLVCONF)) {
+	                    	haveEnd = true;
+	                    	if(add) {
+	                    		w.println("# net: " + iface);
+	                    		for(var ns : dns) 
+		                    		w.println("nameserver " + ns);
+	                    		if(search.length >0) 
+		                    		w.println("search " + String.join(" ", search));
+	                    	}
+	                        inLbVpn = false;
+	                        inIface = null;
+	                    } else {
+	                        line = line.trim();
+	                        if(inLbVpn) {
+		                        
+		                        if(inLbVpn && line.startsWith("# net: ")) {
+		                        	inIface = line.substring(7);
+		                        }
+		                        else if(line.isEmpty() || line.startsWith("#")) {
+		                        	continue;
+		                        }
+		
+		                        if(iface.equals(inIface)) {
+		                        	continue;
+		                        }
+		                        else 
+		                        	w.println(line);
+	                        }
+	                        else {
+	                        	w.println(line);
+	                        }
+	                    }
+	                }
+	                
+	                if(!haveStart && add) {
+	                	w.println(START_LOGONBOX_VPN__RESOLVECONF);
+	                }
+	                if(!haveEnd && add) {
+	                	w.println("# net: " + iface);
+                		for(var ns : dns) 
+                    		w.println("nameserver " + ns);
+                		if(search.length >0) 
+                    		w.println("search " + String.join(" ", search));
+	                	w.println(END_LOGONBOX_VPN_RESOLVCONF);
+	                }
                 }
-                if (dns.length > 0) {
-                    pw.println(START_LOGONBOX_VPN__RESOLVECONF);
-                    if (add) {
-                        for (String d : dns) {
-                            if (!rowdns.contains(d))
-                                pw.println(String.format("nameserver %s", d));
-                        }
-                    } else {
-                        for (String d : dnslist) {
-                            if (!Arrays.asList(dns).contains(d)) {
-                                pw.println(String.format("nameserver %s", d));
-                            }
-                        }
-                    }
-                    pw.println(END_LOGONBOX_VPN_RESOLVCONF);
-                }
-                for (String l : taillines) {
-                    pw.println(l);
-                }
-            } catch (IOException ioe) {
-                throw new IllegalStateException("Failed to write resolv.conf", ioe);
-            }
+            } 
+            Files.move(outfile, file, StandardCopyOption.REPLACE_EXISTING);
             return null;
         }
     }

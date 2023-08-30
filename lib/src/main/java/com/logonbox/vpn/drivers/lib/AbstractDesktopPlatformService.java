@@ -124,7 +124,18 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
                     LOG.warn("Found multiple DNS provider factories, only the first will be used. This may be incorrect.");
                 }
                 try {
-                    // TODO configuration of preferred when set
+                	if(context.configuration().dnsIntegrationMethod().isPresent()) {
+	                	for(var provFactory : srvs) {
+	                		var provs = provFactory.get().available();
+	                		for(var prov : provs) {
+	                			if(prov.getName().equals(context.configuration().dnsIntegrationMethod().get())) {
+	                				dnsProvider = Optional.of(provFactory.get().create(Optional.of(prov)));
+	                                dnsProvider.get().init(this);
+	                                return dnsProvider;
+	                			}
+	                		}
+	                	}
+                	}
                     dnsProvider = Optional.of(srvs.get(0).get().create(Optional.empty()));
                     dnsProvider.get().init(this);
                 }

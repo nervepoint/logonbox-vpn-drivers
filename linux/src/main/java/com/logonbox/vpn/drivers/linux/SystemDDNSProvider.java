@@ -122,9 +122,6 @@ public class SystemDDNSProvider implements DNSProvider {
 
     private String indexToName(int index) {
         try {
-            NetworkInterface.networkInterfaces().forEach(ni -> {
-                System.out.println(ni.getName() + " :" + ni.getDisplayName() + " : " + ni.getIndex());
-            });
             return NetworkInterface.getByIndex(index).getName();
         } catch (Exception e) {
             throw new IllegalArgumentException("Failed to get interface for index " + index + ".", e);
@@ -133,9 +130,6 @@ public class SystemDDNSProvider implements DNSProvider {
 
     private int nameToIndex(String name) {
         try {
-            NetworkInterface.networkInterfaces().forEach(ni -> {
-                System.out.println(ni.getName() + " :" + ni.getDisplayName() + " : " + ni.getIndex());
-            });
             return NetworkInterface.getByName(name).getIndex();
         } catch (Exception e) {
             throw new IllegalArgumentException("Failed to get interface for name " + name + ".", e);

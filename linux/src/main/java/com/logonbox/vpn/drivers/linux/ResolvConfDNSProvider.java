@@ -1,8 +1,5 @@
 package com.logonbox.vpn.drivers.linux;
 
-import com.logonbox.vpn.drivers.lib.DNSProvider;
-import com.logonbox.vpn.drivers.lib.PlatformService;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -16,7 +13,12 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Pattern;
+
+import com.logonbox.vpn.drivers.lib.DNSProvider;
+import com.logonbox.vpn.drivers.lib.PlatformService;
+import com.logonbox.vpn.drivers.lib.util.IpUtil;
 
 public class ResolvConfDNSProvider implements DNSProvider {
 
@@ -24,12 +26,13 @@ public class ResolvConfDNSProvider implements DNSProvider {
 
     @Override
     public List<DNSEntry> entries() throws IOException {
-        var dir = Paths.get("/var/run/resolvconf/interfaces");
+        var dir = Paths.get("/var/run/resolvconf/interface");
         if(Files.exists(dir)) {
             var l = new ArrayList<DNSEntry>();
-            try(var str = Files.newDirectoryStream(dir, f -> f.getFileName().toString().startsWith(resolvconfIfacePrefix() + "."))) {
+            //try(var str = Files.newDirectoryStream(dir, f -> f.getFileName().toString().startsWith(resolvconfIfacePrefix() + "."))) {
+            try(var str = Files.newDirectoryStream(dir)) {
                 for(var f : str) {
-                    l.add(dnsEntry(f));
+                	dnsEntry(f).ifPresent(d -> l.add(d));
                 }
             }
             return l;
@@ -88,10 +91,17 @@ public class ResolvConfDNSProvider implements DNSProvider {
         return "";
     }
 
-    private DNSEntry dnsEntry(Path resolvConf) throws IOException {
+    private Optional<DNSEntry> dnsEntry(Path resolvConf) throws IOException {
         try(var rdr = Files.newBufferedReader(resolvConf)) {
             String line;
             var bldr = new DNSEntry.Builder();
+            var ifname = resolvConf.getFileName().toString();
+            if(ifname.equals("systemd-resolved")) {
+            	var sysd = new SystemDDNSProvider();
+            	sysd.init(platform);
+            	return sysd.entry(IpUtil.getBestLocalNic().getName());
+            }
+			bldr.withInterface(ifname);
             while( ( line = rdr.readLine() ) != null) {
                 if(line.startsWith("nameserver")) {
                     bldr.addServers(line.substring(11).trim().split("\\s+"));
@@ -100,7 +110,7 @@ public class ResolvConfDNSProvider implements DNSProvider {
                     bldr.addDomains(line.substring(7).trim().split("\\s+"));
                 }
             }
-            return bldr.build();
+            return Optional.of(bldr.build());
         }
     }
 }

@@ -52,7 +52,7 @@ public interface SystemConfiguration {
 		}
 
 		@Override
-		public Optional<Class<? extends DNSProvider>> dnsIntegrationMethod() {
+		public Optional<String> dnsIntegrationMethod() {
 		    return Optional.empty();
 		}
 	}
@@ -76,5 +76,5 @@ public interface SystemConfiguration {
 
     Duration handshakeTimeout();
 
-    Optional<Class<? extends DNSProvider>> dnsIntegrationMethod();
+    Optional<String> dnsIntegrationMethod();
 }

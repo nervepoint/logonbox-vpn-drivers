@@ -32,7 +32,7 @@ import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 
 @Command(name = "lbv", description = "Set and retrieve configuration of wireguard interfaces, a Java clone of the 'wg' command.", mixinStandardHelpOptions = true, subcommands = {
-        Lbv.Show.class, Lbv.ShowConf.class, Lbv.SetConf.class, Lbv.SyncConf.class, Lbv.AddConf.class, Lbv.GenKey.class, Lbv.PubKey.class })
+        Lbv.Show.class, Lbv.ShowConf.class, Lbv.SetConf.class, Lbv.SyncConf.class, Lbv.AddConf.class, Lbv.GenKey.class, Lbv.GenPsk.class, Lbv.PubKey.class })
 public class Lbv extends AbstractCommand implements SystemContext {
 
     final static PrintStream out = System.out;
@@ -283,7 +283,7 @@ public class Lbv extends AbstractCommand implements SystemContext {
 
         @Command(name = "all", description = "Shows all wireguard interfaces", subcommands = { All.PublicKey.class,
                 All.PrivateKey.class, All.ListenPort.class, All.FwMark.class, All.Peers.class, All.PresharedKeys.class,
-                All.Endpoints.class, All.DNS.class })
+                All.Endpoints.class })
         public final static class All implements Callable<Integer> {
 
             @ParentCommand
@@ -434,25 +434,6 @@ public class Lbv extends AbstractCommand implements SystemContext {
 
             }
 
-            @Command(name = "dns", description = "Shows the DNS configuration (when supported)")
-            public final static class DNS implements Callable<Integer> {
-
-                @ParentCommand
-                private All parent;
-
-                @Override
-                public Integer call() throws Exception {
-                    parent.parent.parent.initCommand();
-                    for (var ip : parent.parent.parent.platform().dns()
-                            .orElseThrow(() -> new IllegalStateException("No DNS provider available.")).entries()) {
-                        var all = ip.all();
-                        out.format("%s\t%s%n", ip.iface(), all.length == 0 ? "(none)" : String.join(",", all));
-                    }
-                    return 0;
-                }
-
-            }
-
             @Command(name = "allowed-ips", description = "Shows the allowed IPs")
             public final static class AllowedIps implements Callable<Integer> {
 
@@ -553,7 +534,7 @@ public class Lbv extends AbstractCommand implements SystemContext {
     }
 
     @Command(name = "genkey", description = "Generates a new private key and writes it to stdout")
-    public final static class GenKey implements Callable<Integer> {
+    public static class GenKey implements Callable<Integer> {
 
         @ParentCommand
         private Lbv parent;
@@ -564,6 +545,10 @@ public class Lbv extends AbstractCommand implements SystemContext {
             out.println(Keys.genkey().getBase64PrivateKey());
             return 0;
         }
+    }
+
+    @Command(name = "genpsk", description = "Generates a new preshared key and writes it to stdout")
+    public final static class GenPsk extends GenKey {
     }
 
     @Command(name = "pubkey", description = "Reads a private key from stdin and writes a public key to stdout")

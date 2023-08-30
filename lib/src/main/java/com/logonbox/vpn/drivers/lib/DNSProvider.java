@@ -1,7 +1,5 @@
 package com.logonbox.vpn.drivers.lib;
 
-import com.logonbox.vpn.drivers.lib.util.IpUtil;
-
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -9,6 +7,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+
+import com.logonbox.vpn.drivers.lib.util.IpUtil;
 
 import uk.co.bithatch.nativeimage.annotations.Serialization;
 

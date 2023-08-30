@@ -1,16 +1,5 @@
 package com.logonbox.vpn.quick;
 
-import com.logonbox.vpn.drivers.lib.DNSProvider;
-import com.logonbox.vpn.drivers.lib.ElevatableSystemCommands;
-import com.logonbox.vpn.drivers.lib.NativeComponents;
-import com.logonbox.vpn.drivers.lib.SystemCommands;
-import com.logonbox.vpn.drivers.lib.SystemConfiguration;
-import com.logonbox.vpn.drivers.lib.SystemContext;
-import com.logonbox.vpn.drivers.lib.Vpn;
-import com.logonbox.vpn.drivers.lib.VpnAdapter;
-import com.logonbox.vpn.drivers.lib.VpnConfiguration;
-import com.sshtools.liftlib.OS;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -24,9 +13,22 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.ServiceLoader;
 import java.util.StringTokenizer;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
+
+import com.logonbox.vpn.drivers.lib.DNSProvider;
+import com.logonbox.vpn.drivers.lib.ElevatableSystemCommands;
+import com.logonbox.vpn.drivers.lib.NativeComponents;
+import com.logonbox.vpn.drivers.lib.PlatformService;
+import com.logonbox.vpn.drivers.lib.SystemCommands;
+import com.logonbox.vpn.drivers.lib.SystemConfiguration;
+import com.logonbox.vpn.drivers.lib.SystemContext;
+import com.logonbox.vpn.drivers.lib.Vpn;
+import com.logonbox.vpn.drivers.lib.VpnAdapter;
+import com.logonbox.vpn.drivers.lib.VpnConfiguration;
+import com.sshtools.liftlib.OS;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -35,7 +37,7 @@ import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 
 @Command(name = "lbv-quick", description = "Set up a WireGuard interface simply.", mixinStandardHelpOptions = true, subcommands = {
-        LbvQuick.Up.class, LbvQuick.Down.class, LbvQuick.Save.class, LbvQuick.Strip.class })
+        LbvQuick.Up.class, LbvQuick.Down.class, LbvQuick.Save.class, LbvQuick.Strip.class, LbvQuick.DNS.class, LbvQuick.DNSProviders.class })
 public class LbvQuick extends AbstractCommand implements SystemContext {
 
     private final class LbvConfiguration implements SystemConfiguration {
@@ -56,9 +58,9 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
         public Optional<Integer> defaultMTU() {
             return mtu;
         }
-
+ 
         @Override
-        public Optional<Class<? extends DNSProvider>> dnsIntegrationMethod() {
+        public Optional<String> dnsIntegrationMethod() {
             return dns;
         }
 
@@ -91,7 +93,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 
     @Option(names = { "-d",
             "--dns" }, paramLabel = "METHOD", description = "The method of DNS integration to use. There should be no need to specify this option, but if you do it must be one of the methods supported by this operating system.")
-    private Optional<Class<? extends DNSProvider>> dns;
+    private Optional<String> dns;
 
     @Option(names = { "-m", "--mtu" }, paramLabel = "BYTES", description = "The default MTU. ")
     private Optional<Integer> mtu;
@@ -111,7 +113,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
     @Option(names = { "-t",
             "--timeout" }, paramLabel = "SECONDS", description = "Connection timeout. If no handshake has been received in this time then the connection is considered invalid. An error with thrown and the connection taken down. Only applies if there is a single peer with a single endpoint.")
     private Optional<Integer> connectTimeout;
-
+    
     private SystemConfiguration configuration;
     private ScheduledExecutorService queue;
     private SystemCommands commands;
@@ -119,6 +121,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 
     @Override
     protected Integer onCall() throws Exception {
+    	CommandLine.usage(this, out);
         return 0;
     }
 
@@ -279,6 +282,51 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
             var cfg = bldr.build();
             cfg.write(configFile);
             
+            return 0;
+        }
+
+    }
+
+    @Command(name = "dns", description = "Shows the DNS configuration (when supported)")
+    public final static class DNS implements Callable<Integer> {
+
+        @ParentCommand
+        protected LbvQuick parent;
+
+        @Override
+        public Integer call() throws Exception {
+            parent.initCommand();
+            for (var ip : PlatformService.create(parent).dns()
+                    .orElseThrow(() -> new IllegalStateException("No DNS provider available.")).entries()) {
+                var all = ip.all();
+                out.format("%s\t%s%n", ip.iface(), all.length == 0 ? "(none)" : String.join(",", all));
+            }
+            return 0;
+        }
+
+    }
+
+    @Command(name = "dns-providers", description = "Shows available DNS systems.")
+    public final static class DNSProviders implements Callable<Integer> {
+
+        @ParentCommand
+        protected LbvQuick parent;
+
+        @Override
+        public Integer call() throws Exception {
+            parent.initCommand();
+            PlatformService.create(parent).dns().ifPresent(prov -> {
+                for(var fact : ServiceLoader.load(DNSProvider.Factory.class))  {
+                	for(var clazz : fact.available()) {
+                		if(clazz.equals(prov.getClass())) {
+                            out.format("*%s%n", clazz.getName());
+                		}
+                		else {
+                            out.println(clazz.getName());
+                		}
+                	}
+                }
+            });
             return 0;
         }
 

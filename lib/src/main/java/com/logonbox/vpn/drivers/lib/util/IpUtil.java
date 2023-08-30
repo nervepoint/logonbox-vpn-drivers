@@ -20,7 +20,12 @@
  */
 package com.logonbox.vpn.drivers.lib.util;
 
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.List;
 
 import com.github.jgonian.ipmath.AbstractIp;
@@ -28,6 +33,72 @@ import com.github.jgonian.ipmath.Ipv4;
 import com.github.jgonian.ipmath.Ipv6;
 
 public class IpUtil {
+
+	public static NetworkInterface getBestLocalNic() {
+		var nics = getBestLocalNics();
+		if(nics.isEmpty())
+			throw new IllegalStateException("Could not find local network interface.");
+		return nics.get(0);
+	}
+
+	public static List<NetworkInterface> getBestLocalNics() {
+		List<NetworkInterface> addrList = new ArrayList<>();
+		try {
+			for (Enumeration<NetworkInterface> nifEn = NetworkInterface.getNetworkInterfaces(); nifEn
+					.hasMoreElements();) {
+				var nif = nifEn.nextElement();
+				/* TODO: Wireguard interfaces won't necessarily start with wg* */
+				if (!nif.getName().startsWith("wg") && !nif.isLoopback() && nif.isUp()) {
+					for (var addr : nif.getInterfaceAddresses()) {
+						var ipAddr = addr.getAddress();
+						if (!ipAddr.isAnyLocalAddress() && !ipAddr.isLinkLocalAddress()
+								&& !ipAddr.isLoopbackAddress()) {
+							addrList.add(nif);
+							break;
+						}
+					}
+				}
+			}
+		} catch (Exception e) {
+		}
+		return addrList;
+	}
+
+	public static String getBestLocalAddress() {
+		var l = getBestLocalAddresses(false);
+		try {
+			return l.isEmpty() ? InetAddress.getLocalHost().getHostAddress() : l.get(0);
+		} catch (UnknownHostException e) {
+			return "127.0.0.1";
+		}
+	}
+	
+	public static List<String> getBestLocalAddresses(boolean network, String... exclude) {
+		var excludeList = Arrays.asList(exclude);
+		var addrList = new ArrayList<String>();
+		try {
+			for (var nifEn = NetworkInterface.getNetworkInterfaces(); nifEn.hasMoreElements();) {
+				var nif = nifEn.nextElement();
+				if (!excludeList.contains(nif.getName()) && !nif.isLoopback() && nif.isUp()) {
+					for (var addr : nif.getInterfaceAddresses()) {
+						var ipAddr = addr.getAddress();
+						if (!ipAddr.isAnyLocalAddress() && !ipAddr.isLinkLocalAddress()
+								&& !ipAddr.isLoopbackAddress()) {
+							var pref = addr.getNetworkPrefixLength();
+							if (network)
+								addrList.add(Ipv4.of(ipAddr.getHostAddress()).lowerBoundForPrefix(pref).toString() + "/"
+										+ pref);
+							else
+								addrList.add(ipAddr.getHostAddress());
+						}
+					}
+				}
+			}
+		} catch (Exception e) {
+
+		}
+		return addrList;
+	}
 	
 	public static AbstractIp<?, ?> parse(String ip) {
 		try {

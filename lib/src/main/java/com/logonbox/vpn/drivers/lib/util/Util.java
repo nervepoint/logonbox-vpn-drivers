@@ -20,20 +20,18 @@
  */
 package com.logonbox.vpn.drivers.lib.util;
 
-import com.sshtools.liftlib.OS;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.net.InetAddress;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.security.MessageDigest;
 import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.sshtools.liftlib.OS;
 
 public class Util {
     static Logger log = LoggerFactory.getLogger(Util.class);

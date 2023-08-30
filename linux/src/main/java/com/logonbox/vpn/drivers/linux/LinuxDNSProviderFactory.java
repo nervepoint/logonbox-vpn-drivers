@@ -30,7 +30,7 @@ public class LinuxDNSProviderFactory implements DNSProvider.Factory {
             } else if (clazzVal.equals(SystemDDNSProvider.class)) {
                 return new SystemDDNSProvider();
             } else if (clazzVal.equals(RawDNSProvider.class)) {
-                return new SystemDDNSProvider();
+                return new RawDNSProvider();
             } else
                 throw new IllegalArgumentException(clazzVal.toString());
         } else {
