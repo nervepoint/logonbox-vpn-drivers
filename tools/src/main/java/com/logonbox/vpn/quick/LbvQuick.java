@@ -27,6 +27,7 @@ import com.logonbox.vpn.drivers.lib.SystemConfiguration;
 import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.Vpn;
 import com.logonbox.vpn.drivers.lib.VpnAdapter;
+import com.logonbox.vpn.drivers.lib.VpnAddress;
 import com.logonbox.vpn.drivers.lib.VpnConfiguration;
 import com.sshtools.liftlib.OS;
 
@@ -348,4 +349,9 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
         var idx = name.lastIndexOf('.');
         return idx == -1 ? name : name.substring(0, idx);
     }
+
+	@Override
+	public void alert(VpnAddress connector, String message) {
+        System.out.format("[+] %s%n", message);
+	}
 }

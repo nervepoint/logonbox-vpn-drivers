@@ -46,4 +46,6 @@ public interface SystemContext {
      * @return configuration
      */
     NativeComponents nativeComponents();
+    
+    void alert(VpnAddress addr, String message);
 }

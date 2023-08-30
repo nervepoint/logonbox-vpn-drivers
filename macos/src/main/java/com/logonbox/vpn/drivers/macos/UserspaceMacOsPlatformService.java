@@ -66,7 +66,9 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 	    var priv = context().commands().privileged();
         priv.result("mkdir", "/var/run/wireguard");
 	    priv.logged().result(context().nativeComponents().tool(Tool.WIREGUARD_GO), "utun");
-		return UserspaceMacOsAddress.ofName(name, this);
+		var addr = UserspaceMacOsAddress.ofName(name, this);
+		context.alert(addr, String.format("Interface for %s is %s", addr.name(), addr.nativeName()));
+		return addr;
 	}
 
 	@Override

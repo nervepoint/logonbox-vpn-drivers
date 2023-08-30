@@ -1,14 +1,13 @@
 package com.logonbox.vpn.drivers.lib;
 
-import com.sshtools.liftlib.ElevatedClosure;
-
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Serializable;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Map;
 import java.util.function.Consumer;
+
+import com.sshtools.liftlib.ElevatedClosure;
 
 public interface SystemCommands {
     

@@ -24,6 +24,7 @@ public final class Vpn implements Closeable {
         private Optional<SystemContext> systemContext = Optional.empty();
         private Optional<SystemConfiguration> systemConfiguration = Optional.empty();
         private Optional<BiConsumer<VpnAdapter, Map<String, String>>> onAddScriptEnvironment = Optional.empty();
+        private Optional<BiConsumer<VpnAddress, String>> onAlert = Optional.empty();
         
         public Builder withPlatformService(PlatformService<?> platformService) {
             this.platformService = Optional.of(platformService);
@@ -72,6 +73,11 @@ public final class Vpn implements Closeable {
             return this;
         }
         
+        public Builder onAlert(BiConsumer<VpnAddress, String> onAlert) {
+            this.onAlert = Optional.of(onAlert);
+            return this;
+        }
+        
         public Vpn build() {
             return new Vpn(this);
         }
@@ -109,7 +115,7 @@ public final class Vpn implements Closeable {
         if (builder.platformService.isPresent()) {
             platformService = builder.platformService.get();
         } else {
-            platformService = PlatformService.create(builder.systemContext.orElseGet(() -> new VpnSystemContext(builder.systemConfiguration)));
+            platformService = PlatformService.create(builder.systemContext.orElseGet(() -> new VpnSystemContext(builder.onAlert, builder.systemConfiguration)));
         }
         
         try {
@@ -161,9 +167,11 @@ public final class Vpn implements Closeable {
     class VpnSystemContext extends AbstractSystemContext implements Closeable {
         private final ScheduledExecutorService queue = Executors.newSingleThreadScheduledExecutor();
         private final SystemConfiguration configuration;
+		private final Optional<BiConsumer<VpnAddress, String>> onAlert;
         
-        VpnSystemContext(Optional<SystemConfiguration> configuration) {
+        VpnSystemContext(Optional<BiConsumer<VpnAddress, String>> onAlert, Optional<SystemConfiguration> configuration) {
             this.configuration = configuration.orElseGet(() -> SystemConfiguration.defaultConfiguration());
+            this.onAlert = onAlert;
         }
 
         @Override
@@ -185,5 +193,10 @@ public final class Vpn implements Closeable {
         public void close() {
             queue.shutdown();
         }
+
+		@Override
+		public void alert(VpnAddress connector, String message) {
+			onAlert.ifPresent(a -> a.accept(connector, message));
+		}
     }
 }
