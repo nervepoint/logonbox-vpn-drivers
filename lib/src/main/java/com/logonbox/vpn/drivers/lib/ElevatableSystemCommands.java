@@ -238,7 +238,8 @@ public class ElevatableSystemCommands implements SystemCommands {
 
 		@Override
 		public SystemCommands env(Map<String, String> env) {
-			return delegate.env(env);
+			delegate.env(env);
+			return this;
 		}
     }
 
@@ -313,7 +314,8 @@ public class ElevatableSystemCommands implements SystemCommands {
 
 		@Override
 		public SystemCommands env(Map<String, String> env) {
-			return delegate.env(env);
+			delegate.env(env);
+			return this;
 		}
 
 		@Override
