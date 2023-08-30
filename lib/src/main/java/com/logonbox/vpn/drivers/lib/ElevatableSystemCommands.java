@@ -318,8 +318,7 @@ public class ElevatableSystemCommands implements SystemCommands {
 
 		@Override
 		public Map<String, String> env() {
-			// TODO Auto-generated method stub
-			return null;
+			return delegate.env();
 		}
     }
 
