@@ -23,7 +23,7 @@ import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
 import com.logonbox.vpn.drivers.windows.WindowsDNSProviderFactory;
 import com.logonbox.vpn.drivers.windows.WindowsPlatformServiceFactory;
 
-module com.logonbox.vpn.drivers.os {
+open module com.logonbox.vpn.drivers.os {
     exports com.logonbox.vpn.drivers.windows;
     requires transitive com.logonbox.vpn.drivers.lib; 
     requires transitive org.slf4j;

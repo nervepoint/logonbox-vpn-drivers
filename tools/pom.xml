@@ -52,11 +52,6 @@ ACTION
         <!--<graalvm.pgo>-Ob</graalvm.pgo>-->
     </properties>
     <dependencies>
-                <dependency>
-                    <groupId>com.logonbox</groupId>
-                    <artifactId>logonbox-vpn-linux</artifactId>
-                    <version>${project.version}</version>
-                </dependency>
         <dependency>
             <groupId>com.sshtools</groupId>
             <artifactId>porter</artifactId>
@@ -207,7 +202,6 @@ ACTION
                                     <buildArgs>
                                         --report-unsupported-elements-at-runtime
                                         -R:MaxHeapSize=64m
-                                        -H:+BuildReport
                                         ${graalvm.pgo} ${graalvm.compatibility} ${graalvm.gc}
                                     </buildArgs>
                                      <metadataRepository>
@@ -227,7 +221,6 @@ ACTION
                                     <buildArgs>
                                         --report-unsupported-elements-at-runtime
                                         -R:MaxHeapSize=64m
-                                        -H:+BuildReport
                                         ${graalvm.pgo} ${graalvm.compatibility} ${graalvm.gc}
                                     </buildArgs>
                                      <metadataRepository>

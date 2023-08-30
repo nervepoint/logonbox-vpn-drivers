@@ -25,6 +25,9 @@ import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
 import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.sshtools.liftlib.OS;
 
+import uk.co.bithatch.nativeimage.annotations.Resource;
+
+@Resource({ "win32-x84-64/.*" })
 public class WindowsPlatformServiceFactory implements PlatformServiceFactory {
 
     @Override

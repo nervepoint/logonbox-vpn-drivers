@@ -47,6 +47,8 @@ import com.sun.jna.platform.win32.Win32Exception;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
 
+import uk.co.bithatch.nativeimage.annotations.Proxy;
+
 /**
  * JNA interface to wireguard.dll.
  * 
@@ -56,6 +58,7 @@ import com.sun.jna.ptr.PointerByReference;
  * See https://git.zx2c4.com/wireguard-nt/about/ for full description of API, of Service.cs in the C# example
  * This code was ported from that example.
  */
+@Proxy
 public interface WireguardLibrary extends Library {
 
 	final static Logger LOG = LoggerFactory.getLogger(WireguardLibrary.class);
