@@ -20,9 +20,6 @@
  */
 package com.logonbox.vpn.drivers.macos;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -30,8 +27,8 @@ import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,12 +60,13 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 
 	@Override
 	protected UserspaceMacOsAddress add(String name, String type) throws IOException {
-	    var priv = context().commands().privileged();
-        priv.result("mkdir", "/var/run/wireguard");
-	    priv.logged().result(context().nativeComponents().tool(Tool.WIREGUARD_GO), "utun");
-		var addr = UserspaceMacOsAddress.ofName(name, this);
-		context.alert(addr, String.format("Interface for %s is %s", addr.name(), addr.nativeName()));
-		return addr;
+		var priv = context().commands().privileged();
+		priv.result("mkdir", "/var/run/wireguard");
+		var env = Map.of("WG_TUN_NAME_FILE", String.format("/var/run/wireguard/%s.name", name));
+		var tool = context().nativeComponents().tool(Tool.WIREGUARD_GO);
+		priv.logged().env(env).result(tool, "utun");
+        context.alert(addr, String.format("Interface for %s is %s", addr.name(), addr.nativeName()));
+		return UserspaceMacOsAddress.ofName(name, this);
 	}
 
 	@Override
@@ -101,7 +99,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 				} else if (lastLink != null) {
 					r = r.trim();
 					if (state == IpAddressState.MAC) {
-						if(r.startsWith("ether ")) {
+						if (r.startsWith("ether ")) {
 							var a = r.split("\\s+");
 							if (a.length > 1) {
 								String mac = lastLink.getMac();
@@ -129,23 +127,6 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 		return l;
 	}
 
-	String resolvconfIfacePrefix() throws IOException {
-		var f = new File("/etc/resolvconf/interface-order");
-		if (f.exists()) {
-			try (var br = new BufferedReader(new FileReader(f))) {
-				String l;
-				var p = Pattern.compile("^([A-Za-z0-9-]+)\\*$");
-				while ((l = br.readLine()) != null) {
-					var m = p.matcher(l);
-					if (m.matches()) {
-						return m.group(1);
-					}
-				}
-			}
-		}
-		return "";
-	}
-
 	@Override
 	protected UserspaceMacOsAddress createVirtualInetAddress(NetworkInterface nif) throws IOException {
 		var ip = UserspaceMacOsAddress.ofNativeName(nif.getName(), this);
@@ -156,8 +137,9 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 	}
 
 	@Override
-	protected void onStart(Optional<String> interfaceName, VpnConfiguration configuration, VpnAdapter session, Optional<VpnPeer> peer) throws IOException {
-	    var ip = findAddress(interfaceName, configuration, true);
+	protected void onStart(Optional<String> interfaceName, VpnConfiguration configuration, VpnAdapter session,
+			Optional<VpnPeer> peer) throws IOException {
+		var ip = findAddress(interfaceName, configuration, true);
 
 		var tempFile = Files.createTempFile("wg", "cfg");
 		try {
@@ -165,27 +147,24 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 				transform(configuration).write(writer);
 			}
 			log.info("Activating Wireguard configuration for {} (in {})", ip.shortName(), tempFile);
-			context().commands().privileged().logged().result(context().nativeComponents().tool(Tool.WG), "setconf", ip.name(), tempFile.toString());
+			context().commands().privileged().logged().result(context().nativeComponents().tool(Tool.WG), "setconf",
+					ip.name(), tempFile.toString());
 			log.info("Activated Wireguard configuration for {}", ip.shortName());
 		} finally {
 			Files.delete(tempFile);
 		}
 
-        /* Set the address reserved */
-        if (configuration.addresses().size() > 0)
-            ip.setAddresses(configuration.addresses().get(0));
-
 		/*
 		 * About to start connection. The "last handshake" should be this value or later
 		 * if we get a valid connection
 		 */
-        var connectionStarted = Instant.ofEpochMilli(((System.currentTimeMillis() / 1000l) - 1) * 1000l);
+		var connectionStarted = Instant.ofEpochMilli(((System.currentTimeMillis() / 1000l) - 1) * 1000l);
 
 		/* Set the address reserved */
-		if(configuration.addresses().size() > 0) {
-		    var addr = configuration.addresses().get(0);
-    		log.info("Setting address {} on {}", addr, ip.shortName());
-    		ip.setAddresses(addr);
+		if (configuration.addresses().size() > 0) {
+			var addr = configuration.addresses().get(0);
+			log.info("Setting address {} on {}", addr, ip.shortName());
+			ip.setAddresses(addr);
 		}
 
 		/* Bring up the interface (will set the given MTU) */
@@ -199,41 +178,38 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 		 * we don't get a handshake in that time, then consider this a failed
 		 * connection. We don't know WHY, just it has failed
 		 */
-		if(context.configuration().connectTimeout().isPresent()) {
-            waitForFirstHandshake(configuration, session, connectionStarted, peer, context.configuration().connectTimeout().get());
-        }
+		if (peer.isPresent() && context.configuration().connectTimeout().isPresent()) {
+			waitForFirstHandshake(configuration, session, connectionStarted, peer,
+					context.configuration().connectTimeout().get());
+		}
 
 		/* Set the routes */
 		try {
 			log.info("Setting routes for {}", ip.shortName());
 			setRoutes(session);
-		}
-		catch(IOException | RuntimeException ioe) {
+		} catch (IOException | RuntimeException ioe) {
 			try {
-                session.close();
-			}
-			catch(Exception e) {
+				session.close();
+			} catch (Exception e) {
 			}
 			throw ioe;
 		}
-		
-		if(ip.isAutoRoute4() || ip.isAutoRoute6()) {
+
+		if (ip.isAutoRoute4() || ip.isAutoRoute6()) {
 			ip.setEndpointDirectRoute();
 		}
-		
+
 		/* DNS */
 		try {
 			dns(configuration, ip);
-		}
-		catch(IOException | RuntimeException ioe) {
+		} catch (IOException | RuntimeException ioe) {
 			try {
-			    session.close();
-			}
-			catch(Exception e) {
+				session.close();
+			} catch (Exception e) {
 			}
 			throw ioe;
 		}
-		
+
 //		monitor_daemon
 //		execute_hooks "${POST_UP[@]}"
 
@@ -241,11 +217,12 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 
 	@Override
 	public void runHook(VpnConfiguration configuration, VpnAdapter session, String... hookScript) throws IOException {
-		runHookViaPipeToShell(configuration, session, OsUtil.getPathOfCommandInPathOrFail("bash").toString(), "-c", String.join(" ; ",  hookScript).trim());
+		runHookViaPipeToShell(configuration, session, OsUtil.getPathOfCommandInPathOrFail("bash").toString(), "-c",
+				String.join(" ; ", hookScript).trim());
 	}
 
-    @Override
-    protected void runCommand(List<String> commands) throws IOException {
-        context().commands().privileged().logged().run(commands.toArray(new String[0]));
-    }
+	@Override
+	protected void runCommand(List<String> commands) throws IOException {
+		context().commands().privileged().logged().run(commands.toArray(new String[0]));
+	}
 }

@@ -369,7 +369,7 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
     public static UserspaceMacOsAddress ofName(String name,
             UserspaceMacOsPlatformService platformService) {
         try {
-            return new UserspaceMacOsAddress(name, platformService.context().commands().task(new GetNativeName(name)), platformService);
+            return new UserspaceMacOsAddress(name, platformService.context().commands().privileged().task(new GetNativeName(name)), platformService);
         } catch(IOException ioe) {
             throw new UncheckedIOException(ioe);
         } catch(RuntimeException re) {
@@ -443,17 +443,20 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 
         @Override
         public String call(ElevatedClosure<String, Serializable> proxy) throws Exception {
-            try(var nameFiles = Files.newDirectoryStream(Paths.get("/var/run/wireguard"), f->f.getFileName().endsWith(".name"))) {
-                for(var f : nameFiles) {
-                    String iface;
-                    try(var in = Files.newBufferedReader(f)) {
-                        iface = in.readLine();
-                    }       
-                    if(realInterace.equals(iface)) {
-                        var n = f.getFileName().toString();
-                        return n.substring(0, n.lastIndexOf('.'));
-                    }
-                }
+            var dir = Paths.get("/var/run/wireguard");
+            if(Files.exists(dir)) {
+				try(var nameFiles = Files.newDirectoryStream(dir, f->f.getFileName().endsWith(".name"))) {
+	                for(var f : nameFiles) {
+	                    String iface;
+	                    try(var in = Files.newBufferedReader(f)) {
+	                        iface = in.readLine();
+	                    }       
+	                    if(realInterace.equals(iface)) {
+	                        var n = f.getFileName().toString();
+	                        return n.substring(0, n.lastIndexOf('.'));
+	                    }
+	                }
+	            }
             }
             return realInterace;
         }
