@@ -1,10 +1,5 @@
 package com.logonbox.vpn.drivers.lib;
 
-import com.sshtools.liftlib.ElevatedClosure;
-import com.sshtools.liftlib.Elevator;
-import com.sshtools.liftlib.Elevator.ReauthorizationPolicy;
-import com.sshtools.liftlib.OS;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -17,9 +12,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
+
+import com.sshtools.liftlib.ElevatedClosure;
+import com.sshtools.liftlib.Elevator;
+import com.sshtools.liftlib.Elevator.ReauthorizationPolicy;
+import com.sshtools.liftlib.OS;
 
 import uk.co.bithatch.nativeimage.annotations.Serialization;
 
@@ -46,7 +47,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     @Override
     public void run(String... args) throws IOException {
         try {
-            new BasicRun(env(), args).call();
+            new BasicRun(new Env(env()), args).call();
         } catch (IOException | RuntimeException e) {
             throw e;
         }  catch (Exception e) {
@@ -79,7 +80,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     @Override
     public int result(String... args) throws IOException {
         try {
-            return new WithResult(env(), args).call();
+            return new WithResult(new Env(env()), args).call();
         } catch (IOException | RuntimeException e) {
             throw e;
         }  catch (Exception e) {
@@ -135,7 +136,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         @Override
         public int result(String... args) throws IOException {
             try {
-                return elevator.call(new WithResult(env(), args));
+                return elevator.call(new WithResult(new Env(env()), args));
             } catch (IOException | RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
@@ -168,7 +169,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         @Override
         public void run(String... args) throws IOException {
             try {
-                elevator.call(new BasicRun(env(), args));
+                elevator.call(new BasicRun(new Env(env()), args));
             } catch (IOException | RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
@@ -313,6 +314,19 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
 			return this;
 		}
     }
+    
+    @SuppressWarnings("serial")
+    @Serialization
+	public final static class Env extends HashMap<String, String> implements Serializable {
+    	
+    	public Env() {
+    		super();
+    	}
+    	
+    	public Env(Map<String, String> env) {
+    		super(env);
+    	}
+    };
 
     @SuppressWarnings("serial")
     @Serialization
@@ -324,7 +338,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         public BasicRun() {
         }
 
-        BasicRun(Map<String, String> env, String... args) {
+        BasicRun(Env env, String... args) {
             this.args = args;
             this.env = env;
         }
@@ -351,12 +365,12 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     public final static class WithResult implements ElevatedClosure<Integer, Serializable> {
 
         String[] args;
-        Map<String, String> env;
+        Env env;
 
         public WithResult() {
         }
 
-        WithResult(Map<String, String> env, String... args) {
+        WithResult(Env env, String... args) {
             this.args = args;
             this.env = env;
         }
