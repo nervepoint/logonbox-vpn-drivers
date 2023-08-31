@@ -121,7 +121,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
 
     @Override
     public SystemCommands logged() {
-        return new LoggedSystemCommands(this, env());
+        return new LoggedSystemCommands(this);
     } 
 
     private final class PrvilegedSystemCommands extends AbstractSystemCommands {
@@ -216,7 +216,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
 
         @Override
         public SystemCommands logged() {
-            return new LoggedSystemCommands(this, env());
+            return new LoggedSystemCommands(this);
         }
 
         @Override
@@ -233,11 +233,10 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         }
     }
 
-    private final class LoggedSystemCommands extends AbstractSystemCommands {
+    private final class LoggedSystemCommands implements SystemCommands {
         private SystemCommands delegate;
 
-        LoggedSystemCommands(SystemCommands delegate, Map<String, String> env) {
-            super(env);
+        LoggedSystemCommands(SystemCommands delegate) {
             this.delegate = delegate;
         }
         
@@ -302,6 +301,17 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         public <R extends Serializable> R task(ElevatedClosure<R, Serializable> task) throws Exception {
             return delegate.task(task);
         }
+
+		@Override
+		public Map<String, String> env() {
+			return delegate.env();
+		}
+
+		@Override
+		public SystemCommands env(Map<String, String> env) {
+			delegate.env(env);
+			return this;
+		}
     }
 
     @SuppressWarnings("serial")
