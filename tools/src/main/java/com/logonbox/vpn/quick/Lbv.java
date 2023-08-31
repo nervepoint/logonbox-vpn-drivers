@@ -1,5 +1,19 @@
 package com.logonbox.vpn.quick;
 
+import com.logonbox.vpn.drivers.lib.ElevatableSystemCommands;
+import com.logonbox.vpn.drivers.lib.NativeComponents;
+import com.logonbox.vpn.drivers.lib.PlatformService;
+import com.logonbox.vpn.drivers.lib.SystemCommands;
+import com.logonbox.vpn.drivers.lib.SystemConfiguration;
+import com.logonbox.vpn.drivers.lib.SystemContext;
+import com.logonbox.vpn.drivers.lib.Vpn;
+import com.logonbox.vpn.drivers.lib.VpnAdapter;
+import com.logonbox.vpn.drivers.lib.VpnAdapterConfiguration;
+import com.logonbox.vpn.drivers.lib.VpnAddress;
+import com.logonbox.vpn.drivers.lib.VpnInterfaceInformation;
+import com.logonbox.vpn.drivers.lib.util.Keys;
+import com.logonbox.vpn.drivers.lib.util.Util;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -14,21 +28,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 
-import com.logonbox.vpn.drivers.lib.ElevatableSystemCommands;
-import com.logonbox.vpn.drivers.lib.NativeComponents;
-import com.logonbox.vpn.drivers.lib.PlatformService;
-import com.logonbox.vpn.drivers.lib.SystemCommands;
-import com.logonbox.vpn.drivers.lib.SystemConfiguration;
-import com.logonbox.vpn.drivers.lib.SystemContext;
-import com.logonbox.vpn.drivers.lib.Vpn;
-import com.logonbox.vpn.drivers.lib.VpnAdapter;
-import com.logonbox.vpn.drivers.lib.VpnAdapterConfiguration;
-import com.logonbox.vpn.drivers.lib.VpnAddress;
-import com.logonbox.vpn.drivers.lib.util.Keys;
-import com.logonbox.vpn.drivers.lib.util.Util;
-
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Help.Ansi;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 
@@ -98,7 +100,7 @@ public class Lbv extends AbstractCommand implements SystemContext {
     }
 
     @Command(name = "show", description = "Shows the current configuration and device information", subcommands = {
-            Show.Interfaces.class, Show.All.class, Show.PublicKey.class, Show.ListenPort.class, Show.FwMark.class,
+            Show.Interfaces.class, Show.All.class, Show.PublicKey.class, Show.LatestHandshake.class, Show.ListenPort.class, Show.FwMark.class,
             Show.Peers.class, Show.PresharedKeys.class, Show.Endpoints.class })
     public final static class Show implements Callable<Integer> {
 
@@ -113,43 +115,78 @@ public class Lbv extends AbstractCommand implements SystemContext {
             parent.initCommand();
             if (iface.isPresent())
                 show(parent.platform().adapter(iface.get()));
+            else {
+                var idx = 0;
+                for (var ip : parent.platform().adapters()) {
+                    if (idx++ > 0)
+                        out.println();
+                    show(ip);
+                }
+            }
             return 0;
+        }
+
+        void printDetail(StringBuilder bldr, int indent, String name, String fmt, Object... args) {
+            printDetail(bldr, indent, name, Optional.empty(), fmt, args);
+        }
+        
+        void printDetail(StringBuilder bldr, int indent, String name, Optional<String> color, String fmt, Object... args) {
+            if(color.isPresent()) {
+                if(indent == 0) {
+                    bldr.append(Ansi.AUTO.string(String.format("@|bold," + color.get() + " %s: |@", name)));
+                }
+                else {
+                    bldr.append(Ansi.AUTO.string(String.format("%" + indent + "s@|bold," + color.get() + " %s: |@", "", name)));
+                }
+                bldr.append(Ansi.AUTO.string("@|" + color.get() + " " + String.format(fmt, args) + "|@"));
+            }
+            else {
+                if(indent == 0) {
+                    bldr.append(Ansi.AUTO.string(String.format("@|bold %s: |@", name)));
+                }
+                else {
+                    bldr.append(Ansi.AUTO.string(String.format("%" + indent + "s@|bold %s: |@", "", name)));
+                }
+                bldr.append(String.format(fmt, args));
+            }
+            bldr.append(System.lineSeparator());
         }
 
         void show(VpnAdapter vpn) throws IOException {
             var info = vpn.information();
             var config = vpn.configuration();
+            
+            var report = new StringBuilder();
+            
+            printDetail(report, 0, "interface", "%s", info.interfaceName());            
+            printDetail(report, 2, "public key", "%s", config.publicKey());            
+            printDetail(report, 2, "private key", "%s", "(hidden)");
 
-            out.format("interface: %s%n", info.interfaceName());
-            out.format("  public key: %s%n", config.publicKey());
-            out.format("  private key: %s%n", "(hidden)");
-            info.listenPort().ifPresent(p -> out.format("  listening port: %s%n", p));
+            info.listenPort().ifPresent(p -> printDetail(report, 2, "listening port", "%s", p));
+            info.fwmark().ifPresent(p -> printDetail(report, 2, "fwmark", "0x%4x", p));
 
             var peers = config.peers();
             if (peers.size() > 0) {
-                out.println();
+                report.append(System.lineSeparator());
                 for (var peer : peers) {
-
-                    out.format("peer: %s%n", peer.publicKey());
-
-                    peer.endpointAddress().ifPresent(ep -> {
-                        out.format("  endpoint: %s%n", ep, peer.endpointPort().orElse(Vpn.DEFAULT_PORT));
-                    });
-
-                    out.format("  allowed ips: %s%n", String.join(", ", peer.allowedIps()));
+                    
+                    printDetail(report, 0, "peer", Optional.of("yellow"), "%s", peer.publicKey());
+                    peer.endpointAddress().ifPresent(ep -> printDetail(report, 2, "endpoint", "%s", peer.endpointPort().orElse(Vpn.DEFAULT_PORT)));
+                    printDetail(report, 2, "allowed ips", "%s", String.join(", ", peer.allowedIps()));
 
                     var peerInfo = info.peer(peer.publicKey());
                     peerInfo.ifPresent(i -> {
                         var seconds = Duration.between(i.lastHandshake(), Instant.now()).toSeconds();
-                        out.format("  latest handshake: %d %s ago%n", seconds, seconds < 2 ? "second" : "seconds");
-                        out.format("  transfer: %s received, %s sent%n", Util.toHumanSize(i.rx()),
-                                Util.toHumanSize(i.tx()));
+                        printDetail(report, 2, "latest handshake", "%d %s ago", seconds, seconds < 2 ? "second" : "seconds");
+                        printDetail(report, 2, "transfer", "%s received, %s sent", Util.toHumanSize(i.rx()), Util.toHumanSize(i.tx()));
                     });
 
                     peer.persistentKeepalive().ifPresent(
-                            p -> out.format("  persistent keepalive: every %d %s%n", p, p < 2 ? "second" : "seconds"));
+                            p -> printDetail(report, 2, "persistent keepalive", "every %d %s", p, p < 2 ? "second" : "seconds"));
                 }
             }
+            
+            out.print(report.toString());
         }
 
         @Command(name = "public-key", description = "Shows the public key")
@@ -163,6 +200,23 @@ public class Lbv extends AbstractCommand implements SystemContext {
                 parent.parent.initCommand();
                 var ip = parent.parent.platform().adapter(parent.iface.get());
                 out.format("%s%n", ip.information().publicKey());
+                return 0;
+            }
+
+        }
+
+        @Command(name = "latest-handshake", description = "Shows the latest handshake")
+        public final static class LatestHandshake implements Callable<Integer> {
+
+            @ParentCommand
+            private Show parent;
+
+            @Override
+            public Integer call() throws Exception {
+                parent.parent.initCommand();
+                var ip = parent.parent.platform().adapter(parent.iface.get());
+                VpnInterfaceInformation info = ip.information();
+                out.format("%s\t%d%n", info.publicKey(), info.lastHandshake().getEpochSecond());
                 return 0;
             }
 
@@ -288,7 +342,7 @@ public class Lbv extends AbstractCommand implements SystemContext {
         }
 
         @Command(name = "all", description = "Shows all wireguard interfaces", subcommands = { All.PublicKey.class,
-                All.PrivateKey.class, All.ListenPort.class, All.FwMark.class, All.Peers.class, All.PresharedKeys.class,
+                All.PrivateKey.class, All.ListenPort.class, All.FwMark.class, All.Peers.class, All.LatestHandshakes.class, All.PresharedKeys.class,
                 All.Endpoints.class })
         public final static class All implements Callable<Integer> {
 
@@ -388,6 +442,26 @@ public class Lbv extends AbstractCommand implements SystemContext {
                     for (var ip : parent.parent.parent.platform().adapters()) {
                         for (var peer : ip.information().peers()) {
                             out.format("%s\t%s%n", ip.address().name(), peer.publicKey());
+                        }
+                    }
+                    return 0;
+                }
+
+            }
+
+            @Command(name = "latest-handshakes", description = "Shows the latest handshakes")
+            public final static class LatestHandshakes implements Callable<Integer> {
+
+                @ParentCommand
+                private All parent;
+
+                @Override
+                public Integer call() throws Exception {
+                    parent.parent.parent.initCommand();
+                    for (var ip : parent.parent.parent.platform().adapters()) {
+                        var info = ip.information();
+                        for (var peer : info.peers()) {
+                            out.format("%s\t%s\t%d%n", ip.address().name(), peer.publicKey(), peer.lastHandshake().getEpochSecond());
                         }
                     }
                     return 0;

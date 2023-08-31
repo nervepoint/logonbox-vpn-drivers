@@ -24,7 +24,7 @@ import java.net.InetAddress;
 import java.security.MessageDigest;
 import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
-import java.util.ArrayList;
+import java.util.ArrayList; 
 import java.util.Base64;
 import java.util.List;
 
@@ -135,6 +135,19 @@ public class Util {
 //		return ((a & 0xff000000) >>> 24) | ((a & 0x00ff0000) >>> 8) | ((a & 0x0000ff00) << 8)
 //				| ((a & 0x000000ff) << 24);
 	}
+
+    public static int parseFwMark(String tkn) {
+        tkn = tkn.trim();
+        if (tkn.equals("off") || tkn.length() == 0)
+            return 0;
+        else {
+            if (tkn.startsWith("0x")) {
+                return Integer.parseInt(tkn.substring(2), 16);
+            } else {
+                return Integer.parseInt(tkn);
+            }
+        }
+    }
 
 	/**
 	 * Parse a space separated string into a list, treating portions quotes with

@@ -434,7 +434,7 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
                 throw new IOException();
             else {
                 String fwmark = lines.iterator().next();
-                return AbstractUnixDesktopPlatformService.parseFwMark(fwmark);
+                return Util.parseFwMark(fwmark);
             }
         } catch (IOException ioe) {
             return 0;

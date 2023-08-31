@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 
 import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
+import com.logonbox.vpn.drivers.lib.util.Util;
 
 public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
 		extends AbstractDesktopPlatformService<I> {
@@ -209,7 +210,7 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
 					privateKey.append(st.nextToken());
 					publicKey.append(st.nextToken());
 					port.set(Integer.parseInt(st.nextToken()));
-					fwmark.set(parseFwMark(st.nextToken()));
+					fwmark.set(Util.parseFwMark(st.nextToken()));
 				} else {
 					var peerPublicKey = st.nextToken();
 					var presharedKeyVal = st.nextToken();
@@ -345,19 +346,6 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
 			}
 		} catch (IOException ioe) {
 			throw new UncheckedIOException(ioe);
-		}
-	}
-
-	public static int parseFwMark(String tkn) {
-		tkn = tkn.trim();
-		if (tkn.equals("off") || tkn.length() == 0)
-			return 0;
-		else {
-			if (tkn.startsWith("0x")) {
-				return Integer.parseInt(tkn.substring(2), 16);
-			} else {
-				return Integer.parseInt(tkn);
-			}
 		}
 	}
 

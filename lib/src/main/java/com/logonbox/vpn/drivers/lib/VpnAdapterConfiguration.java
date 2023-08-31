@@ -21,6 +21,7 @@
 package com.logonbox.vpn.drivers.lib;
 
 import com.logonbox.vpn.drivers.lib.util.Keys;
+import com.logonbox.vpn.drivers.lib.util.Util;
 import com.sshtools.jini.INI;
 import com.sshtools.jini.INI.Section;
 import com.sshtools.jini.INIReader;
@@ -175,7 +176,7 @@ public interface VpnAdapterConfiguration extends Serializable {
             withPrivateKey(iface.getOr("PrivateKey"));
             withPublicKey(iface.getOr("PublicKey"));
             withListenPort(iface.getIntOr("ListenPort"));
-            withFwMark(iface.getIntOr("FwMark"));
+            withFwMark(iface.getOr("FwMark").map(s -> Util.parseFwMark(s)));
         }
 
         public abstract VpnAdapterConfiguration build();
