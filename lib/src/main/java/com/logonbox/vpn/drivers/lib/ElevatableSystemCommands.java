@@ -58,7 +58,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     @Override
     public Collection<String> output(String... args) throws IOException {
         try {
-            return Arrays.asList(new Output(env(), args).call());
+            return Arrays.asList(new Output(new Env(env()), args).call());
         } catch (IOException | RuntimeException e) {
             throw e;
         }  catch (Exception e) {
@@ -69,7 +69,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     @Override
     public Collection<String> silentOutput(String... args) {
         try {
-            return Arrays.asList(new SilentOutput(env(), args).call());
+            return Arrays.asList(new SilentOutput(new Env(env()), args).call());
         } catch (RuntimeException e) {
             throw e;
         }  catch (Exception e) {
@@ -91,7 +91,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     @Override
     public void pipeTo(String content, String... args) throws IOException {
         try {
-            new PipeTo(env(), content, args).call();
+            new PipeTo(new Env(env()), content, args).call();
         } catch (IOException | RuntimeException e) {
             throw e;
         }  catch (Exception e) {
@@ -102,7 +102,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     @Override
     public int consume(Consumer<String> consumer, String... args) throws IOException {
         try {
-            return new WithConsume(env(), consumer, args).call();
+            return new WithConsume(new Env(env()), consumer, args).call();
         } catch (IOException | RuntimeException e) {
             throw e;
         }  catch (Exception e) {
@@ -147,7 +147,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         @Override
         public Collection<String> output(String... args) throws IOException {
             try {
-                return Arrays.asList(elevator.call(new Output(env(), args)));
+                return Arrays.asList(elevator.call(new Output(new Env(env()), args)));
             } catch (IOException | RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
@@ -158,7 +158,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         @Override
         public Collection<String> silentOutput(String... args) {
             try {
-                return Arrays.asList(elevator.call(new SilentOutput(env(), args)));
+                return Arrays.asList(elevator.call(new SilentOutput(new Env(env()), args)));
             } catch (RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
@@ -185,7 +185,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         @Override
         public void pipeTo(String content, String... args) throws IOException {
             try {
-                elevator.call(new PipeTo(env(), content, args));
+                elevator.call(new PipeTo(new Env(env()), content, args));
             } catch (IOException | RuntimeException e) {
                 e.printStackTrace();
                 throw e;
@@ -202,7 +202,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         @Override
         public int consume(Consumer<String> consumer, String... args) throws IOException {
             try {
-                return elevator.call(new WithConsume(env(), consumer, args));
+                return elevator.call(new WithConsume(new Env(env()), consumer, args));
             } catch (IOException | RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
@@ -333,7 +333,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     public final static class BasicRun implements ElevatedClosure<Serializable, Serializable> {
 
         String[] args;
-        Map<String, String> env;
+        Env env;
 
         public BasicRun() {
         }
@@ -393,12 +393,12 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     public final static class Output implements ElevatedClosure<String[], Serializable> {
 
         String[] args;
-        Map<String, String> env;
+        Env env;
 
         public Output() {
         }
 
-        Output(Map<String, String> env, String... args) {
+        Output(Env env, String... args) {
             this.args = args;
             this.env = env;
         }
@@ -433,12 +433,12 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     public final static class SilentOutput implements ElevatedClosure<String[], Serializable> {
 
         String[] args;
-        Map<String, String> env;
+        Env env;
 
         public SilentOutput() {
         }
 
-        SilentOutput(Map<String, String> env, String... args) {
+        SilentOutput(Env env, String... args) {
             this.args = args;
             this.env = env;
         }
@@ -471,13 +471,13 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     public final static class PipeTo implements ElevatedClosure<Serializable, Serializable> {
 
         String[] args;
-        Map<String, String> env;
+        Env env;
         String content;
 
         public PipeTo() {
         }
 
-        PipeTo(Map<String, String> env, String content, String... args) {
+        PipeTo(Env env, String content, String... args) {
             this.args = args;
             this.env = env;
             this.content = content;
@@ -512,13 +512,13 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     public final static class WithConsume implements ElevatedClosure<Integer, String> {
 
         String[] args;
-        Map<String, String> env;
+        Env env;
         transient Consumer<String> consumer;
 
         public WithConsume() {
         }
 
-        WithConsume(Map<String, String> env, Consumer<String> consumer, String... args) {
+        WithConsume(Env env, Consumer<String> consumer, String... args) {
             this.args = args;
             this.env = env;
             this.consumer = consumer;
