@@ -20,11 +20,12 @@
  */
 package com.logonbox.vpn.drivers.macos;
 
-import com.logonbox.vpn.drivers.lib.AbstractVirtualInetAddress;
-
 import java.io.IOException;
+import java.util.Collection;
 
-public class KernelMacOsAddress extends AbstractVirtualInetAddress<KernelMacOsPlatformService> {
+import com.logonbox.vpn.drivers.lib.AbstractUnixAddress;
+
+public class KernelMacOsAddress extends AbstractUnixAddress<KernelMacOsPlatformService> {
 
 	public KernelMacOsAddress(KernelMacOsPlatformService platform) {
 		super(platform);
@@ -58,6 +59,11 @@ public class KernelMacOsAddress extends AbstractVirtualInetAddress<KernelMacOsPl
 	@Override
 	public String displayName() {
 		throw new UnsupportedOperationException("TODO");
+	}
+
+	@Override
+	public void setRoutes(Collection<String> allows) throws IOException {
+		throw new UnsupportedOperationException("TODO");		
 	}
 
 }

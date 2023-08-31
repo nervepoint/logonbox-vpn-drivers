@@ -38,7 +38,7 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.logonbox.vpn.drivers.lib.AbstractVirtualInetAddress;
+import com.logonbox.vpn.drivers.lib.AbstractUnixAddress;
 import com.logonbox.vpn.drivers.lib.util.IpUtil;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
 import com.logonbox.vpn.drivers.lib.util.Util;
@@ -46,7 +46,7 @@ import com.sshtools.liftlib.ElevatedClosure;
 
 import uk.co.bithatch.nativeimage.annotations.Serialization;
 
-public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceMacOsPlatformService> {
+public class UserspaceMacOsAddress extends AbstractUnixAddress<UserspaceMacOsPlatformService> {
 	enum IpAddressState {
 		HEADER, IP, MAC
 	}
@@ -66,7 +66,7 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 		super(platform, name);
 		this.nativeName = nativeName;
 	}
-	
+
 	@Override
 	public String nativeName() {
 	    return nativeName;
@@ -91,7 +91,9 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 	@Override
 	public void delete() throws IOException {
         commands.privileged().logged().result(OsUtil.debugCommandArgs("rm", "-f", getSocketFile().getAbsolutePath()));
-	}
+        if(!name().equals(nativeName()))
+        	commands.privileged().logged().result(OsUtil.debugCommandArgs("rm", "-f", String.format("/var/run/wireguard/%s.name", name())));
+    }
 
 	@Override
 	public void down() throws IOException {
@@ -218,8 +220,9 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 //		}
 //	}
 
+	@Override
 	public void setRoutes(Collection<String> allows) throws IOException {
-	    
+
 		/* Remove all the current routes for this interface */
 		var ipv6 = false;
 		for (var row : commands.privileged().output(OsUtil.debugCommandArgs("netstat", "-nr"))) {
@@ -364,7 +367,7 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 		}
 
 	}
-    
+
 
     public static UserspaceMacOsAddress ofName(String name,
             UserspaceMacOsPlatformService platformService) {
@@ -392,7 +395,7 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
             throw new IllegalStateException(e);
         }
     }
-    
+
     @SuppressWarnings("serial")
     @Serialization
     public final static class GetNativeName implements ElevatedClosure<String, Serializable> {
@@ -411,7 +414,7 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
             var namePath = Paths.get(String.format("/var/run/wireguard/%s.name", name));
             if(!Files.exists(namePath))
                 return name;
-            
+
             String iface;
             try(var in = Files.newBufferedReader(namePath)) {
                 iface = in.readLine();
@@ -419,15 +422,15 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
             var socketPath = Paths.get(String.format("/var/run/wireguard/%s.sock", iface));
             if(!Files.exists(socketPath))
                 return name;
-            
+
             var secDiff = Files.getLastModifiedTime(socketPath).to(TimeUnit.SECONDS) - Files.getLastModifiedTime(namePath).to(TimeUnit.SECONDS) ;
             if(secDiff > 2 || secDiff < -2)
                 return name;
-            
+
             return iface;
         }
     }
-    
+
     @SuppressWarnings("serial")
     @Serialization
     public final static class GetName implements ElevatedClosure<String, Serializable> {
@@ -450,7 +453,7 @@ public class UserspaceMacOsAddress extends AbstractVirtualInetAddress<UserspaceM
 	                    String iface;
 	                    try(var in = Files.newBufferedReader(f)) {
 	                        iface = in.readLine();
-	                    }       
+	                    }
 	                    if(realInterace.equals(iface)) {
 	                        var n = f.getFileName().toString();
 	                        return n.substring(0, n.lastIndexOf('.'));

@@ -355,7 +355,7 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
 		session.allows().clear();
 
 		for (String s : context().commands().privileged().output(context().nativeComponents().tool(Tool.WG), "show",
-				session.address().name(), "allowed-ips")) {
+				session.address().nativeName(), "allowed-ips")) {
 			StringTokenizer t = new StringTokenizer(s);
 			if (t.hasMoreTokens()) {
 				t.nextToken();
