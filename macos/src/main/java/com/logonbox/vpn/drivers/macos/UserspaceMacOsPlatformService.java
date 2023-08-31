@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.nio.file.Files;
+import java.text.MessageFormat;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -62,10 +63,12 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 	protected UserspaceMacOsAddress add(String name, String type) throws IOException {
 		var priv = context().commands().privileged();
 		priv.result("mkdir", "/var/run/wireguard");
-		var env = Map.of("WG_TUN_NAME_FILE", String.format("/var/run/wireguard/%s.name", name));
 		var tool = context().nativeComponents().tool(Tool.WIREGUARD_GO);
-		priv.logged().env(env).result(tool, "utun");
+		priv.logged().env(Map.of("WG_TUN_NAME_FILE", String.format("/var/run/wireguard/%s.name", name))).result(tool, "utun");
         var addr = UserspaceMacOsAddress.ofName(name, this);
+        if(!addr.nativeName().startsWith("utun")) {
+        	throw new IOException(MessageFormat.format("Native network interface name should start with 'utun', but it is ''{0}''", addr.nativeName()));
+        }
         context.alert(addr, String.format("Interface for %s is %s", addr.name(), addr.nativeName()));
 		return addr;
 	}
@@ -149,7 +152,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 			}
 			log.info("Activating Wireguard configuration for {} (in {})", ip.shortName(), tempFile);
 			context().commands().privileged().logged().result(context().nativeComponents().tool(Tool.WG), "setconf",
-					ip.name(), tempFile.toString());
+					ip.nativeName(), tempFile.toString());
 			log.info("Activated Wireguard configuration for {}", ip.shortName());
 		} finally {
 			Files.delete(tempFile);
