@@ -4,12 +4,34 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
 import com.sshtools.liftlib.ElevatedClosure;
 
 public interface SystemCommands {
+    
+    public abstract class AbstractSystemCommands implements SystemCommands {
+        private Map<String, String> env = new HashMap<>();
+        
+        protected AbstractSystemCommands(Map<String, String> env) {
+            this.env.putAll(env);
+        }
+
+        @Override
+        public final Map<String, String> env() {
+            return env;
+        }
+
+        @Override
+        public final SystemCommands env(Map<String, String> env) {
+            this.env.putAll(env);
+            return this;
+        }
+        
+        
+    }
     
 //    public static SystemCommands withEnv(Map<String, String> env, SystemCommands delegate) {
 //        return new SystemCommands() {

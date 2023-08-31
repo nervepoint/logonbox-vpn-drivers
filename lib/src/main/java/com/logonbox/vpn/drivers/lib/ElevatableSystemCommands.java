@@ -1,5 +1,10 @@
 package com.logonbox.vpn.drivers.lib;
 
+import com.sshtools.liftlib.ElevatedClosure;
+import com.sshtools.liftlib.Elevator;
+import com.sshtools.liftlib.Elevator.ReauthorizationPolicy;
+import com.sshtools.liftlib.OS;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -11,25 +16,20 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 
-import com.sshtools.liftlib.ElevatedClosure;
-import com.sshtools.liftlib.Elevator;
-import com.sshtools.liftlib.Elevator.ReauthorizationPolicy;
-import com.sshtools.liftlib.OS;
-
 import uk.co.bithatch.nativeimage.annotations.Serialization;
 
-public class ElevatableSystemCommands implements SystemCommands {
+public class ElevatableSystemCommands extends SystemCommands.AbstractSystemCommands {
     
     private final Elevator elevator;
     private Optional<Consumer<String[]>> onLog = Optional.empty();
-	private Map<String, String> env = new HashMap<>();
     
     public ElevatableSystemCommands() {
+        super(Collections.emptyMap());
         elevator = new Elevator.ElevatorBuilder().
                 withReauthorizationPolicy(ReauthorizationPolicy.NEVER).
                 build();
@@ -40,7 +40,7 @@ public class ElevatableSystemCommands implements SystemCommands {
         if(OS.isAdministrator())
             return this;
         
-        return new PrvilegedSystemCommands(this);
+        return new PrvilegedSystemCommands(this, env());
     }
 
     @Override
@@ -121,13 +121,14 @@ public class ElevatableSystemCommands implements SystemCommands {
 
     @Override
     public SystemCommands logged() {
-        return new LoggedSystemCommands(this);
+        return new LoggedSystemCommands(this, env());
     } 
 
-    private final class PrvilegedSystemCommands implements SystemCommands {
+    private final class PrvilegedSystemCommands extends AbstractSystemCommands {
         private SystemCommands delegate;
 
-        public PrvilegedSystemCommands(SystemCommands delegate) {
+        PrvilegedSystemCommands(SystemCommands delegate, Map<String, String> env) {
+            super(env);
             this.delegate = delegate;
         }
 
@@ -209,18 +210,13 @@ public class ElevatableSystemCommands implements SystemCommands {
         }
 
         @Override
-        public Map<String, String> env() {
-            return delegate.env();
-        }
-
-        @Override
         public void onLog(Consumer<String[]> commandLine) {
             delegate.onLog(commandLine);
         }
 
         @Override
         public SystemCommands logged() {
-            return new LoggedSystemCommands(this);
+            return new LoggedSystemCommands(this, env());
         }
 
         @Override
@@ -235,18 +231,13 @@ public class ElevatableSystemCommands implements SystemCommands {
                 throw new IOException("Failed to run task.", e);
             }
         }
-
-		@Override
-		public SystemCommands env(Map<String, String> env) {
-			delegate.env(env);
-			return this;
-		}
     }
 
-    private final class LoggedSystemCommands implements SystemCommands {
+    private final class LoggedSystemCommands extends AbstractSystemCommands {
         private SystemCommands delegate;
 
-        LoggedSystemCommands(SystemCommands delegate) {
+        LoggedSystemCommands(SystemCommands delegate, Map<String, String> env) {
+            super(env);
             this.delegate = delegate;
         }
         
@@ -264,7 +255,7 @@ public class ElevatableSystemCommands implements SystemCommands {
 
         @Override
         public SystemCommands privileged() {
-            return new PrvilegedSystemCommands(this);
+            return new PrvilegedSystemCommands(this, env());
         }
 
         @Override
@@ -311,17 +302,6 @@ public class ElevatableSystemCommands implements SystemCommands {
         public <R extends Serializable> R task(ElevatedClosure<R, Serializable> task) throws Exception {
             return delegate.task(task);
         }
-
-		@Override
-		public SystemCommands env(Map<String, String> env) {
-			delegate.env(env);
-			return this;
-		}
-
-		@Override
-		public Map<String, String> env() {
-			return delegate.env();
-		}
     }
 
     @SuppressWarnings("serial")
@@ -550,15 +530,4 @@ public class ElevatableSystemCommands implements SystemCommands {
     public <R extends Serializable> R task(ElevatedClosure<R, Serializable> task) throws Exception {
         return task.call(task);
     }
-
-	@Override
-	public Map<String, String> env() {
-		return env;
-	}
-
-	@Override
-	public SystemCommands env(Map<String, String> env) {
-		this.env  = env;
-		return this;
-	}
 }
