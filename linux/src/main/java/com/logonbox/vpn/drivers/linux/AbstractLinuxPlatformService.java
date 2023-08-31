@@ -194,7 +194,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
         /* Set the routes */
         try {
             LOG.info("Setting routes for {}", ip.shortName());
-            setRoutes(session);
+            addRoutes(session);
         } catch (IOException | RuntimeException ioe) {
             try {
                 session.close();

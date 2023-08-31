@@ -190,7 +190,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 		/* Set the routes */
 		try {
 			log.info("Setting routes for {}", ip.shortName());
-			setRoutes(session);
+			addRoutes(session);
 		} catch (IOException | RuntimeException ioe) {
 			try {
 				session.close();

@@ -48,19 +48,19 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
 	@Override
 	public void reconfigure(VpnAdapter adapter, VpnAdapterConfiguration configuration) throws IOException {
 		super.reconfigure(adapter, configuration);
-		setRoutes(adapter);
+		addRoutes(adapter);
 	}
 
 	@Override
 	public void sync(VpnAdapter adapter, VpnAdapterConfiguration configuration) throws IOException {
 		super.sync(adapter, configuration);
-		setRoutes(adapter);
+		addRoutes(adapter);
 	}
 
 	@Override
 	public void append(VpnAdapter adapter, VpnAdapterConfiguration configuration) throws IOException {
 		super.append(adapter, configuration);
-		setRoutes(adapter);
+		addRoutes(adapter);
 	}
 
 	@Override
@@ -349,14 +349,14 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
 		}
 	}
 
-	protected void setRoutes(VpnAdapter session) throws IOException {
+	protected final void addRoutes(VpnAdapter session) throws IOException {
 
 		/* Set routes from the known allowed-ips supplies by Wireguard. */
 		session.allows().clear();
 
-		for (String s : context().commands().privileged().output(context().nativeComponents().tool(Tool.WG), "show",
+		for (var s : context().commands().privileged().output(context().nativeComponents().tool(Tool.WG), "show",
 				session.address().nativeName(), "allowed-ips")) {
-			StringTokenizer t = new StringTokenizer(s);
+			var t = new StringTokenizer(s);
 			if (t.hasMoreTokens()) {
 				t.nextToken();
 				while (t.hasMoreTokens())
@@ -368,11 +368,11 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
 		 * Sort by network subnet size (biggest first)
 		 */
 		Collections.sort(session.allows(), (a, b) -> {
-			String[] sa = a.split("/");
-			String[] sb = b.split("/");
+			var sa = a.split("/");
+			var sb = b.split("/");
 			Integer ia = Integer.parseInt(sa[1]);
 			Integer ib = Integer.parseInt(sb[1]);
-			int r = ia.compareTo(ib);
+			var r = ia.compareTo(ib);
 			if (r == 0) {
 				return a.compareTo(b);
 			} else

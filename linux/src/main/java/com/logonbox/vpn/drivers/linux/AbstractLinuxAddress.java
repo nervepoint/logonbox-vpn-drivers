@@ -20,6 +20,15 @@
  */
 package com.logonbox.vpn.drivers.linux;
 
+import com.logonbox.vpn.drivers.lib.AbstractUnixAddress;
+import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
+import com.logonbox.vpn.drivers.lib.util.IpUtil;
+import com.logonbox.vpn.drivers.lib.util.OsUtil;
+import com.logonbox.vpn.drivers.lib.util.Util;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -30,16 +39,6 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.regex.Pattern;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.logonbox.vpn.drivers.lib.AbstractUnixAddress;
-import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
-import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
-import com.logonbox.vpn.drivers.lib.util.IpUtil;
-import com.logonbox.vpn.drivers.lib.util.OsUtil;
-import com.logonbox.vpn.drivers.lib.util.Util;
 
 public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractLinuxPlatformService> {
 
