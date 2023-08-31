@@ -297,7 +297,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 				throw new IOException(String.format("Interrupted connecting to %s", ip.shortName()));
 			}
 			try {
-				var lastHandshake = getLatestHandshake(ip.name(), peer.publicKey());
+				var lastHandshake = getLatestHandshake(ip, peer.publicKey());
 				if(lastHandshake.equals(connectionStarted) || lastHandshake.isAfter(connectionStarted)) {
 					/* Ready ! */
 					return;

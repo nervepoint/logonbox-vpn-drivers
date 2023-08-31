@@ -211,8 +211,8 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	 * @return last handshake
 	 * @throws IOException
 	 */
-	default Instant getLatestHandshake(String iface, String publicKey) throws IOException {
-		return adapter(iface).latestHandshake(publicKey);
+	default Instant getLatestHandshake(VpnAddress address, String publicKey) throws IOException {
+		return adapter(address.name()).latestHandshake(publicKey);
 	}
 
 	/**

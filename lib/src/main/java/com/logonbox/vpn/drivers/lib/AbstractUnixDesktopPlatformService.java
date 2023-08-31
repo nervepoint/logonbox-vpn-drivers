@@ -80,9 +80,9 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
 	}
 
 	@Override
-	public Instant getLatestHandshake(String iface, String publicKey) throws IOException {
+	public Instant getLatestHandshake(VpnAddress iface, String publicKey) throws IOException {
 		for (String line : context.commands().privileged().output(context.nativeComponents().tool(Tool.WG), "show",
-				iface, "latest-handshakes")) {
+				iface.nativeName(), "latest-handshakes")) {
 			String[] args = line.trim().split("\\s+");
 			if (args.length == 2) {
 				if (args[0].equals(publicKey)) {
