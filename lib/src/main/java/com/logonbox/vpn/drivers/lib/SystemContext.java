@@ -47,5 +47,5 @@ public interface SystemContext {
      */
     NativeComponents nativeComponents();
     
-    void alert(VpnAddress addr, String message);
+    void alert(String message, Object... args);
 }

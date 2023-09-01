@@ -43,7 +43,7 @@ public class SCUtil {
                     append(str, k, v); 
                 });
                 str.append(format("set %s%nquit%n", key));
-                platform.context().commands().privileged().logged().pipeTo(str.toString(), "scutil");
+                platform.context().commands().privileged().pipeTo(str.toString(), "scutil");
             }
         }
         
@@ -54,7 +54,7 @@ public class SCUtil {
                     append(str, k, v); 
                 });
                 str.append(format("add %s%nquit%n", key));
-                platform.context().commands().privileged().logged().pipeTo(str.toString(), "scutil");
+                platform.context().commands().privileged().pipeTo(str.toString(), "scutil");
             }
         }
 
@@ -144,6 +144,6 @@ public class SCUtil {
     }
     
     public void remove(String key) throws IOException {
-        platform.context().commands().privileged().logged().pipeTo(String.format("remove %s%nquit%n", key), "scutil");
+        platform.context().commands().privileged().pipeTo(String.format("remove %s%nquit%n", key), "scutil");
     }
 }

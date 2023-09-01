@@ -24,7 +24,7 @@ public final class Vpn implements Closeable {
         private Optional<SystemContext> systemContext = Optional.empty();
         private Optional<SystemConfiguration> systemConfiguration = Optional.empty();
         private Optional<BiConsumer<VpnAdapter, Map<String, String>>> onAddScriptEnvironment = Optional.empty();
-        private Optional<BiConsumer<VpnAddress, String>> onAlert = Optional.empty();
+        private Optional<BiConsumer<String, Object[]>> onAlert = Optional.empty();
         
         public Builder withPlatformService(PlatformService<?> platformService) {
             this.platformService = Optional.of(platformService);
@@ -73,7 +73,7 @@ public final class Vpn implements Closeable {
             return this;
         }
         
-        public Builder onAlert(BiConsumer<VpnAddress, String> onAlert) {
+        public Builder onAlert(BiConsumer<String, Object[]> onAlert) {
             this.onAlert = Optional.of(onAlert);
             return this;
         }
@@ -167,9 +167,9 @@ public final class Vpn implements Closeable {
     class VpnSystemContext extends AbstractSystemContext implements Closeable {
         private final ScheduledExecutorService queue = Executors.newSingleThreadScheduledExecutor();
         private final SystemConfiguration configuration;
-		private final Optional<BiConsumer<VpnAddress, String>> onAlert;
+		private final Optional<BiConsumer<String, Object[]>> onAlert;
         
-        VpnSystemContext(Optional<BiConsumer<VpnAddress, String>> onAlert, Optional<SystemConfiguration> configuration) {
+        VpnSystemContext(Optional<BiConsumer<String, Object[]>> onAlert, Optional<SystemConfiguration> configuration) {
             this.configuration = configuration.orElseGet(() -> SystemConfiguration.defaultConfiguration());
             this.onAlert = onAlert;
         }
@@ -195,8 +195,8 @@ public final class Vpn implements Closeable {
         }
 
 		@Override
-		public void alert(VpnAddress connector, String message) {
-			onAlert.ifPresent(a -> a.accept(connector, message));
+		public void alert(String message, Object... args) {
+			onAlert.ifPresent(a -> a.accept(message, args));
 		}
     }
 }

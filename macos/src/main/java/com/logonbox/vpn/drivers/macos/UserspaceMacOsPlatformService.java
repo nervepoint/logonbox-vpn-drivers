@@ -69,7 +69,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
         if(!addr.nativeName().startsWith("utun")) {
         	throw new IOException(MessageFormat.format("Native network interface name should start with 'utun', but it is ''{0}''", addr.nativeName()));
         }
-        context.alert(addr, String.format("Interface for %s is %s", addr.name(), addr.nativeName()));
+        context.alert("Interface for {0} is {1]", addr.name(), addr.nativeName());
 		return addr;
 	}
 

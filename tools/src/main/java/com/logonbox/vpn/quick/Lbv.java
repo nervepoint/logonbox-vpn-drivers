@@ -9,7 +9,6 @@ import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.Vpn;
 import com.logonbox.vpn.drivers.lib.VpnAdapter;
 import com.logonbox.vpn.drivers.lib.VpnAdapterConfiguration;
-import com.logonbox.vpn.drivers.lib.VpnAddress;
 import com.logonbox.vpn.drivers.lib.VpnInterfaceInformation;
 import com.logonbox.vpn.drivers.lib.util.Keys;
 import com.logonbox.vpn.drivers.lib.util.Util;
@@ -19,6 +18,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.nio.file.Path;
+import java.text.MessageFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -65,8 +65,8 @@ public class Lbv extends AbstractCommand implements SystemContext {
     }
 
 	@Override
-	public void alert(VpnAddress connector, String message) {
-        System.out.format("[+] %s%n", message);
+	public void alert(String message, Object... args) {
+        System.out.format("[+] %s%n", MessageFormat.format(message, args));
 	}
 
     @Override
