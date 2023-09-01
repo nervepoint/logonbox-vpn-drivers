@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.io.UncheckedIOException;
+import java.lang.ProcessBuilder.Redirect;
 import java.net.NetworkInterface;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -236,10 +237,10 @@ public class UserspaceMacOsAddress extends AbstractUnixAddress<UserspaceMacOsPla
 				if(!getAddresses().contains(gateway)) {
     				LOG.info("Removing route {} {} for {}", l[0], gateway, nativeName);
     				if (ipv6) {
-    					commands.privileged().logged().result(OsUtil.debugCommandArgs("route", "-qn", "delete", "-inet6", "-ifp",
+    					commands.privileged().logged().stdout(Redirect.DISCARD).result(OsUtil.debugCommandArgs("route", "-qn", "delete", "-inet6", "-ifp",
     					        nativeName, l[0], gateway));
     				} else {
-    					commands.privileged().logged().result(
+    					commands.privileged().logged().stdout(Redirect.DISCARD).result(
     							OsUtil.debugCommandArgs("route", "-qn", "delete", "-ifp", nativeName, l[0], gateway));
     				}
 				}
@@ -332,15 +333,15 @@ public class UserspaceMacOsAddress extends AbstractUnixAddress<UserspaceMacOsPla
 		if (route.endsWith("/0") && (Util.isBlank(table()) || TABLE_AUTO.equals(table()))) {
 			if (route.matches(".*:.*")) {
 				autoRoute6 = true;
-				commands.privileged().logged().result(OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-inet6", "::/1:",
+				commands.privileged().logged().stdout(Redirect.DISCARD).result(OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-inet6", "::/1:",
 						"-interface", nativeName()));
-				commands.privileged().logged().result(OsUtil.debugCommandArgs("route", "-q", "-m", "add", "-inet6", "8000::/1",
+				commands.privileged().logged().stdout(Redirect.DISCARD).result(OsUtil.debugCommandArgs("route", "-q", "-m", "add", "-inet6", "8000::/1",
 						"-interface", nativeName()));
 			} else {
 				autoRoute4 = true;
-				commands.privileged().logged().result(OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-inet", "0.0.0.0/1",
+				commands.privileged().logged().stdout(Redirect.DISCARD).result(OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-inet", "0.0.0.0/1",
 						"-interface", nativeName()));
-				commands.privileged().logged().result(OsUtil.debugCommandArgs("route", "-q", "-m", "add", "-inet", "128.0.0.1/1",
+				commands.privileged().logged().stdout(Redirect.DISCARD).result(OsUtil.debugCommandArgs("route", "-q", "-m", "add", "-inet", "128.0.0.1/1",
 						"-interface", nativeName()));
 			}
 		} else {
@@ -358,7 +359,7 @@ public class UserspaceMacOsAddress extends AbstractUnixAddress<UserspaceMacOsPla
 			}
 
 			LOG.info(String.format("Adding route %s to %s for %s", route, shortName(), proto));
-			commands.privileged().logged().result(
+			commands.privileged().logged().stdout(Redirect.DISCARD).result(
 					OsUtil.debugCommandArgs("route", "-q", "-n", "add", "-" + proto, route, "-interface", nativeName()));
 		}
 

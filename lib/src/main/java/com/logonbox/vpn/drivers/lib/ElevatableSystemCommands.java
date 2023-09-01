@@ -30,7 +30,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     private Optional<Consumer<String[]>> onLog = Optional.empty();
     
     public ElevatableSystemCommands() {
-        super(Collections.emptyMap());
+        super(Collections.emptyMap(), Optional.empty(), Optional.empty(), Optional.empty());
         elevator = new Elevator.ElevatorBuilder().
                 withReauthorizationPolicy(ReauthorizationPolicy.NEVER).
                 build();
@@ -41,13 +41,13 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         if(OS.isAdministrator())
             return this;
         
-        return new PrvilegedSystemCommands(this, env());
+        return new PrvilegedSystemCommands(this, env(), stdin(), stdout(), stderr());
     }
 
     @Override
     public void run(String... args) throws IOException {
         try {
-            new BasicRun(new Env(env()), args).call();
+            new BasicRun(this, args).call();
         } catch (IOException | RuntimeException e) {
             throw e;
         }  catch (Exception e) {
@@ -58,7 +58,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     @Override
     public Collection<String> output(String... args) throws IOException {
         try {
-            return Arrays.asList(new Output(new Env(env()), args).call());
+            return Arrays.asList(new Output(this, args).call());
         } catch (IOException | RuntimeException e) {
             throw e;
         }  catch (Exception e) {
@@ -69,7 +69,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     @Override
     public Collection<String> silentOutput(String... args) {
         try {
-            return Arrays.asList(new SilentOutput(new Env(env()), args).call());
+            return Arrays.asList(new SilentOutput(this, args).call());
         } catch (RuntimeException e) {
             throw e;
         }  catch (Exception e) {
@@ -80,7 +80,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     @Override
     public int result(String... args) throws IOException {
         try {
-            return new WithResult(new Env(env()), args).call();
+            return new WithResult(this, args).call();
         } catch (IOException | RuntimeException e) {
             throw e;
         }  catch (Exception e) {
@@ -91,7 +91,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     @Override
     public Collection<String> pipeTo(String content, String... args) throws IOException {
         try {
-            return Arrays.asList(new PipeTo(new Env(env()), content, args).call());
+            return Arrays.asList(new PipeTo(this, content, args).call());
         } catch (IOException | RuntimeException e) {
             throw e;
         }  catch (Exception e) {
@@ -102,7 +102,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     @Override
     public int consume(Consumer<String> consumer, String... args) throws IOException {
         try {
-            return new WithConsume(new Env(env()), consumer, args).call();
+            return new WithConsume(this, consumer, args).call();
         } catch (IOException | RuntimeException e) {
             throw e;
         }  catch (Exception e) {
@@ -128,15 +128,16 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     private final class PrvilegedSystemCommands extends AbstractSystemCommands {
         private SystemCommands delegate;
 
-        PrvilegedSystemCommands(SystemCommands delegate, Map<String, String> env) {
-            super(env);
+        PrvilegedSystemCommands(SystemCommands delegate, Map<String, String> env, Optional<Redirect> stdin, Optional<Redirect> stdout,
+                Optional<Redirect> stderr) {
+            super(env, stdin, stdout, stderr);
             this.delegate = delegate;
         }
 
         @Override
         public int result(String... args) throws IOException {
             try {
-                return elevator.call(new WithResult(new Env(env()), args));
+                return elevator.call(new WithResult(this, args));
             } catch (IOException | RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
@@ -147,7 +148,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         @Override
         public Collection<String> output(String... args) throws IOException {
             try {
-                return Arrays.asList(elevator.call(new Output(new Env(env()), args)));
+                return Arrays.asList(elevator.call(new Output(this, args)));
             } catch (IOException | RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
@@ -158,7 +159,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         @Override
         public Collection<String> silentOutput(String... args) {
             try {
-                return Arrays.asList(elevator.call(new SilentOutput(new Env(env()), args)));
+                return Arrays.asList(elevator.call(new SilentOutput(this, args)));
             } catch (RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
@@ -169,7 +170,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         @Override
         public void run(String... args) throws IOException {
             try {
-                elevator.call(new BasicRun(new Env(env()), args));
+                elevator.call(new BasicRun(this, args));
             } catch (IOException | RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
@@ -185,7 +186,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         @Override
         public Collection<String> pipeTo(String content, String... args) throws IOException {
             try {
-                return Arrays.asList(elevator.call(new PipeTo(new Env(env()), content, args)));
+                return Arrays.asList(elevator.call(new PipeTo(this, content, args)));
             } catch (IOException | RuntimeException e) {
                 e.printStackTrace();
                 throw e;
@@ -202,7 +203,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         @Override
         public int consume(Consumer<String> consumer, String... args) throws IOException {
             try {
-                return elevator.call(new WithConsume(new Env(env()), consumer, args));
+                return elevator.call(new WithConsume(this, consumer, args));
             } catch (IOException | RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
@@ -255,7 +256,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
 
         @Override
         public SystemCommands privileged() {
-            return new PrvilegedSystemCommands(this, env());
+            return new PrvilegedSystemCommands(this, env(), stdin(), stdout(), stderr());
         }
 
         @Override
@@ -313,6 +314,39 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
 			delegate.env(env);
 			return this;
 		}
+
+        @Override
+        public SystemCommands stderr(Redirect redirect) {
+            delegate.stderr(redirect);
+            return this;
+        }
+
+        @Override
+        public SystemCommands stdout(Redirect redirect) {
+            delegate.stdout(redirect);
+            return this;
+        }
+
+        @Override
+        public SystemCommands stdin(Redirect redirect) {
+            delegate.stdin(redirect);
+            return this;
+        }
+
+        @Override
+        public Optional<Redirect> stderr() {
+            return delegate.stderr();
+        }
+
+        @Override
+        public Optional<Redirect> stdout() {
+            return delegate.stdout();
+        }
+
+        @Override
+        public Optional<Redirect> stdin() {
+            return delegate.stdin();
+        }
     }
     
     @SuppressWarnings("serial")
@@ -330,17 +364,35 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
 
     @SuppressWarnings("serial")
     @Serialization
-    public final static class BasicRun implements ElevatedClosure<Serializable, Serializable> {
+    public static abstract class AbstractProcessClosure<RET extends Serializable, EVT extends Serializable> implements ElevatedClosure<RET,EVT> {
+
+        Env env;
+        Redirect stdin, stdout, stderr;
+
+        protected AbstractProcessClosure() {
+        }
+
+        AbstractProcessClosure(SystemCommands parent) {
+            this.env = new Env(parent.env());
+            this.stdin = parent.stdin().orElse(null);
+            this.stdout = parent.stdout().orElse(null);
+            this.stderr = parent.stderr().orElse(null);
+        }
+
+    }
+
+    @SuppressWarnings("serial")
+    @Serialization
+    public final static class BasicRun extends AbstractProcessClosure<Serializable, Serializable> {
 
         String[] args;
-        Env env;
 
         public BasicRun() {
         }
 
-        BasicRun(Env env, String... args) {
+        BasicRun(SystemCommands parent, String... args) {
+            super(parent);
             this.args = args;
-            this.env = env;
         }
 
         @Override
@@ -348,9 +400,9 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             var bldr = new ProcessBuilder(args);
             if (!env.isEmpty())
                 bldr.environment().putAll(env);
-            bldr.redirectError(Redirect.INHERIT);
-            bldr.redirectOutput(Redirect.INHERIT);
-            bldr.redirectInput(Redirect.INHERIT);
+            bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr);
+            bldr.redirectOutput(stdin == null ? Redirect.INHERIT : stdin);
+            bldr.redirectInput(stdout == null ? Redirect.INHERIT : stdout);
             var process = bldr.start();
             var result = process.waitFor();
             if (result != 0) {
@@ -362,17 +414,16 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
 
     @SuppressWarnings("serial")
     @Serialization
-    public final static class WithResult implements ElevatedClosure<Integer, Serializable> {
+    public final static class WithResult  extends AbstractProcessClosure<Integer, Serializable> {
 
         String[] args;
-        Env env;
 
         public WithResult() {
         }
 
-        WithResult(Env env, String... args) {
+        WithResult(SystemCommands parent, String... args) {
+            super(parent);
             this.args = args;
-            this.env = env;
         }
 
         @Override
@@ -380,9 +431,9 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             var bldr = new ProcessBuilder(args);
             if (!env.isEmpty())
                 bldr.environment().putAll(env);
-            bldr.redirectError(Redirect.INHERIT);
-            bldr.redirectOutput(Redirect.INHERIT);
-            bldr.redirectInput(Redirect.INHERIT);
+            bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr);
+            bldr.redirectOutput(stdin == null ? Redirect.INHERIT : stdin);
+            bldr.redirectInput(stdout == null ? Redirect.INHERIT : stdout);
             var process = bldr.start();
             return process.waitFor();
         }
@@ -390,17 +441,16 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
 
     @SuppressWarnings("serial")
     @Serialization
-    public final static class Output implements ElevatedClosure<String[], Serializable> {
+    public final static class Output extends AbstractProcessClosure<String[], Serializable> {
 
         String[] args;
-        Env env;
 
         public Output() {
         }
 
-        Output(Env env, String... args) {
+        Output(SystemCommands parent, String... args) {
+            super(parent);
             this.args = args;
-            this.env = env;
         }
 
         @Override
@@ -408,8 +458,8 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             var bldr = new ProcessBuilder(args);
             if (!env.isEmpty())
                 bldr.environment().putAll(env);
-            bldr.redirectError(Redirect.INHERIT);
-            bldr.redirectInput(Redirect.INHERIT);
+            bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr);
+            bldr.redirectInput(stdout == null ? Redirect.INHERIT : stdout);
             var process = bldr.start();
             String line = null;
             var reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
@@ -430,17 +480,16 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
 
     @SuppressWarnings("serial")
     @Serialization
-    public final static class SilentOutput implements ElevatedClosure<String[], Serializable> {
+    public final static class SilentOutput extends AbstractProcessClosure<String[], Serializable> {
 
         String[] args;
-        Env env;
 
         public SilentOutput() {
         }
 
-        SilentOutput(Env env, String... args) {
+        SilentOutput(SystemCommands parent, String... args) {
+            super(parent);
             this.args = args;
-            this.env = env;
         }
 
         @Override
@@ -448,8 +497,8 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             var bldr = new ProcessBuilder(args);
             if (!env.isEmpty())
                 bldr.environment().putAll(env);
-            bldr.redirectError(Redirect.DISCARD);
-            bldr.redirectInput(Redirect.INHERIT);
+            bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr);
+            bldr.redirectInput(stdout == null ? Redirect.INHERIT : stdout);
             var process = bldr.start();
             String line = null;
             var reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
@@ -468,18 +517,17 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
 
     @SuppressWarnings("serial")
     @Serialization
-    public final static class PipeTo implements ElevatedClosure<String[], Serializable> {
+    public final static class PipeTo extends AbstractProcessClosure<String[], Serializable> {
 
         String[] args;
-        Env env;
         String content;
 
         public PipeTo() {
         }
 
-        PipeTo(Env env, String content, String... args) {
+        PipeTo(SystemCommands parent, String content, String... args) {
+            super(parent);
             this.args = args;
-            this.env = env;
             this.content = content;
         }
 
@@ -488,7 +536,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             var bldr = new ProcessBuilder(args);
             if (!env.isEmpty())
                 bldr.environment().putAll(env);
-            bldr.redirectError(Redirect.INHERIT);
+            bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr);
 
             var process = bldr.start();
             var output = new ArrayList<String>();
@@ -515,18 +563,17 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
 
     @SuppressWarnings("serial")
     @Serialization
-    public final static class WithConsume implements ElevatedClosure<Integer, String> {
+    public final static class WithConsume extends AbstractProcessClosure<Integer, String> {
 
         String[] args;
-        Env env;
         transient Consumer<String> consumer;
 
         public WithConsume() {
         }
 
-        WithConsume(Env env, Consumer<String> consumer, String... args) {
+        WithConsume(SystemCommands parent, Consumer<String> consumer, String... args) {
+            super(parent);
             this.args = args;
-            this.env = env;
             this.consumer = consumer;
         }
 
