@@ -1,5 +1,10 @@
 package com.logonbox.vpn.drivers.lib;
 
+import com.sshtools.liftlib.ElevatedClosure;
+import com.sshtools.liftlib.Elevator;
+import com.sshtools.liftlib.Elevator.ReauthorizationPolicy;
+import com.sshtools.liftlib.OS;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -16,11 +21,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
-
-import com.sshtools.liftlib.ElevatedClosure;
-import com.sshtools.liftlib.Elevator;
-import com.sshtools.liftlib.Elevator.ReauthorizationPolicy;
-import com.sshtools.liftlib.OS;
 
 import uk.co.bithatch.nativeimage.annotations.Serialization;
 
@@ -468,7 +468,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
 
     @SuppressWarnings("serial")
     @Serialization
-    public final static class PipeTo implements ElevatedClosure<Serializable, Serializable> {
+    public final static class PipeTo implements ElevatedClosure<String[], Serializable> {
 
         String[] args;
         Env env;
@@ -484,7 +484,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         }
 
         @Override
-        public Serializable call(ElevatedClosure<Serializable, Serializable> closure) throws Exception {
+        public String[] call(ElevatedClosure<String[], Serializable> closure) throws Exception {
             var bldr = new ProcessBuilder(args);
             if (!env.isEmpty())
                 bldr.environment().putAll(env);
@@ -492,9 +492,16 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             bldr.redirectOutput(Redirect.INHERIT);
 
             var process = bldr.start();
-            try (var stdin = process.getOutputStream()) {
-                stdin.write(content.getBytes());
-                stdin.flush();
+            var output = new ArrayList<String>();
+            try(var stdout = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                try (var stdin = process.getOutputStream()) {
+                    stdin.write(content.getBytes());
+                    stdin.flush();
+                }
+                String line;
+                while( ( line = stdout.readLine() ) != null) {
+                    output.add(line);
+                }
             }
             try {
                 int ret = process.waitFor();
@@ -503,7 +510,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             } catch (InterruptedException ie) {
                 throw new IOException("Interrupted.", ie);
             }
-            return null;
+            return output.toArray(new String[0]);
         }
     }
 

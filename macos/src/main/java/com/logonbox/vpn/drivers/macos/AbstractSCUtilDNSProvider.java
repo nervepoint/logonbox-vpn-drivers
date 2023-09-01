@@ -16,6 +16,7 @@ public abstract class AbstractSCUtilDNSProvider implements DNSProvider {
     final static Logger LOG = LoggerFactory.getLogger(AbstractSCUtilDNSProvider.class);
 
     protected PlatformService<?> platform;
+    protected SCUtil scutil;
 
     @Override
     public void init(PlatformService<?> platform) {

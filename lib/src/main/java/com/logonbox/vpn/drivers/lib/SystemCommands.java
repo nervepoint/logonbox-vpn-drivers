@@ -134,7 +134,7 @@ public interface SystemCommands {
 
     int result(String... args) throws IOException;
     
-    void pipeTo(String content, String... args) throws IOException;
+    Collection<String> pipeTo(String content, String... args) throws IOException;
 
     int consume(Consumer<String> consumer, String... args) throws IOException;
     
