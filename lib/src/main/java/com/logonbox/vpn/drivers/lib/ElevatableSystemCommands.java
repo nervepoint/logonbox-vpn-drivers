@@ -89,9 +89,9 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     }
 
     @Override
-    public void pipeTo(String content, String... args) throws IOException {
+    public Collection<String> pipeTo(String content, String... args) throws IOException {
         try {
-            new PipeTo(new Env(env()), content, args).call();
+            return Arrays.asList(new PipeTo(new Env(env()), content, args).call());
         } catch (IOException | RuntimeException e) {
             throw e;
         }  catch (Exception e) {
@@ -183,9 +183,9 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         }
 
         @Override
-        public void pipeTo(String content, String... args) throws IOException {
+        public Collection<String> pipeTo(String content, String... args) throws IOException {
             try {
-                elevator.call(new PipeTo(new Env(env()), content, args));
+                return Arrays.asList(elevator.call(new PipeTo(new Env(env()), content, args)));
             } catch (IOException | RuntimeException e) {
                 e.printStackTrace();
                 throw e;
@@ -259,9 +259,9 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         }
 
         @Override
-        public void pipeTo(String content, String... args) throws IOException {
+        public Collection<String> pipeTo(String content, String... args) throws IOException {
             onLog.ifPresent(c -> c.accept(args));
-            delegate.pipeTo(content, args);
+            return delegate.pipeTo(content, args);
         }
 
         @Override
