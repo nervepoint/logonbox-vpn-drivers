@@ -38,8 +38,8 @@ public abstract class AbstractSCUtilDNSProvider implements DNSProvider {
                 bldr.addServers(line.split(":")[1].trim());
             }
             else if(bldr != null && line.startsWith("if_index")) {
-                var iface = line.split(" ")[5].trim();
-                bldr.addServers(iface.substring(1, iface.length() - 1));
+                var iface = line.split(" ")[3].trim();
+                bldr.withInterface(iface.substring(1, iface.length() - 1));
                 l.add(bldr.build());
             }
         }
