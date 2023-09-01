@@ -2,30 +2,14 @@ package com.logonbox.vpn.drivers.macos;
 
 import static java.lang.String.format;
 
-import com.logonbox.vpn.drivers.lib.DNSProvider;
-import com.logonbox.vpn.drivers.lib.PlatformService;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.StringWriter;
-import java.util.List;
 
-public class SCUtilCompatibleDNSProvider implements DNSProvider {
+public class SCUtilCompatibleDNSProvider extends AbstractSCUtilDNSProvider {
     final static Logger LOG = LoggerFactory.getLogger(SCUtilCompatibleDNSProvider.class);
-
-    private PlatformService<?> platform;
-
-    @Override
-    public void init(PlatformService<?> platform) {
-        this.platform = platform;        
-    }
-
-    @Override
-    public List<DNSEntry> entries() throws IOException {
-        throw new UnsupportedOperationException();
-    }
 
     @Override
     public void set(DNSEntry entry) throws IOException {
