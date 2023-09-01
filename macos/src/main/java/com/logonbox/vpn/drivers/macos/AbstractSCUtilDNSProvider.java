@@ -20,7 +20,8 @@ public abstract class AbstractSCUtilDNSProvider implements DNSProvider {
 
     @Override
     public void init(PlatformService<?> platform) {
-        this.platform = platform;        
+        this.platform = platform;   
+        scutil = new SCUtil(platform);
     }
 
     @Override

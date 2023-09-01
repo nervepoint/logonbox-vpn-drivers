@@ -111,8 +111,8 @@ public class SCUtil {
                 }
                 else {
                     var idx = line.indexOf(':');                    
-                    var k = line.substring(0, idx - 1);
-                    var v = line.substring(idx + 1);
+                    var k = line.substring(0, idx - 1).trim();
+                    var v = line.substring(idx + 1).trim();
                     if(v.equals("<array> {")) {
                         arr = new ArrayList<>();
                         arrKey = k;
@@ -132,7 +132,7 @@ public class SCUtil {
                 }
                 else {
                     var idx = line.indexOf(':');                   
-                    var v = line.substring(idx + 1);
+                    var v = line.substring(idx + 1).trim();
                     arr.add(v);
                 }
                 break;

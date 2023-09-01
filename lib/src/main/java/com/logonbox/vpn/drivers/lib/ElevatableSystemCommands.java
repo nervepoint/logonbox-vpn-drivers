@@ -489,7 +489,6 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             if (!env.isEmpty())
                 bldr.environment().putAll(env);
             bldr.redirectError(Redirect.INHERIT);
-            bldr.redirectOutput(Redirect.INHERIT);
 
             var process = bldr.start();
             var output = new ArrayList<String>();
