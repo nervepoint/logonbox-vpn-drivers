@@ -42,7 +42,7 @@ public interface DNSProvider {
             public Builder fromSpec(String... dnsSpec) {
                 withIpv4Servers(IpUtil.filterIpV4Addresses(dnsSpec));
                 withIpv6Servers(IpUtil.filterIpV6Addresses(dnsSpec));
-                withDomains();
+                withDomains(IpUtil.filterNames(dnsSpec));
                 return this;
             }
 
@@ -125,7 +125,7 @@ public interface DNSProvider {
             }
 
             public Builder fromConfiguration(VpnConfiguration configuration) {
-                return fromSpec(configuration.addresses());
+                return fromSpec(configuration.dns());
             }
 
             public DNSEntry build() {
