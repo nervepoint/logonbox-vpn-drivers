@@ -233,7 +233,7 @@ public class UserspaceMacOsAddress extends AbstractUnixAddress<UserspaceMacOsPla
 				ipv6 = true;
 			} else if (l.length > 3 && l[3].equals(nativeName)) {
 				var gateway = l[1];
-				if(getAddresses().contains(gateway)) {
+				if(!getAddresses().contains(gateway)) {
     				LOG.info("Removing route {} {} for {}", l[0], gateway, nativeName);
     				if (ipv6) {
     					commands.privileged().logged().result(OsUtil.debugCommandArgs("route", "-qn", "delete", "-inet6", "-ifp",

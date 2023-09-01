@@ -31,9 +31,12 @@ public class SCUtilSplitDNSProvider implements DNSProvider {
     public void set(DNSEntry entry) throws IOException {
         LOG.info("Creating split resolver");
         try(var str = new StringWriter()) {
+        	str.append(String.format("d.init%n"));
             str.append(format("d.add ServerAddresses * %s%n", String.join(" ", entry.servers())));
-            str.append(format("d.add SupplementalMatchDomains * %s%n", String.join(" ", entry.domains())));
-            str.append(format("set State:/Network/Service/%s/DNS%nquit%n", entry.iface()));
+            if(entry.domains().length > 0)
+            	str.append(format("d.add SupplementalMatchDomains * %s%n", String.join(" ", entry.domains())));
+            str.append(format("set State:/Network/Interface/%s/DNS%nquit%n", entry.iface()));
+            System.out.println(str);
             platform.context().commands().privileged().logged().pipeTo(str.toString(), "scutil");
         }
     }
@@ -42,7 +45,8 @@ public class SCUtilSplitDNSProvider implements DNSProvider {
     public void unset(DNSEntry entry) throws IOException {
         LOG.info("Removing resolver");
         try(var str = new StringWriter()) {
-            str.append(format("remove State:/Network/Service/%s/DNS%nquit%n", entry.iface()));
+        	str.append(String.format("d.init%n"));
+            str.append(format("remove State:/Network/Interface/%s/DNS%nquit%n", entry.iface()));
             platform.context().commands().privileged().logged().pipeTo(str.toString(), "scutil");
         }
         
