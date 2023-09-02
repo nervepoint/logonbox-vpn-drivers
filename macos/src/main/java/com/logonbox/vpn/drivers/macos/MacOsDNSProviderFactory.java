@@ -31,7 +31,8 @@ public class MacOsDNSProviderFactory implements DNSProvider.Factory {
             } else
                 throw new IllegalArgumentException(clazzVal.toString());
         } else {
-            return create(Optional.of(SCUtilSplitDNSProvider.class));
+            //return create(Optional.of(SCUtilSplitDNSProvider.class));
+        	return create(Optional.of(SCUtilCompatibleDNSProvider.class));
         }
     }
 

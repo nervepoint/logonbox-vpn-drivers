@@ -29,7 +29,8 @@ public class SCUtilCompatibleDNSProvider extends AbstractSCUtilDNSProvider {
 				bldr.withInterface(defIface);
 			}
             bldr.addServers((Collection<String>) dict.get("ServerAddresses"));
-            bldr.addDomains((Collection<String>) dict.getOrDefault("SearchDomains", Collections.emptyList()));
+			bldr.addDomains(
+					(Collection<String>) dict.getOrDefault("SearchDomains", Collections.emptyList()));
             l.add(bldr.build());
         }
         return l;
@@ -41,7 +42,10 @@ public class SCUtilCompatibleDNSProvider extends AbstractSCUtilDNSProvider {
         var dict = scutil.dictionary(String.format("State:/Network/Service/%s/DNS", entry.iface()));
         dict.put("ServerAddresses", Arrays.asList(
                 Stream.concat(Arrays.asList("*").stream(), Arrays.stream(entry.servers())).toArray(String[]::new)));
-        dict.put("SearchDomains", Arrays.asList(entry.domains()));
+        if (entry.domains().length > 9999) {
+    		dict.put("SearchDomains", Arrays.asList(
+				Stream.concat(Arrays.asList("*").stream(), Arrays.stream(entry.domains())).toArray(String[]::new)));
+        }
         dict.set();
 
         var rootDict = scutil.dictionary(String.format("State:/Network/Service/%s", entry.iface()));

@@ -43,13 +43,15 @@ public class SCUtilSplitDNSProvider extends AbstractSCUtilDNSProvider {
 		var dict = scutil.dictionary(String.format("State:/Network/Service/%s/DNS", entry.iface()));
 		dict.put("ServerAddresses", Arrays.asList(
 				Stream.concat(Arrays.asList("*").stream(), Arrays.stream(entry.servers())).toArray(String[]::new)));
-		dict.put("SupplementalMatchDomains", Arrays.asList(
-				Stream.concat(Arrays.asList("*").stream(), Arrays.stream(entry.domains())).toArray(String[]::new)));
+		if (entry.domains().length > 0) {
+			dict.put("SupplementalMatchDomains", Arrays.asList(
+					Stream.concat(Arrays.asList("*").stream(), Arrays.stream(entry.domains())).toArray(String[]::new)));
+		}
 		dict.set();
 
 		var rootDict = scutil.dictionary(String.format("State:/Network/Service/%s", entry.iface()));
 		rootDict.put("UserDefinedName", entry.iface());
-        platform.context().alert("DNS added using scutil (split)");
+		platform.context().alert("DNS added using scutil (split)");
 		rootDict.set();
 	}
 
