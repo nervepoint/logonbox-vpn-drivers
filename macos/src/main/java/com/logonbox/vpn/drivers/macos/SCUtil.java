@@ -100,6 +100,8 @@ public class SCUtil {
             line = line.trim();
             switch(state) {
             case OPEN_DICT:
+            	if(line.startsWith("No such key"))
+            		throw new IllegalArgumentException("No such key " + key);
                 if(!line.equals("<dictionary> {")) {
                     throw new IOException("Unexpected response.");
                 }

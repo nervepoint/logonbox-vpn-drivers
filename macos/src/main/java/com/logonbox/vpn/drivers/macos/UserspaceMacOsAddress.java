@@ -20,16 +20,6 @@
  */
 package com.logonbox.vpn.drivers.macos;
 
-import com.logonbox.vpn.drivers.lib.AbstractUnixAddress;
-import com.logonbox.vpn.drivers.lib.SystemCommands.ProcessRedirect;
-import com.logonbox.vpn.drivers.lib.util.IpUtil;
-import com.logonbox.vpn.drivers.lib.util.OsUtil;
-import com.logonbox.vpn.drivers.lib.util.Util;
-import com.sshtools.liftlib.ElevatedClosure;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
@@ -44,6 +34,16 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.logonbox.vpn.drivers.lib.AbstractUnixAddress;
+import com.logonbox.vpn.drivers.lib.SystemCommands.ProcessRedirect;
+import com.logonbox.vpn.drivers.lib.util.IpUtil;
+import com.logonbox.vpn.drivers.lib.util.OsUtil;
+import com.logonbox.vpn.drivers.lib.util.Util;
+import com.sshtools.liftlib.ElevatedClosure;
 
 import uk.co.bithatch.nativeimage.annotations.Serialization;
 

@@ -21,8 +21,13 @@ public class SCUtilCompatibleDNSProvider extends AbstractSCUtilDNSProvider {
         for (var key : scutil.list(".*/Network/Service/.*/DNS")) {
             var bldr = new DNSEntry.Builder();
             var dict = scutil.get(key);
-            var rootDict = scutil.get(key.substring(0,key.lastIndexOf('/')));
-            bldr.withInterface((String)rootDict.getOrDefault("UserDefinedName", dict.key().split("/")[3]));
+			var defIface = dict.key().split("/")[3];
+			try {
+				var rootDict = scutil.get(key.substring(0, key.lastIndexOf('/')));
+				bldr.withInterface((String) rootDict.getOrDefault("UserDefinedName", defIface));
+			} catch (IllegalArgumentException iae) {
+				bldr.withInterface(defIface);
+			}
             bldr.addServers((Collection<String>) dict.get("ServerAddresses"));
             bldr.addDomains((Collection<String>) dict.getOrDefault("SearchDomains", Collections.emptyList()));
             l.add(bldr.build());
