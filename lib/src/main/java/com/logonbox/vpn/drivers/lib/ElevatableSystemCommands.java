@@ -128,8 +128,8 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     private final class PrvilegedSystemCommands extends AbstractSystemCommands {
         private SystemCommands delegate;
 
-        PrvilegedSystemCommands(SystemCommands delegate, Map<String, String> env, Optional<Redirect> stdin, Optional<Redirect> stdout,
-                Optional<Redirect> stderr) {
+        PrvilegedSystemCommands(SystemCommands delegate, Map<String, String> env, Optional<ProcessRedirect> stdin, Optional<ProcessRedirect> stdout,
+                Optional<ProcessRedirect> stderr) {
             super(env, stdin, stdout, stderr);
             this.delegate = delegate;
         }
@@ -316,35 +316,35 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
 		}
 
         @Override
-        public SystemCommands stderr(Redirect redirect) {
+        public SystemCommands stderr(ProcessRedirect redirect) {
             delegate.stderr(redirect);
             return this;
         }
 
         @Override
-        public SystemCommands stdout(Redirect redirect) {
+        public SystemCommands stdout(ProcessRedirect redirect) {
             delegate.stdout(redirect);
             return this;
         }
 
         @Override
-        public SystemCommands stdin(Redirect redirect) {
+        public SystemCommands stdin(ProcessRedirect redirect) {
             delegate.stdin(redirect);
             return this;
         }
 
         @Override
-        public Optional<Redirect> stderr() {
+        public Optional<ProcessRedirect> stderr() {
             return delegate.stderr();
         }
 
         @Override
-        public Optional<Redirect> stdout() {
+        public Optional<ProcessRedirect> stdout() {
             return delegate.stdout();
         }
 
         @Override
-        public Optional<Redirect> stdin() {
+        public Optional<ProcessRedirect> stdin() {
             return delegate.stdin();
         }
     }
@@ -367,7 +367,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
     public static abstract class AbstractProcessClosure<RET extends Serializable, EVT extends Serializable> implements ElevatedClosure<RET,EVT> {
 
         Env env;
-        Redirect stdin, stdout, stderr;
+        ProcessRedirect stdin, stdout, stderr;
 
         protected AbstractProcessClosure() {
         }
@@ -400,9 +400,9 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             var bldr = new ProcessBuilder(args);
             if (!env.isEmpty())
                 bldr.environment().putAll(env);
-            bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr);
-            bldr.redirectOutput(stdin == null ? Redirect.INHERIT : stdin);
-            bldr.redirectInput(stdout == null ? Redirect.INHERIT : stdout);
+            bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr.toRedirect());
+            bldr.redirectOutput(stdin == null ? Redirect.INHERIT : stdin.toRedirect());
+            bldr.redirectInput(stdout == null ? Redirect.INHERIT : stdout.toRedirect());
             var process = bldr.start();
             var result = process.waitFor();
             if (result != 0) {
@@ -431,9 +431,9 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             var bldr = new ProcessBuilder(args);
             if (!env.isEmpty())
                 bldr.environment().putAll(env);
-            bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr);
-            bldr.redirectOutput(stdin == null ? Redirect.INHERIT : stdin);
-            bldr.redirectInput(stdout == null ? Redirect.INHERIT : stdout);
+            bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr.toRedirect());
+            bldr.redirectOutput(stdin == null ? Redirect.INHERIT : stdin.toRedirect());
+            bldr.redirectInput(stdout == null ? Redirect.INHERIT : stdout.toRedirect());
             var process = bldr.start();
             return process.waitFor();
         }
@@ -458,8 +458,8 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             var bldr = new ProcessBuilder(args);
             if (!env.isEmpty())
                 bldr.environment().putAll(env);
-            bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr);
-            bldr.redirectInput(stdout == null ? Redirect.INHERIT : stdout);
+            bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr.toRedirect());
+            bldr.redirectInput(stdout == null ? Redirect.INHERIT : stdout.toRedirect());
             var process = bldr.start();
             String line = null;
             var reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
@@ -497,8 +497,8 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             var bldr = new ProcessBuilder(args);
             if (!env.isEmpty())
                 bldr.environment().putAll(env);
-            bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr);
-            bldr.redirectInput(stdout == null ? Redirect.INHERIT : stdout);
+            bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr.toRedirect());
+            bldr.redirectInput(stdout == null ? Redirect.INHERIT : stdout.toRedirect());
             var process = bldr.start();
             String line = null;
             var reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
@@ -536,7 +536,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             var bldr = new ProcessBuilder(args);
             if (!env.isEmpty())
                 bldr.environment().putAll(env);
-            bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr);
+            bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr.toRedirect());
 
             var process = bldr.start();
             var output = new ArrayList<String>();
@@ -587,8 +587,8 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             var bldr = new ProcessBuilder(args);
             if (!env.isEmpty())
                 bldr.environment().putAll(env);
-            bldr.redirectError(Redirect.INHERIT);
-            bldr.redirectInput(Redirect.INHERIT);
+            bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr.toRedirect());
+            bldr.redirectInput(stdout == null ? Redirect.INHERIT : stdout.toRedirect());
             var process = bldr.start();
             var reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             String line = null;

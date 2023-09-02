@@ -13,15 +13,32 @@ import java.util.function.Consumer;
 import com.sshtools.liftlib.ElevatedClosure;
 
 public interface SystemCommands {
+    
+    public enum ProcessRedirect {
+        INHERIT, DISCARD, PIPE;
+        
+        public Redirect toRedirect() {
+            switch(this) {
+            case INHERIT:
+                return Redirect.INHERIT;
+            case DISCARD:
+                return Redirect.DISCARD;
+            case PIPE:
+                return Redirect.PIPE;
+            default:
+                throw new UnsupportedOperationException();
+            }
+        }
+    }
 
     public abstract class AbstractSystemCommands implements SystemCommands {
         private Map<String, String> env = new HashMap<>();
-        private Optional<Redirect> stdin;
-        private Optional<Redirect> stdout;
-        private Optional<Redirect> stderr;
+        private Optional<ProcessRedirect> stdin;
+        private Optional<ProcessRedirect> stdout;
+        private Optional<ProcessRedirect> stderr;
 
-        protected AbstractSystemCommands(Map<String, String> env, Optional<Redirect> stdin, Optional<Redirect> stdout,
-                Optional<Redirect> stderr) {
+        protected AbstractSystemCommands(Map<String, String> env, Optional<ProcessRedirect> stdin, Optional<ProcessRedirect> stdout,
+                Optional<ProcessRedirect> stderr) {
             this.env.putAll(env);
             this.stdin = stdin;
             this.stdout = stdout;
@@ -40,35 +57,35 @@ public interface SystemCommands {
         }
 
         @Override
-        public SystemCommands stderr(Redirect stderr) {
+        public SystemCommands stderr(ProcessRedirect stderr) {
             this.stderr = Optional.of(stderr);
             return this;
         }
 
         @Override
-        public SystemCommands stdout(Redirect stdout) {
+        public SystemCommands stdout(ProcessRedirect stdout) {
             this.stdout = Optional.of(stdout);
             return this;
         }
 
         @Override
-        public SystemCommands stdin(Redirect stdin) {
+        public SystemCommands stdin(ProcessRedirect stdin) {
             this.stdin = Optional.of(stdin);
             return this;
         }
 
         @Override
-        public Optional<Redirect> stderr() {
+        public Optional<ProcessRedirect> stderr() {
             return stderr;
         }
 
         @Override
-        public Optional<Redirect> stdout() {
+        public Optional<ProcessRedirect> stdout() {
             return stdout;
         }
 
         @Override
-        public Optional<Redirect> stdin() {
+        public Optional<ProcessRedirect> stdin() {
             return stdin;
         }
 
@@ -86,17 +103,17 @@ public interface SystemCommands {
 
     SystemCommands env(Map<String, String> env);
 
-    SystemCommands stderr(Redirect redirect);
+    SystemCommands stderr(ProcessRedirect redirect);
 
-    SystemCommands stdout(Redirect redirect);
+    SystemCommands stdout(ProcessRedirect redirect);
 
-    SystemCommands stdin(Redirect redirect);
+    SystemCommands stdin(ProcessRedirect redirect);
 
-    Optional<Redirect> stderr();
+    Optional<ProcessRedirect> stderr();
 
-    Optional<Redirect> stdout();
+    Optional<ProcessRedirect> stdout();
 
-    Optional<Redirect> stdin();
+    Optional<ProcessRedirect> stdin();
 
     void run(String... args) throws IOException;
 
