@@ -401,8 +401,8 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             if (!env.isEmpty())
                 bldr.environment().putAll(env);
             bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr.toRedirect());
-            bldr.redirectOutput(stdin == null ? Redirect.INHERIT : stdin.toRedirect());
-            bldr.redirectInput(stdout == null ? Redirect.INHERIT : stdout.toRedirect());
+            bldr.redirectInput(stdin == null ? Redirect.INHERIT : stdin.toRedirect());
+            bldr.redirectOutput(stdout == null ? Redirect.INHERIT : stdout.toRedirect());
             var process = bldr.start();
             var result = process.waitFor();
             if (result != 0) {
@@ -432,8 +432,8 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             if (!env.isEmpty())
                 bldr.environment().putAll(env);
             bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr.toRedirect());
-            bldr.redirectOutput(stdin == null ? Redirect.INHERIT : stdin.toRedirect());
-            bldr.redirectInput(stdout == null ? Redirect.INHERIT : stdout.toRedirect());
+            bldr.redirectInput(stdin == null ? Redirect.INHERIT : stdin.toRedirect());
+            bldr.redirectOutput(stdout == null ? Redirect.INHERIT : stdout.toRedirect());
             var process = bldr.start();
             return process.waitFor();
         }
@@ -459,7 +459,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             if (!env.isEmpty())
                 bldr.environment().putAll(env);
             bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr.toRedirect());
-            bldr.redirectInput(stdout == null ? Redirect.INHERIT : stdout.toRedirect());
+            bldr.redirectInput(stdin == null ? Redirect.INHERIT : stdin.toRedirect());
             var process = bldr.start();
             String line = null;
             var reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
@@ -498,7 +498,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             if (!env.isEmpty())
                 bldr.environment().putAll(env);
             bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr.toRedirect());
-            bldr.redirectInput(stdout == null ? Redirect.INHERIT : stdout.toRedirect());
+            bldr.redirectInput(stdin == null ? Redirect.INHERIT : stdin.toRedirect());
             var process = bldr.start();
             String line = null;
             var reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
@@ -588,7 +588,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             if (!env.isEmpty())
                 bldr.environment().putAll(env);
             bldr.redirectError(stderr == null ? Redirect.INHERIT : stderr.toRedirect());
-            bldr.redirectInput(stdout == null ? Redirect.INHERIT : stdout.toRedirect());
+            bldr.redirectInput(stdin == null ? Redirect.INHERIT : stdin.toRedirect());
             var process = bldr.start();
             var reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             String line = null;
