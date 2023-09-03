@@ -13,6 +13,10 @@ import com.logonbox.vpn.drivers.lib.util.IpUtil;
 import uk.co.bithatch.nativeimage.annotations.Serialization;
 
 public interface DNSProvider {
+    
+    public enum Mode {
+        AUTO, SPLIT, OVERRIDE
+    }
 
     public interface Factory {
         <P extends DNSProvider> Class<P>[] available();
