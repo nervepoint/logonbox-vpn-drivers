@@ -137,7 +137,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         @Override
         public int result(String... args) throws IOException {
             try {
-                return elevator.call(new WithResult(this, args));
+                return elevator.closure(new WithResult(this, args));
             } catch (IOException | RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
@@ -148,7 +148,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         @Override
         public Collection<String> output(String... args) throws IOException {
             try {
-                return Arrays.asList(elevator.call(new Output(this, args)));
+                return Arrays.asList(elevator.closure(new Output(this, args)));
             } catch (IOException | RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
@@ -159,7 +159,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         @Override
         public Collection<String> silentOutput(String... args) {
             try {
-                return Arrays.asList(elevator.call(new SilentOutput(this, args)));
+                return Arrays.asList(elevator.closure(new SilentOutput(this, args)));
             } catch (RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
@@ -170,7 +170,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         @Override
         public void run(String... args) throws IOException {
             try {
-                elevator.call(new BasicRun(this, args));
+                elevator.closure(new BasicRun(this, args));
             } catch (IOException | RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
@@ -186,7 +186,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         @Override
         public Collection<String> pipeTo(String content, String... args) throws IOException {
             try {
-                return Arrays.asList(elevator.call(new PipeTo(this, content, args)));
+                return Arrays.asList(elevator.closure(new PipeTo(this, content, args)));
             } catch (IOException | RuntimeException e) {
                 e.printStackTrace();
                 throw e;
@@ -203,7 +203,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         @Override
         public int consume(Consumer<String> consumer, String... args) throws IOException {
             try {
-                return elevator.call(new WithConsume(this, consumer, args));
+                return elevator.closure(new WithConsume(this, consumer, args));
             } catch (IOException | RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
@@ -224,7 +224,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         @Override
         public <R extends Serializable> R task(ElevatedClosure<R, Serializable> task) throws Exception {
             try {
-                return elevator.call(task);
+                return elevator.closure(task);
             } catch(UncheckedIOException uioe) {
             	throw uioe.getCause();
             } catch (IOException | RuntimeException e) {

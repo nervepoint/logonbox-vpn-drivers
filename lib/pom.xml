@@ -32,11 +32,6 @@
     <artifactId>logonbox-vpn-lib</artifactId>
     <name>LogonBox VPN Drivers - Library</name>
     <dependencies>
-        <!--<dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-lang3</artifactId>
-            <version>3.12.0</version>
-        </dependency>-->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
@@ -50,18 +45,13 @@
         <dependency>
             <groupId>com.sshtools</groupId>
             <artifactId>liftlib</artifactId>
-            <version>0.0.3-SNAPSHOT</version>
+            <version>0.9.0</version>
         </dependency> 
         <dependency>
             <groupId>com.sshtools</groupId>
             <artifactId>jini</artifactId>
-            <version>0.2.0-SNAPSHOT</version>
+            <version>0.2.0</version>
         </dependency>
-        <!--<dependency>
-            <groupId>com.sshtools</groupId>
-            <artifactId>forker-client</artifactId>
-            <version>1.8-SNAPSHOT</version>
-        </dependency>-->
     </dependencies>
    
     <repositories>
