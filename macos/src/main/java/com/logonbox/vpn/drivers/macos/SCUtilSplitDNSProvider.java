@@ -53,6 +53,8 @@ public class SCUtilSplitDNSProvider extends AbstractSCUtilDNSProvider {
 		rootDict.put("UserDefinedName", entry.iface());
 		platform.context().alert("DNS added using scutil (split)");
 		rootDict.set();
+		resetCache();
+        
 	}
 
 	@Override
@@ -61,6 +63,7 @@ public class SCUtilSplitDNSProvider extends AbstractSCUtilDNSProvider {
 		scutil.remove(String.format("State:/Network/Service/%s/DNS", entry.iface()));
 		scutil.remove(String.format("State:/Network/Service/%s", entry.iface()));
 		platform.context().alert("DNS removed using scutil (split)");
+		resetCache();
 	}
 
 }

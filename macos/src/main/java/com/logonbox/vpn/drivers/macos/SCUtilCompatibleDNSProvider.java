@@ -13,6 +13,9 @@ import java.util.stream.Stream;
 
 public class SCUtilCompatibleDNSProvider extends AbstractSCUtilDNSProvider {
     final static Logger LOG = LoggerFactory.getLogger(SCUtilCompatibleDNSProvider.class);
+    final static String DNS_CONFIGURATION_FLAGS_KEY	= "__FLAGS__";
+    final static String DNS_CONFIGURATION_IF_INDEX_KEY = "__IF_INDEX__";
+    final static String DNS_CONFIGURATION_ORDER_KEY = "__ORDER__";
 
     @SuppressWarnings("unchecked")
     @Override
@@ -46,13 +49,17 @@ public class SCUtilCompatibleDNSProvider extends AbstractSCUtilDNSProvider {
     		dict.put("SearchDomains", Arrays.asList(
 				Stream.concat(Arrays.asList("*").stream(), Arrays.stream(entry.domains())).toArray(String[]::new)));
         }
+        dict.put("InterfaceName", entry.iface());
+        dict.put(DNS_CONFIGURATION_ORDER_KEY, "1");
+        dict.put(DNS_CONFIGURATION_FLAGS_KEY, "2");
         dict.set();
 
         var rootDict = scutil.dictionary(String.format("State:/Network/Service/%s", entry.iface()));
         rootDict.put("UserDefinedName", entry.iface());
+        rootDict.put("PrimaryRanked", "scoped");
         rootDict.set();
         platform.context().alert("DNS added using scutil (compatible)");
-        
+		resetCache();
     }
 
     @Override
@@ -61,6 +68,7 @@ public class SCUtilCompatibleDNSProvider extends AbstractSCUtilDNSProvider {
         scutil.remove(String.format("State:/Network/Service/%s/DNS", entry.iface()));
         scutil.remove(String.format("State:/Network/Service/%s", entry.iface()));
         platform.context().alert("DNS removed using scutil (compatible)");
+		resetCache();
     }
 
 }

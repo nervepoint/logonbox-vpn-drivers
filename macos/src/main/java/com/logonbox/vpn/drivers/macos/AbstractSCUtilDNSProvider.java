@@ -49,4 +49,8 @@ public abstract class AbstractSCUtilDNSProvider implements DNSProvider {
         return l;
     }
 
+	protected void resetCache() throws IOException {
+		platform.context().commands().privileged().logged().result("dscacheutil", "-flushcache");
+        platform.context().commands().privileged().logged().result("killall", "-HUP", "mDNSResponder");
+	}
 }
