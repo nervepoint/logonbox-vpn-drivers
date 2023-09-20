@@ -43,6 +43,7 @@
         <module>windows</module>
         <module>macos</module>
         <module>tools</module>
+        <module>dll</module>
     </modules>
     <developers>
         <developer>

@@ -15,7 +15,7 @@ import uk.co.bithatch.nativeimage.annotations.Serialization;
 public interface DNSProvider {
     
     public enum Mode {
-        AUTO, SPLIT, OVERRIDE
+        AUTO, PREFER_SPLIT, PREFER_OVERRIDE, REQUIRE_SPLIT, REQUIRE_OVERRIDE
     }
 
     public interface Factory {

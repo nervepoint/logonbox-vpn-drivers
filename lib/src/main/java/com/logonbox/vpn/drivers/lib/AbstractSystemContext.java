@@ -11,12 +11,12 @@ public abstract class AbstractSystemContext implements SystemContext {
     }
 
     @Override
-    public SystemCommands commands() {
+    public final SystemCommands commands() {
         return commands;
     }
 
     @Override
-    public NativeComponents nativeComponents() {
+    public final NativeComponents nativeComponents() {
         return nativeComponents;
     }
 
