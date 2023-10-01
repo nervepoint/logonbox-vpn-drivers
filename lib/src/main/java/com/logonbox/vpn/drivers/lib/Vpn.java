@@ -3,6 +3,7 @@ package com.logonbox.vpn.drivers.lib;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.Reader;
+import java.io.StringReader;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.text.MessageFormat;
@@ -52,6 +53,10 @@ public final class Vpn implements Closeable {
         
         public Builder withVpnConfiguration(Reader vpnConfiguration) throws IOException, ParseException {
             return withVpnConfiguration(new VpnConfiguration.Builder().fromFileContent(vpnConfiguration).build());
+        }
+        
+        public Builder withVpnConfiguration(String content) throws IOException, ParseException {
+            return withVpnConfiguration(new StringReader(content));
         }
         
         public Builder withSystemConfiguration(SystemConfiguration systemConfiguration) {
