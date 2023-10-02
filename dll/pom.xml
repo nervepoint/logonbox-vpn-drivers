@@ -40,13 +40,15 @@ ACTION
 		<version>0.0.1-SNAPSHOT</version>
 	</parent>
 	<artifactId>logonbox-vpn-dll</artifactId>
-	<name>LogonBox VPN Drivers - DLL</name>
+	<name>LogonBox VPN Drivers - Shared Library</name>
 	<packaging>jar</packaging>
 	<properties>
 		<graalvm.version>0.9.25</graalvm.version>
 		<graalvm.pgo></graalvm.pgo>
 		<graalvm.compatibility></graalvm.compatibility>
 		<graalvm.gc></graalvm.gc>
+		<graalvm.firstArgs></graalvm.firstArgs>
+		<graalvm.libName>liblbv</graalvm.libName>
 		<!-- Commented out quick build mode - has less optiisations, smaller
 		size, lower throuput -->
 		<!--<graalvm.pgo>-Ob</graalvm.pgo>-->
@@ -105,6 +107,9 @@ ACTION
 					<family>windows</family>
 				</os>
 			</activation>
+			<properties>
+				<graalvm.firstArgs>-H:+UnlockExperimentalVMOptions</graalvm.firstArgs>
+			</properties>
 			<dependencies>
 				<dependency>
 					<groupId>com.logonbox</groupId>
@@ -193,13 +198,13 @@ ACTION
                                 </goals>
                                 <phase>package</phase>
                                 <configuration>
-                                    <imageName>lbvdll</imageName>
+                                    <imageName>${graalvm.libName}</imageName>
                                     <buildArgs>
-                                        -H:+UnlockExperimentalVMOptions
+										${graalvm.firstArgs}                                        
                                         --report-unsupported-elements-at-runtime
                                         -R:MaxHeapSize=64m
                                         --shared
-                                        -H:Name=lbvdll
+                                        -H:Name=${graalvm.libName}
                                         ${graalvm.pgo} ${graalvm.compatibility} ${graalvm.gc}
                                     </buildArgs>
                                      <metadataRepository>

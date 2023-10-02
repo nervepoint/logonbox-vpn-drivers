@@ -123,11 +123,13 @@ public final class Vpn implements Closeable {
             platformService = PlatformService.create(builder.systemContext.orElseGet(() -> new VpnSystemContext(builder.onAlert, builder.systemConfiguration)));
         }
         
-        try {
-			adapter = platformService.getByPublicKey(cfg.publicKey());
-		} catch (IOException e) {
-			throw new UncheckedIOException(e);
-		}
+		adapter = peer.map(p -> {
+			try {
+				return platformService.getByPublicKey(p.publicKey());
+			} catch (IOException e) {
+				throw new UncheckedIOException(e);
+			}
+		}).orElse(Optional.empty());
     }
     
     public boolean started() {

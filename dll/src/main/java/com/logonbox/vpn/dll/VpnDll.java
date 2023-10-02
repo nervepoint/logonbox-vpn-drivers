@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Pattern;
 
 import org.graalvm.nativeimage.IsolateThread;
 import org.graalvm.nativeimage.c.function.CEntryPoint;
@@ -62,7 +63,7 @@ public class VpnDll {
 
 	public enum Error {
 		NO_SUCH_VPN_INSTANCE, NO_SUCH_CONFIGURATION, NO_SUCH_CONTEXT, FAILED_TO_FIND_CONFIGURATION, FAILED_TO_LOAD_CONFIGURATION,
-		FAILED_TO_PARSE_CONFIGURATION, FAILED_TO_CLOSE;
+		FAILED_TO_PARSE_CONFIGURATION, FAILED_TO_CLOSE, FAILED_TO_OPEN;
 
 		public String toErrorString() {
 			switch (this) {
@@ -373,11 +374,17 @@ public class VpnDll {
 		}
 
 		var vpn = bldr.build();
-		var id = vpnId.getAndIncrement();
-		vpns.put(id, vpn);
-		active.put(configurationFileOrInterfaceString, id);
-		error = null;
-		return id;
+		try {
+			vpn.open();
+			var id = vpnId.getAndIncrement();
+			vpns.put(id, vpn);
+			active.put(configurationFileOrInterfaceString, id);
+			error = null;
+			return id;
+		} catch (IOException e) {
+			error = Error.FAILED_TO_OPEN;
+			return 0;
+		}
 	}
 	
 	@CEntryPoint(name = "down")
@@ -447,7 +454,8 @@ public class VpnDll {
 			bldr.withSystemContext(ctx);
 		}
 
-		if(configurationFileOrContentOrIface.matches(".*\\[Interface\\].*")) {
+    	var pattern  = Pattern.compile(".*\\[Interface\\].*", Pattern.DOTALL);
+		if(pattern.matcher(configurationFileOrContentOrIface).matches()) {
 		    try {
                 bldr.withVpnConfiguration(configurationFileOrContentOrIface);
             } catch (ParseException e) {

@@ -51,7 +51,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         } catch (IOException | RuntimeException e) {
             throw e;
         }  catch (Exception e) {
-            throw new IOException("Failed to run command.", e);
+            throw new IOException("Failed to run command. "  + e.getMessage(), e);
         }
     }
 
@@ -62,7 +62,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         } catch (IOException | RuntimeException e) {
             throw e;
         }  catch (Exception e) {
-            throw new IOException("Failed to run command.", e);
+            throw new IOException("Failed to run command. "  + e.getMessage(), e);
         }
     }
 
@@ -73,7 +73,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         } catch (RuntimeException e) {
             throw e;
         }  catch (Exception e) {
-            throw new UncheckedIOException(new IOException("Failed to run command.", e));
+            throw new UncheckedIOException(new IOException("Failed to run command. " + e.getMessage(), e));
         }
     }
 
@@ -84,7 +84,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         } catch (IOException | RuntimeException e) {
             throw e;
         }  catch (Exception e) {
-            throw new IOException("Failed to run command.", e);
+            throw new IOException("Failed to run command."  + e.getMessage(), e);
         }
     }
 
@@ -95,7 +95,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         } catch (IOException | RuntimeException e) {
             throw e;
         }  catch (Exception e) {
-            throw new IOException("Failed to run command.", e);
+            throw new IOException("Failed to run command."  + e.getMessage(), e);
         }
     }
 
@@ -106,7 +106,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
         } catch (IOException | RuntimeException e) {
             throw e;
         }  catch (Exception e) {
-            throw new IOException("Failed to run command.", e);
+            throw new IOException("Failed to run command. "  + e.getMessage(), e);
         }
     }
 
@@ -141,7 +141,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             } catch (IOException | RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
-                throw new IOException("Failed to run command.", e);
+                throw new IOException("Failed to run command. "  + e.getMessage(), e);
             }
         }
 
@@ -152,7 +152,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             } catch (IOException | RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
-                throw new IOException("Failed to run command.", e);
+                throw new IOException("Failed to run command. "  + e.getMessage(), e);
             }
         }
 
@@ -163,7 +163,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             } catch (RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
-                throw new UncheckedIOException(new IOException("Failed to run command.", e));
+                throw new UncheckedIOException(new IOException("Failed to run command. "  + e.getMessage() , e));
             }
         }
 
@@ -174,7 +174,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             } catch (IOException | RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
-                throw new IOException("Failed to run command.", e);
+                throw new IOException("Failed to run command. "  + e.getMessage(), e);
             }
         }
 
@@ -191,7 +191,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
                 e.printStackTrace();
                 throw e;
             }  catch (Exception e) {
-                throw new IOException("Failed to run command.", e);
+                throw new IOException("Failed to run command. "  + e.getMessage(), e);
             }
         }
 
@@ -207,7 +207,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             } catch (IOException | RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
-                throw new IOException("Failed to run command.", e);
+                throw new IOException("Failed to run command. "  + e.getMessage(), e);
             }
         }
 
@@ -230,7 +230,7 @@ public class ElevatableSystemCommands extends SystemCommands.AbstractSystemComma
             } catch (IOException | RuntimeException e) {
                 throw e;
             }  catch (Exception e) {
-                throw new IOException("Failed to run task.", e);
+                throw new IOException("Failed to run task. "  + e.getMessage(), e);
             }
         }
     }
