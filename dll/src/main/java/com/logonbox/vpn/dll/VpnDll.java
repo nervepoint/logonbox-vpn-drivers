@@ -363,11 +363,9 @@ public class VpnDll {
 	static long up(IsolateThread thread, CCharPointer configurationFileOrInterface, long systemconfHandle,
 			long contextHandle) {
 		var configurationFileOrInterfaceString = CTypeConversion.toJavaString(configurationFileOrInterface);
-		var configFile = Paths.get(configurationFileOrInterfaceString);
-
 		var bldr = new Vpn.Builder();
 		try {
-			buildVpn(bldr, configFile, systemconfHandle, contextHandle);
+			buildVpn(bldr, configurationFileOrInterfaceString, systemconfHandle, contextHandle);
 		}
 		catch(ErrorException ee) {
 			error = ee.error;
@@ -407,15 +405,14 @@ public class VpnDll {
 	@CEntryPoint(name = "stop")
 	static boolean stop(IsolateThread thread, CCharPointer configurationFileOrInterface, long systemconfHandle,
 			long contextHandle) {
-		var configurationFileOrInterfaceString = CTypeConversion.toJavaString(configurationFileOrInterface);
-		if(active.containsKey(configurationFileOrInterfaceString)) {
-			return down(thread, active.get(configurationFileOrInterfaceString));
+		var configurationFileOrContentOrIface = CTypeConversion.toJavaString(configurationFileOrInterface);
+		if(active.containsKey(configurationFileOrContentOrIface)) {
+			return down(thread, active.get(configurationFileOrContentOrIface));
 		}
 
-		var configFile = Paths.get(configurationFileOrInterfaceString);
 		var bldr = new Vpn.Builder();
 		try {
-			buildVpn(bldr, configFile, systemconfHandle, contextHandle);
+			buildVpn(bldr, configurationFileOrContentOrIface, systemconfHandle, contextHandle);
 		}
 		catch(ErrorException ee) {
 			error = ee.error;
@@ -433,7 +430,7 @@ public class VpnDll {
 		return true;
 	}
 	
-	private static void buildVpn(Vpn.Builder bldr, Path configFile, long systemconfHandle, long contextHandle) throws ErrorException {
+	private static void buildVpn(Vpn.Builder bldr, String configurationFileOrContentOrIface, long systemconfHandle, long contextHandle) throws ErrorException {
 		if (systemconfHandle > 0) {
 			var cfg = configuration.get(systemconfHandle);
 			if (cfg == null) {
@@ -450,26 +447,38 @@ public class VpnDll {
 			bldr.withSystemContext(ctx);
 		}
 
-		Path file;
-		if (Files.exists(configFile)) {
-			bldr.withInterfaceName(toInterfaceName(configFile));
-			file = configFile;
-		} else {
-			var iface = configFile.toString();
-			bldr.withInterfaceName(iface);
-			try {
-				file = findConfig(iface);
-			} catch (IOException e) {
-				throw new ErrorException(Error.FAILED_TO_FIND_CONFIGURATION);
-			}
+		if(configurationFileOrContentOrIface.matches(".*\\[Interface\\].*")) {
+		    try {
+                bldr.withVpnConfiguration(configurationFileOrContentOrIface);
+            } catch (ParseException e) {
+                throw new ErrorException(Error.FAILED_TO_PARSE_CONFIGURATION);
+            } catch (IOException e) {
+                throw new ErrorException(Error.FAILED_TO_LOAD_CONFIGURATION);
+            }
 		}
-
-		try {
-			bldr.withVpnConfiguration(file);
-		} catch (ParseException e) {
-			throw new ErrorException(Error.FAILED_TO_PARSE_CONFIGURATION);
-		} catch (IOException e) {
-			throw new ErrorException(Error.FAILED_TO_LOAD_CONFIGURATION);
+		else {
+		    var configFile = Paths.get(configurationFileOrContentOrIface);
+    		Path file;
+    		if (Files.exists(configFile)) {
+    			bldr.withInterfaceName(toInterfaceName(configFile));
+    			file = configFile;
+    		} else {
+    			var iface = configFile.toString();
+    			bldr.withInterfaceName(iface);
+    			try {
+    				file = findConfig(iface);
+    			} catch (IOException e) {
+    				throw new ErrorException(Error.FAILED_TO_FIND_CONFIGURATION);
+    			}
+    		}
+    
+    		try {
+    			bldr.withVpnConfiguration(file);
+    		} catch (ParseException e) {
+    			throw new ErrorException(Error.FAILED_TO_PARSE_CONFIGURATION);
+    		} catch (IOException e) {
+    			throw new ErrorException(Error.FAILED_TO_LOAD_CONFIGURATION);
+    		}
 		}
 	}
 
