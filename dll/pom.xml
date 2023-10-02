@@ -195,6 +195,7 @@ ACTION
                                 <configuration>
                                     <imageName>lbvdll</imageName>
                                     <buildArgs>
+                                        -H:+UnlockExperimentalVMOptions
                                         --report-unsupported-elements-at-runtime
                                         -R:MaxHeapSize=64m
                                         --shared

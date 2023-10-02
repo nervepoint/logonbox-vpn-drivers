@@ -168,8 +168,7 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
 
 	protected boolean exists(String name, Iterable<I> links) {
 		try {
-			find(name, links);
-			return true;
+			return find(name, links).isPresent();
 		} catch (IllegalArgumentException iae) {
 			return false;
 		}
