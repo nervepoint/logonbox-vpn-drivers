@@ -22,6 +22,7 @@ package com.logonbox.vpn.drivers.windows;
 
 import com.logonbox.vpn.drivers.lib.AbstractVirtualInetAddress;
 import com.logonbox.vpn.drivers.lib.SystemCommands;
+import com.logonbox.vpn.drivers.lib.SystemCommands.ProcessRedirect;
 import com.sshtools.liftlib.ElevatedClosure;
 
 import org.slf4j.Logger;
@@ -114,7 +115,7 @@ public class WindowsAddress extends AbstractVirtualInetAddress<WindowsPlatformSe
 					tmtu -= 80;
 				}
 
-				commands.privileged().logged().result("netsh", "interface", "ipv4", "set", "subinterface", nativeName(),
+				commands.privileged().logged().stdout(ProcessRedirect.DISCARD).result("netsh", "interface", "ipv4", "set", "subinterface", nativeName(),
 						"mtu=" + String.valueOf(tmtu), "store=persistent");
 			} catch (IOException e) {
 				throw e;

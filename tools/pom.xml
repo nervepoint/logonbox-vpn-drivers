@@ -46,9 +46,8 @@ ACTION
         <graalvm.version>0.9.27</graalvm.version>
         <graalvm.pgo></graalvm.pgo>
         <graalvm.compatibility></graalvm.compatibility>
-        <graalvm.gc></graalvm.gc>
-		<graalvm.firstArgs>--native-image-info</graalvm.firstArgs>
-		<graalvm.march></graalvm.march>
+		<graalvm.firstArgs>-H:+UnlockExperimentalVMOptions</graalvm.firstArgs>
+		<graalvm.march>-march=compatibility</graalvm.march>
         <!-- Commented out quick build mode - has less optiisations, smaller
 		size, lower throuput -->
         <!--<graalvm.pgo>-Ob</graalvm.pgo>-->
@@ -112,7 +111,7 @@ ACTION
                 </os>
             </activation>
             <properties>
-				<graalvm.firstArgs>--native-image-info -H:+UnlockExperimentalVMOptions -H:+AddAllCharsets</graalvm.firstArgs>
+				<graalvm.firstArgs>-H:+UnlockExperimentalVMOptions -H:+AddAllCharsets</graalvm.firstArgs>
 			</properties>
             <dependencies>
                 <dependency>
@@ -177,12 +176,6 @@ ACTION
             </properties>
         </profile>
         <profile>
-            <id>compatibility</id>
-            <properties>
-                <graalvm.march>-march=compatibility</graalvm.march>
-            </properties>
-        </profile>
-        <profile>
             <id>native-image</id>
 
             <build>
@@ -202,10 +195,14 @@ ACTION
                                     <mainClass>com.logonbox.vpn.quick.Lbv</mainClass>
                                     <imageName>lbv</imageName>
                                     <buildArgs>
-										<buildArg>${graalvm.firstArgs} </buildArg>
+										<buildArg>${graalvm.firstArgs}</buildArg>
+										<buildArg>-H:Log=registerResource:verbose</buildArg>
                                         <buildArg>--report-unsupported-elements-at-runtime</buildArg>
                                         <buildArg>-R:MaxHeapSize=64m</buildArg>
-                                        <buildArg>${graalvm.pgo} ${graalvm.march} ${graalvm.gc} </buildArg>
+										<buildArg>${graalvm.march}</buildArg>
+                                        
+                                        <!--TODO This should not be necessary! For some reason native-image-annotations is not working for these -->
+                                        <buildArg>-H:IncludeResources=win32.*</buildArg>
                                     </buildArgs>
                                      <metadataRepository>
                                         <enabled>true</enabled>
@@ -213,7 +210,7 @@ ACTION
                                 </configuration>
                             </execution>
                             <execution>
-                                <id>lbvquick</id>
+                                <id>lbv-quick</id>
                                 <goals>
                                     <goal>compile-no-fork</goal>
                                 </goals>
@@ -222,10 +219,14 @@ ACTION
                                     <mainClass>com.logonbox.vpn.quick.LbvQuick</mainClass>
                                     <imageName>lbv-quick</imageName>
                                     <buildArgs>
-										${graalvm.firstArgs}
-                                        --report-unsupported-elements-at-runtime
-                                        -R:MaxHeapSize=64m
-                                        ${graalvm.pgo} ${graalvm.march} ${graalvm.gc}
+										<buildArg>${graalvm.firstArgs}</buildArg>
+										<buildArg>-H:Log=registerResource:verbose</buildArg>
+                                        <buildArg>--report-unsupported-elements-at-runtime</buildArg>
+                                        <buildArg>-R:MaxHeapSize=64m</buildArg>
+										<buildArg>${graalvm.march}</buildArg>
+                                        
+                                        <!--TODO This should not be necessary! For some reason native-image-annotations is not working for these -->
+                                        <buildArg>-H:IncludeResources=win32.*</buildArg>
                                     </buildArgs>
                                      <metadataRepository>
                                         <enabled>true</enabled>

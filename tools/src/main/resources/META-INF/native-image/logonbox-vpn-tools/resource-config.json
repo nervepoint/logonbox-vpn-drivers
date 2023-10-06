@@ -38,10 +38,7 @@
 				"pattern": "\\Qsimplelogger.properties\\E"
 			},
 		      {
-				"pattern": "win32-x84-64/.*"
-			},
-			{
-				"pattern": "win32-x84-64/.*"
+				"pattern": "\\Qwin32-x84-64/network-configuration-service.exe\\E"
 			}
 		]
 	},
