@@ -5,7 +5,7 @@ import com.logonbox.vpn.drivers.lib.DNSProvider;
 import java.util.Optional;
 
 /**
- * Decides which DNS intergration to use on Windows. Currently only NetSH (the netsh command) is supported. 
+ * Decides which DNS integration to use on Windows. Currently only NetSH (the netsh command) is supported. 
  */
 public class WindowsDNSProviderFactory implements DNSProvider.Factory {
 

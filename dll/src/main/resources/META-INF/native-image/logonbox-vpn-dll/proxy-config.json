@@ -1,0 +1,32 @@
+[
+	{
+		"interfaces": [
+			"org.freedesktop.dbus.interfaces.DBus"
+		]
+	},
+	{
+		"interfaces": [
+			"org.freedesktop.dbus.interfaces.Properties"
+		]
+	},
+	{
+		"interfaces": [
+			"com.logonbox.vpn.drivers.windows.WindowsSystemServices$XAdvapi32"
+		]
+	},
+	{
+		"interfaces": [
+			"com.logonbox.vpn.drivers.windows.WireguardLibrary"
+		]
+	},
+	{
+		"interfaces": [
+			"com.sun.jna.platform.win32.Advapi32"
+		]
+	},
+	{
+		"interfaces": [
+			"com.sun.jna.platform.win32.Kernel32"
+		]
+	}
+]

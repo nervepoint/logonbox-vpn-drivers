@@ -2,6 +2,7 @@ package com.logonbox.vpn.drivers.windows;
 
 import com.logonbox.vpn.drivers.lib.DNSProvider;
 import com.logonbox.vpn.drivers.lib.PlatformService;
+import com.logonbox.vpn.drivers.lib.SystemCommands.ProcessRedirect;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
 import com.logonbox.vpn.drivers.lib.util.Util;
 import com.sshtools.liftlib.ElevatedClosure;
@@ -85,14 +86,14 @@ public class NetSHDNSProvider implements DNSProvider {
                     dnsAddresses.length, dnsAddresses.length - 2);
         }
 
-        commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv4",
+        commands.privileged().logged().stdout(ProcessRedirect.DISCARD).result(OsUtil.debugCommandArgs("netsh", "interface", "ipv4",
                 "delete", "dnsservers", name, "all"));
         if (dnsAddresses.length > 0) {
-            commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv4",
+            commands.privileged().logged().stdout(ProcessRedirect.DISCARD).result(OsUtil.debugCommandArgs("netsh", "interface", "ipv4",
                     "add", "dnsserver", name, dnsAddresses[0], "index=1", "no"));
         }
         if (dnsAddresses.length > 1) {
-            commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv4",
+            commands.privileged().logged().stdout(ProcessRedirect.DISCARD).result(OsUtil.debugCommandArgs("netsh", "interface", "ipv4",
                     "add", "dnsserver", name, dnsAddresses[1], "index=2", "no"));
         }
 
@@ -104,14 +105,14 @@ public class NetSHDNSProvider implements DNSProvider {
                     dnsAddresses.length, dnsAddresses.length - 2);
         }
 
-        commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv6",
+        commands.privileged().logged().stdout(ProcessRedirect.DISCARD).result(OsUtil.debugCommandArgs("netsh", "interface", "ipv6",
                 "delete", "dnsservers", name, "all"));
         if (dnsAddresses.length > 0) {
-            commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv6",
+            commands.privileged().logged().stdout(ProcessRedirect.DISCARD).result(OsUtil.debugCommandArgs("netsh", "interface", "ipv6",
                     "add", "dnsserver", name, dnsAddresses[0], "index=1", "no"));
         }
         if (dnsAddresses.length > 1) {
-            commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv6",
+            commands.privileged().logged().stdout(ProcessRedirect.DISCARD).result(OsUtil.debugCommandArgs("netsh", "interface", "ipv6",
                     "add", "dnsserver", name, dnsAddresses[1], "index=2", "no"));
         }
 
@@ -135,11 +136,11 @@ public class NetSHDNSProvider implements DNSProvider {
         var name = entry.iface();
         
         /* Ipv4 */
-        commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv4",
+        commands.privileged().logged().stdout(ProcessRedirect.DISCARD).result(OsUtil.debugCommandArgs("netsh", "interface", "ipv4",
                 "delete", "dnsservers", name, "all"));
 
         /* Ipv6 */
-        commands.privileged().logged().result(OsUtil.debugCommandArgs("netsh", "interface", "ipv6",
+        commands.privileged().logged().stdout(ProcessRedirect.DISCARD).result(OsUtil.debugCommandArgs("netsh", "interface", "ipv6",
                 "delete", "dnsservers", name, "all"));
         
         try {

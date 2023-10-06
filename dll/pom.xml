@@ -107,8 +107,9 @@ ACTION
 					<family>windows</family>
 				</os>
 			</activation>
-			<properties>
-				<graalvm.firstArgs>-H:+UnlockExperimentalVMOptions</graalvm.firstArgs>
+			<properties>				
+				<graalvm.libName>lbv</graalvm.libName>
+				<graalvm.firstArgs>-H:+UnlockExperimentalVMOptions -H:+AddAllCharsets</graalvm.firstArgs>
 			</properties>
 			<dependencies>
 				<dependency>
@@ -205,7 +206,7 @@ ACTION
                                         -R:MaxHeapSize=64m
                                         --shared
                                         -H:Name=${graalvm.libName}
-                                        ${graalvm.pgo} ${graalvm.compatibility} ${graalvm.gc}
+                                        ${graalvm.pgo} ${graalvm.march} ${graalvm.gc}
                                     </buildArgs>
                                      <metadataRepository>
                                         <enabled>true</enabled>

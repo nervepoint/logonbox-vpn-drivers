@@ -47,6 +47,7 @@ ACTION
         <graalvm.pgo></graalvm.pgo>
         <graalvm.compatibility></graalvm.compatibility>
         <graalvm.gc></graalvm.gc>
+		<graalvm.firstArgs></graalvm.firstArgs>
         <!-- Commented out quick build mode - has less optiisations, smaller
 		size, lower throuput -->
         <!--<graalvm.pgo>-Ob</graalvm.pgo>-->
@@ -109,6 +110,9 @@ ACTION
                     <family>windows</family>
                 </os>
             </activation>
+            <properties>
+				<graalvm.firstArgs>--native-image-info -H:+UnlockExperimentalVMOptions -H:+AddAllCharsets</graalvm.firstArgs>
+			</properties>
             <dependencies>
                 <dependency>
                     <groupId>com.logonbox</groupId>
@@ -200,9 +204,10 @@ ACTION
                                     <mainClass>com.logonbox.vpn.quick.Lbv</mainClass>
                                     <imageName>lbv</imageName>
                                     <buildArgs>
+										${graalvm.firstArgs}
                                         --report-unsupported-elements-at-runtime
                                         -R:MaxHeapSize=64m
-                                        ${graalvm.pgo} ${graalvm.compatibility} ${graalvm.gc}
+                                        ${graalvm.pgo} ${graalvm.march} ${graalvm.gc}
                                     </buildArgs>
                                      <metadataRepository>
                                         <enabled>true</enabled>
@@ -219,9 +224,10 @@ ACTION
                                     <mainClass>com.logonbox.vpn.quick.LbvQuick</mainClass>
                                     <imageName>lbv-quick</imageName>
                                     <buildArgs>
+										${graalvm.firstArgs}
                                         --report-unsupported-elements-at-runtime
                                         -R:MaxHeapSize=64m
-                                        ${graalvm.pgo} ${graalvm.compatibility} ${graalvm.gc}
+                                        ${graalvm.pgo} ${graalvm.march} ${graalvm.gc}
                                     </buildArgs>
                                      <metadataRepository>
                                         <enabled>true</enabled>
