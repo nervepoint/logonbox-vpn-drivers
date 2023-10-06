@@ -43,11 +43,12 @@ ACTION
     <name>LogonBox VPN Drivers - Example Utility</name>
     <packaging>jar</packaging>
     <properties>
-        <graalvm.version>0.9.25</graalvm.version>
+        <graalvm.version>0.9.27</graalvm.version>
         <graalvm.pgo></graalvm.pgo>
         <graalvm.compatibility></graalvm.compatibility>
         <graalvm.gc></graalvm.gc>
-		<graalvm.firstArgs></graalvm.firstArgs>
+		<graalvm.firstArgs>--native-image-info</graalvm.firstArgs>
+		<graalvm.march></graalvm.march>
         <!-- Commented out quick build mode - has less optiisations, smaller
 		size, lower throuput -->
         <!--<graalvm.pgo>-Ob</graalvm.pgo>-->
@@ -128,9 +129,6 @@ ACTION
                     <family>linux</family>
                 </os>
             </activation>
-            <properties>
-				<graalvm.gc>--gc=G1</graalvm.gc>
-			</properties>
             <dependencies>
                 <dependency>
                     <groupId>com.logonbox</groupId>
@@ -204,10 +202,10 @@ ACTION
                                     <mainClass>com.logonbox.vpn.quick.Lbv</mainClass>
                                     <imageName>lbv</imageName>
                                     <buildArgs>
-										${graalvm.firstArgs}
-                                        --report-unsupported-elements-at-runtime
-                                        -R:MaxHeapSize=64m
-                                        ${graalvm.pgo} ${graalvm.march} ${graalvm.gc}
+										<buildArg>${graalvm.firstArgs} </buildArg>
+                                        <buildArg>--report-unsupported-elements-at-runtime</buildArg>
+                                        <buildArg>-R:MaxHeapSize=64m</buildArg>
+                                        <buildArg>${graalvm.pgo} ${graalvm.march} ${graalvm.gc} </buildArg>
                                     </buildArgs>
                                      <metadataRepository>
                                         <enabled>true</enabled>
