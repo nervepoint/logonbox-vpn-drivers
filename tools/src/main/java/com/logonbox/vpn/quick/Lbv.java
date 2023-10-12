@@ -158,7 +158,10 @@ public class Lbv extends AbstractCommand implements SystemContext {
             
             var report = new StringBuilder();
             
-            printDetail(report, 0, "interface", "%s", info.interfaceName());            
+            if(vpn.address().hasVirtualName())
+                printDetail(report, 0, "interface", "%s (%s)", info.interfaceName(), vpn.address().nativeName());
+            else
+            	printDetail(report, 0, "interface", "%s", info.interfaceName());            
             printDetail(report, 2, "public key", "%s", config.publicKey());            
             printDetail(report, 2, "private key", "%s", "(hidden)");
 

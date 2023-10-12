@@ -74,6 +74,10 @@ public interface VpnAddress {
     default String nativeName() {
         return name();
     }
+    
+    default boolean hasVirtualName() {
+    	return !name().equals(nativeName());
+    }
 
 	String peer();
 
