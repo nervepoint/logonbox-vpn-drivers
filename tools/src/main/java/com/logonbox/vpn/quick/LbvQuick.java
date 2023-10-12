@@ -2,6 +2,7 @@ package com.logonbox.vpn.quick;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -208,20 +209,26 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 
         @Override
         public Integer call() throws Exception {
+            Path file = null;
+            
             parent.initCommand();
 
             var bldr = new Vpn.Builder().withSystemContext(parent);
-            Path file;
-            if (Files.exists(configFileOrInterface)) {
-                bldr.withInterfaceName(parent.toInterfaceName(configFileOrInterface));
-                file = configFileOrInterface;
+            if(configFileOrInterface.toString().equals("-")) {
+            	bldr.withVpnConfiguration(new InputStreamReader(System.in));
             }
             else {
-                var iface = configFileOrInterface.toString();
-                bldr.withInterfaceName(iface);
-                file = parent.findConfig(iface);
+	            if (Files.exists(configFileOrInterface)) {
+	                bldr.withInterfaceName(parent.toInterfaceName(configFileOrInterface));
+	                file = configFileOrInterface;
+	            }
+	            else {
+	                var iface = configFileOrInterface.toString();
+	                bldr.withInterfaceName(iface);
+	                file = parent.findConfig(iface);
+	            }
+	            bldr.withVpnConfiguration(file);
             }
-            bldr.withVpnConfiguration(file);
 
             var vpn = bldr.build();
             vpn.platformService().context().commands().onLog(parent::logCommandLine);
