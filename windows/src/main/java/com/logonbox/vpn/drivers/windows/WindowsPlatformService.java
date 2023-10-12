@@ -186,7 +186,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 							b.append(s.nextToken());
 						}
 						var ifName = b.toString();
-						if (isMatchesPrefix(ifName)) {
+						if (!wireguardInterface || ( wireguardInterface && isMatchesPrefix(ifName))) {
 							WindowsAddress vaddr = new WindowsAddress(ifName.toString(), ifName.toString(), this);
 							ips.add(vaddr);
 						}
@@ -230,7 +230,10 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 			LOG.error("Failed to list interfaces via Java.", e);
 		}
 
-		ips.addAll(super.addresses());
+		if(wireguardInterface)
+			ips.addAll(super.addresses().stream().filter(addr -> isWireGuardInterface(addr)).collect(Collectors.toList()));
+		else
+			ips.addAll(super.addresses());
 
 		return new ArrayList<WindowsAddress>(ips);
 	}
