@@ -166,7 +166,7 @@ public class VpnDll {
 	}
 
 	static {
-		System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", System.getProperty("logLevel", "INFO"));
+		System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", System.getProperty("logLevel", "DEBUG"));
 		SLF4JBridgeHandler.removeHandlersForRootLogger();
 		SLF4JBridgeHandler.install();
 	}

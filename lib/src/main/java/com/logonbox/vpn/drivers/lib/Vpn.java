@@ -125,6 +125,13 @@ public final class Vpn implements Closeable {
         
 		adapter = peer.map(p -> {
 			try {
+				if(interfaceName.isPresent()) {
+					try {
+						return Optional.of(platformService.adapter(interfaceName.get()));
+					}
+					catch(IllegalArgumentException iae) {
+					}
+				}
 				return platformService.getByPublicKey(p.publicKey());
 			} catch (IOException e) {
 				throw new UncheckedIOException(e);

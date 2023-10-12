@@ -190,7 +190,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
     public void addScriptEnvironmentVariables(VpnAdapter connection, Map<String, String> env) {
     }
     
-    void logCommandLine(String... args) {
+    static void logCommandLine(String... args) {
         var largs = new ArrayList<>(Arrays.asList(args));
         var path = Paths.get(largs.get(0));
         if(path.isAbsolute()) {
@@ -209,42 +209,58 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 
         @Override
         public Integer call() throws Exception {
-            Path file = null;
+            Optional<Path> file = Optional.empty();
             
             parent.initCommand();
 
+            Optional<String> ifaceName = Optional.empty();
             var bldr = new Vpn.Builder().withSystemContext(parent);
             if(configFileOrInterface.toString().equals("-")) {
             	bldr.withVpnConfiguration(new InputStreamReader(System.in));
             }
             else {
 	            if (Files.exists(configFileOrInterface)) {
-	                bldr.withInterfaceName(parent.toInterfaceName(configFileOrInterface));
-	                file = configFileOrInterface;
+	                var iface = parent.toInterfaceName(configFileOrInterface);
+	                ifaceName = Optional.of(iface);
+					bldr.withInterfaceName(iface);
+	                file = Optional.of(configFileOrInterface);
 	            }
 	            else {
 	                var iface = configFileOrInterface.toString();
 	                bldr.withInterfaceName(iface);
-	                file = parent.findConfig(iface);
+	                ifaceName = Optional.of(iface);
+	                try {
+	                	file = Optional.of(parent.findConfig(iface));
+	                }
+	                catch(IOException ioe) {
+	                	file = Optional.empty();
+	                }
 	            }
-	            bldr.withVpnConfiguration(file);
+	            if(file.isPresent())
+	            	bldr.withVpnConfiguration(file.get());
             }
 
             var vpn = bldr.build();
-            vpn.platformService().context().commands().onLog(parent::logCommandLine);
-            return onCall(vpn, file);
+            vpn.platformService().context().commands().onLog(LbvQuick::logCommandLine);
+            return onCall(vpn, file, ifaceName);
         }
         
-        protected abstract Integer onCall(Vpn vpn, Path configFile) throws Exception;
+        protected abstract Integer onCall(Vpn vpn, Optional<Path> configFile, Optional<String> interfaceName) throws Exception;
 
     }
 
     @Command(name = "up", description = "Bring a VPN interface up.")
     public final static class Up extends AbstractQuickCommand {
 
+        @Option(names = { "-x", "--expire" }, paramLabel = "SECONDS", description = "Expire this connection after the specified number of seconds. ")
+        private Optional<Long> expire;
+
+
         @Override
-        protected Integer onCall(Vpn vpn, Path configFile) throws Exception {
+        protected Integer onCall(Vpn vpn, Optional<Path> configFile, Optional<String> interfaceName) throws Exception {
             vpn.open();
+            if(expire.isPresent()) 
+            	expire(parent, vpn, expire.get(), configFile.orElseThrow(() -> new IllegalStateException("Must use a configuration file with expiry option.")));
             return 0;
         }
 
@@ -254,7 +270,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
     public final static class Down extends AbstractQuickCommand {
 
         @Override
-        protected Integer onCall(Vpn vpn, Path configFile) throws Exception {
+        protected Integer onCall(Vpn vpn, Optional<Path> configFile, Optional<String> interfaceName) throws Exception {
             if(!vpn.started())
                 throw new IOException(MessageFormat.format("`{0}` is not a VPN interface.", vpn.interfaceName().get()));
             vpn.close();
@@ -267,7 +283,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
     public final static class Strip extends AbstractQuickCommand {
 
         @Override
-        protected Integer onCall(Vpn vpn, Path configFile) throws Exception {
+        protected Integer onCall(Vpn vpn, Optional<Path> configFile, Optional<String> interfaceName) throws Exception {
             vpn.adapter().configuration().write(System.out);
             return 0;
         }
@@ -278,7 +294,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
     public final static class Save extends AbstractQuickCommand {
 
         @Override
-        protected Integer onCall(Vpn vpn, Path configFile) throws Exception {
+        protected Integer onCall(Vpn vpn, Optional<Path> configFile, Optional<String> interfaceName) throws Exception {
             
             var bldr = new VpnConfiguration.Builder().
                     fromConfiguration(vpn.configuration());
@@ -287,7 +303,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
             bldr.withPeers(vpn.adapter().configuration().peers());
             
             var cfg = bldr.build();
-            cfg.write(configFile);
+            cfg.write(configFile.orElseThrow(() -> new IllegalStateException("Configuration file must be provided.")));
             
             return 0;
         }
@@ -359,5 +375,81 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 	@Override
 	public void alert(String message, Object... args) {
         System.out.format("[+] %s%n", MessageFormat.format(message, args));
+	}
+	
+	/**
+	 * Work how to launch this same application, but without any arguments. This
+	 * takes into account if launching from native image or Java (could be improved),
+	 * and modular vs non-modular. It should work in a development environment too.
+	 * 
+	 * @return this command
+	 */
+	private static String getThisCommand() {
+		var info = ProcessHandle.current().info();
+		var cmd = info.command().orElseThrow(() -> new UnsupportedOperationException("Expiry not supported, cannot determine own process details."));
+		var args = info.arguments().orElse(new String[0]);
+		
+		if(cmd.toLowerCase().contains("java")) {
+			/* Try to find the classname in the arguments, and remove everything from that point */
+			var newArgList = new ArrayList<String>();
+			for(var i = 0 ; i < args.length; i++) {
+				var arg = args[i];
+				if(arg.contains(" ")) {
+					/* Wrap strings with spaces in quotes. Also, we know this
+					 * is not a class name so just add to list of new args
+					 */
+					newArgList.add("'" + arg + "'");
+				}
+				else {
+					if(arg.equals("-m")) {
+						/* Running modular. We know the next argument is the fully qualified module / class,
+						 * so add those and ignore what remains 
+						 */
+						newArgList.add(arg);
+						newArgList.add(args[i + 1]);
+						break;
+					}
+					else {
+						/* Does this look like a class name? */
+						if(arg.matches("[a-z]+[a-z\\.]*\\.[a-zA-Z\\.]*")) {
+							/* It does, add this and ignore what remains */
+							newArgList.add(arg);
+							break;
+						}
+					}
+				}
+				newArgList.add(arg);
+			}
+			
+			return cmd + " "  + String.join(" ", newArgList);
+		}
+		else {
+			/* Native image, return as is */
+			return cmd;
+		}
+	}
+	
+	
+	private final static void expire(SystemContext context, Vpn vpn, long seconds, Path configurationFile) throws IOException {
+		if(OS.isLinux()) {
+			if(OS.hasCommand("at")) {
+				/* NOTE at only has 'second' resolution */
+				var time = Math.max(1, seconds / 60);
+				var cmds = getThisCommand() + " down " + configurationFile.toString();
+				logCommandLine("at -M now + " + time + " minutes");
+				System.out.println(cmds);
+				
+				/* TODO we may need to record the job ID to match against the public key
+				 * if the VPN is taken down manually and then brought up again. It could
+				 * potentially take down *that* VPN unintentionally. See how it goes ..
+				 */
+				context.commands().privileged().pipeTo(cmds, "at", "-M", "now + " + time + " minutes");
+			}
+			else {
+				throw new UnsupportedOperationException("Expiry requires that the `at` command be installed on Linux.");
+			}
+		}
+		else
+			throw new UnsupportedOperationException("Expiry is not supported on this platform.");
 	}
 }
