@@ -4,13 +4,17 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.MessageFormat;
+import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -36,9 +40,11 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
+import uk.co.bithatch.nativeimage.annotations.Resource;
 
 @Command(name = "lbv-quick", description = "Set up a WireGuard interface simply.", mixinStandardHelpOptions = true, subcommands = {
         LbvQuick.Up.class, LbvQuick.Down.class, LbvQuick.Save.class, LbvQuick.Strip.class, LbvQuick.DNS.class, LbvQuick.DNSProviders.class })
+@Resource({ "windows-task\\.xml" })
 public class LbvQuick extends AbstractCommand implements SystemContext {
 
     private final class LbvConfiguration implements SystemConfiguration {
@@ -384,21 +390,32 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 	 * 
 	 * @return this command
 	 */
-	private static String getThisCommand() {
+	private static List<String> getThisCommand() {
 		var info = ProcessHandle.current().info();
 		var cmd = info.command().orElseThrow(() -> new UnsupportedOperationException("Expiry not supported, cannot determine own process details."));
 		var args = info.arguments().orElse(new String[0]);
+		var newArgList = new ArrayList<String>();
 		
 		if(cmd.toLowerCase().contains("java")) {
+			
+			
+			/* TODO: Windows does not give us our own arguments :( I think it's this
+			 * bug - https://bugs.openjdk.org/browse/JDK-8176725. For now, I am
+			 * not going to worry about this too much, as it will work with a native
+			 * image
+			 * 
+			 * We could do something like what happens in liftlib (reuse it?). 
+			 */
+			if(OS.isWindows())
+				throw new UnsupportedOperationException("Cannot reconstruct command line on Windows.");
+			
 			/* Try to find the classname in the arguments, and remove everything from that point */
-			var newArgList = new ArrayList<String>();
 			for(var i = 0 ; i < args.length; i++) {
 				var arg = args[i];
 				if(arg.contains(" ")) {
-					/* Wrap strings with spaces in quotes. Also, we know this
-					 * is not a class name so just add to list of new args
+					/* We know this is not a class name so just add to list of new args
 					 */
-					newArgList.add("'" + arg + "'");
+					newArgList.add(arg);
 				}
 				else {
 					if(arg.equals("-m")) {
@@ -420,33 +437,97 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 				}
 				newArgList.add(arg);
 			}
-			
-			return cmd + " "  + String.join(" ", newArgList);
 		}
 		else {
-			/* Native image, return as is */
-			return cmd;
+			newArgList.add(cmd);
 		}
+		return newArgList;
+	}
+
+	private static String wrapWithQuotes(String arg) {
+		if(arg.contains(" "))
+			return "'" + arg + "'";
+		else
+			return arg;
+	}
+	
+	private static String wrapWithEncodedQuotes(String arg) {
+		if(arg.contains(" "))
+			return "&quot;" + arg + "&quot;";
+		else
+			return arg;
 	}
 	
 	
 	private final static void expire(SystemContext context, Vpn vpn, long seconds, Path configurationFile) throws IOException {
+		var taskArgs = getThisCommand();
 		if(OS.isLinux()) {
 			if(OS.hasCommand("at")) {
 				/* NOTE at only has 'second' resolution */
 				var time = Math.max(1, seconds / 60);
-				var cmds = getThisCommand() + " down " + configurationFile.toString();
-				logCommandLine("at -M now + " + time + " minutes");
-				System.out.println(cmds);
+				var cmds = Arrays.asList("at", "-M", "now + " + time + " minutes");
+				logCommandLine(cmds.toArray(new String[0]));
 				
 				/* TODO we may need to record the job ID to match against the public key
 				 * if the VPN is taken down manually and then brought up again. It could
 				 * potentially take down *that* VPN unintentionally. See how it goes ..
 				 */
-				context.commands().privileged().pipeTo(cmds, "at", "-M", "now + " + time + " minutes");
+				taskArgs.add("down");
+				taskArgs.add(configurationFile.toString());
+				var taskCmd = String.join(" ", taskArgs.stream().map(LbvQuick::wrapWithQuotes).toList());
+				context.commands().privileged().pipeTo(taskCmd, cmds.toArray(new String[0]));
 			}
 			else {
 				throw new UnsupportedOperationException("Expiry requires that the `at` command be installed on Linux.");
+			}
+		}
+		else if(OS.isWindows()) {
+			if(OS.hasCommand("schtasks")) {
+				/* NOTE schtasks also only has 'second' resolution */
+				
+				taskArgs.add("down");
+				taskArgs.add(configurationFile.toString());
+				
+				/* Stupidly, you can't turn off power management on tasks created
+				 * by schtasks! So instead we use raw task XML. Dumbdumbdumbdumb
+				 */
+				
+				var fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+				var xmlFile = Files.createTempFile("vpntask", ".xml");
+				try {
+					var wrt = new StringWriter();
+					try(var in = new InputStreamReader(LbvQuick.class.getResourceAsStream("/windows-task.xml"), "UTF-16")) {
+						in.transferTo(wrt);
+					}
+					var str = wrt.toString();
+					str = str.replace("${author}", System.getenv("USERDOMAIN") + "\\" + System.getProperty("user.name"));
+					str = str.replace("${uri}", "\\VpnExpiry_" + vpn.adapter().information().interfaceName());
+					str = str.replace("${start}", fmt.format(new Date(System.currentTimeMillis() + (seconds * 1000))));
+					str = str.replace("${cmd}", taskArgs.get(0));
+					str = str.replace("${cwd}", System.getProperty("user.dir"));
+					str = str.replace("${args}", String.join(" ", 
+							taskArgs.subList(1, taskArgs.size()).stream().map(LbvQuick::wrapWithEncodedQuotes).toList()));
+					
+					try(var out = new PrintWriter(Files.newBufferedWriter(xmlFile))) {
+						out.println(str);
+					}
+					
+					var cmds = Arrays.asList(
+							"schtasks", 
+							"/create", 
+							"/f", 
+							"/tn", "VpnExpiry_" + vpn.adapter().information().interfaceName(),
+							"/xml", xmlFile.toString()
+					);
+					logCommandLine(cmds.toArray(new String[0]));
+					context.commands().privileged().run(cmds.toArray(new String[0]));
+				}
+				finally {
+					Files.delete(xmlFile);
+				}
+			}
+			else {
+				throw new UnsupportedOperationException("Expiry requires that the `schtasks` command be installed on Windows.");
 			}
 		}
 		else

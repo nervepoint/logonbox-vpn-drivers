@@ -22,6 +22,7 @@
 open module com.logonbox.vpn.quick {
     requires transitive com.logonbox.vpn.drivers.os;
 	requires info.picocli;
+	requires static uk.co.bithatch.nativeimage.annotations;
     requires com.logonbox.vpn.drivers.lib;
     requires transitive com.sshtools.porter;
     requires com.sshtools.liftlib;
