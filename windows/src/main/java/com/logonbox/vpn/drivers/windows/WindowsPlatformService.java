@@ -28,7 +28,6 @@ import java.net.NetworkInterface;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.text.MessageFormat;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -76,6 +75,8 @@ import uk.co.bithatch.nativeimage.annotations.Serialization;
 @Resource("win32-x84-64/.*")
 public class WindowsPlatformService extends AbstractDesktopPlatformService<WindowsAddress> {
 
+	private static final String WIREGUARD_TUNNEL = "WireGuard Tunnel";
+	
 	public final static String SID_ADMINISTRATORS_GROUP = "S-1-5-32-544";
 	public final static String SID_WORLD = "S-1-1-0";
 	public final static String SID_USERS = "S-1-5-32-545";
@@ -187,8 +188,9 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 							b.append(s.nextToken());
 						}
 						var ifName = b.toString();
-						if (!wireguardInterface || ( wireguardInterface && isMatchesPrefix(ifName))) {
-							WindowsAddress vaddr = new WindowsAddress(ifName.toString(), ifName.toString(), this);
+						var matchesPrefix = isMatchesPrefix(ifName);
+						if (!wireguardInterface || ( wireguardInterface && matchesPrefix)) {
+							WindowsAddress vaddr = new WindowsAddress(nativeNameToInterfaceName(ifName).orElse(ifName), ifName, matchesPrefix ? WIREGUARD_TUNNEL : ifName, this);
 							ips.add(vaddr);
 						}
 					}
@@ -218,8 +220,8 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 					var args = line.split(":");
 					if (args.length > 1) {
 						var description = args[1].trim();
-						if (description.startsWith("WireGuard Tunnel")) {
-							var vaddr = new WindowsAddress(name, description, this);
+						if (description.startsWith(WIREGUARD_TUNNEL)) {
+							var vaddr = new WindowsAddress(nativeNameToInterfaceName(name).orElse(name), name, description, this);
 							ips.add(vaddr);
 							break;
 						}
@@ -291,74 +293,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 	protected void onStart(StartRequest startRequest, VpnAdapter session) throws Exception {
 		var configuration  = startRequest.configuration();
 		var peer = startRequest.peer();
-		WindowsAddress ip = null;
-
-		/*
-		 * Look for wireguard interfaces that are available but not connected. If we
-		 * find none, try to create one.
-		 */
-		int maxIface = -1;
-
-		List<WindowsAddress> ips = ips(false);
-
-		for (int i = 0; i < MAX_INTERFACES; i++) {
-			var name = getInterfacePrefix() + i;
-			LOG.info("Looking for {}.", name);
-
-			/*
-			 * Get ALL the interfaces because on Windows the interface name is netXXX, and
-			 * 'net' isn't specific to wireguard, nor even to WinTun.
-			 */
-			if (exists(name, ips)) {
-				LOG.info("    {} exists.", name);
-				/* Get if this is actually a Wireguard interface. */
-				WindowsAddress nicByName = find(name, ips).orElseThrow(
-						() -> new IOException(MessageFormat.format("Could not find network interface {0}", name)));
-				;
-				if (isWireGuardInterface(nicByName)) {
-					/* Interface exists and is wireguard, is it connected? */
-
-					// TODO check service state, we can't rely on the public key
-					// as we manage storage of it ourselves (no wg show command)
-					LOG.info("    Looking for public key for {}.", name);
-					var publicKey = getPublicKey(name);
-					if (publicKey.isEmpty()) {
-						/* No addresses, wireguard not using it */
-						LOG.info("    {} ({}) is free.", name, nicByName.displayName());
-						ip = nicByName;
-						maxIface = i;
-						break;
-					} else if (publicKey.get().equals(configuration.publicKey())) {
-						LOG.warn("    Peer with public key {} on {} is already active (by {}).", publicKey.get(), name,
-								nicByName.displayName());
-						session.attachToInterface(nicByName);
-						return;
-					} else {
-						LOG.info("    {} is already in use (by {}).", name, nicByName.displayName());
-					}
-				} else
-					LOG.info("    {} is already in use by something other than WinTun ({}).", name,
-							nicByName.displayName());
-			} else if (maxIface == -1) {
-				/* This one is the next free number */
-				maxIface = i;
-				LOG.info("    {} is next free interface.", name);
-				break;
-			}
-		}
-		if (maxIface == -1)
-			throw new IOException(String.format("Exceeds maximum of %d interfaces.", MAX_INTERFACES));
-
-		if (ip == null) {
-			var name = getInterfacePrefix() + maxIface;
-			LOG.info("No existing unused interfaces, creating new one ({}) for public key .", name,
-					configuration.publicKey());
-			ip = new WindowsAddress(name, "WireGuard Tunnel", this);
-			LOG.info("Created {}", name);
-		} else
-			LOG.info("Using {}", ip.shortName());
-
-		session.attachToInterface(ip);
+        var ip = findAddress(startRequest, true);
 
 		var cwd = context().nativeComponents().binDir();
 		var confDir = cwd.resolve("conf").resolve("connections");
@@ -400,12 +335,14 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 			}
 		}
 
+		session.attachToInterface(ip);
+
 		/*
 		 * Wait for the first handshake. As soon as we have it, we are 'connected'. If
 		 * we don't get a handshake in that time, then consider this a failed
 		 * connection. We don't know WHY, just it has failed
 		 */
-		if (context.configuration().connectTimeout().isPresent()) {
+		if (peer.isPresent() && context.configuration().connectTimeout().isPresent()) {
 			waitForFirstHandshake(configuration, session, connectionStarted, peer,
 					context.configuration().connectTimeout().get());
 		}
@@ -436,18 +373,23 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 	}
 
 	@Override
+	protected WindowsAddress add(String name, String nativeName, String type) throws IOException {
+		return new WindowsAddress(name, nativeName, WIREGUARD_TUNNEL, this);
+	}
+
+	@Override
 	protected WindowsAddress createVirtualInetAddress(NetworkInterface nif) throws IOException {
-		return new WindowsAddress(nif.getName(), nif.getDisplayName(), this);
+		return new WindowsAddress(nativeNameToInterfaceName(nif.getName()).orElse(nif.getName()), nif.getName(), nif.getDisplayName(), this);
 	}
 
 	@Override
 	protected boolean isWireGuardInterface(NetworkInterface nif) {
-		return super.isWireGuardInterface(nif) &&  nif.getDisplayName().startsWith("WireGuard Tunnel");
+		return super.isWireGuardInterface(nif) &&  nif.getDisplayName().startsWith(WIREGUARD_TUNNEL);
 	}
 
 	protected boolean isWireGuardInterface(WindowsAddress nif) {
 		return isMatchesPrefix(nif) && (
-				 nif.displayName().startsWith("WireGuard Tunnel") || isMatchesPrefix(nif.displayName()));
+				 nif.displayName().startsWith(WIREGUARD_TUNNEL) || isMatchesPrefix(nif.displayName()));
 	}
 
 	protected boolean isMatchesPrefix(WindowsAddress nif) {

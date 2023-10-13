@@ -29,6 +29,7 @@ import java.net.SocketException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
+import java.text.MessageFormat;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -54,6 +55,7 @@ import com.github.jgonian.ipmath.Ipv6;
 import com.github.jgonian.ipmath.Ipv6Range;
 import com.logonbox.vpn.drivers.lib.DNSProvider.DNSEntry;
 import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
+import com.logonbox.vpn.drivers.lib.Prefs.PrefType;
 import com.logonbox.vpn.drivers.lib.util.IpUtil;
 import com.logonbox.vpn.drivers.lib.util.Util;
 
@@ -67,6 +69,89 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 	
 	protected AbstractDesktopPlatformService(String interfacePrefix, SystemContext context) {
 		super(interfacePrefix, context);
+	}
+	
+	protected final I findAddress(StartRequest startRequest, boolean failIfInUse)
+			throws IOException {
+
+		var addresses = addresses();
+		var configuration = startRequest.configuration();
+		var resolver = new InterfaceNameResolver(this);
+		var result = resolver.resolve(configuration, startRequest.interfaceName(), startRequest.nativeInterfaceName());
+		var resolvedInterfaceName = result.resolvedName();
+		var interfaceName = result.iInterfaceName();
+
+		I ip = null;
+		
+		/* If a particular native interface has been resolved, then see if it is
+		 * available. If it is, we can re-use if
+		 */
+		
+
+		if (resolvedInterfaceName.isPresent()) {
+			var nativeName = resolvedInterfaceName.get();
+			var addr = find(nativeName, addresses);
+			if (addr.isEmpty()) {
+				LOG.info("No existing unused interfaces, creating new one {} for public key .", nativeName,
+						configuration.publicKey());
+				ip = map(interfaceName.orElse(nativeName), nativeName, "wireguard");
+				if (ip == null)
+					throw new IOException("Failed to create virtual IP address.");
+				LOG.info("Created {}", ip.shortName());
+			} else {
+				var publicKey = getPublicKey(nativeName);
+				if (failIfInUse && publicKey.isPresent()) {
+					throw new IOException(MessageFormat.format("{0} is already in use", nativeName));
+				}
+			}
+		}
+
+		/*
+		 * Look for wireguard interfaces that are available but not connected. If we
+		 * find none, try to create one.
+		 */
+		if (ip == null) {
+			int maxIface = -1;
+			for (var i = 0; i < MAX_INTERFACES; i++) {
+				var name = getInterfacePrefix() + i;
+				LOG.info("Looking for {}", name);
+				if (exists(name, addresses)) {
+					/* Interface exists, is it connected? */
+					var publicKey = getPublicKey(name);
+					if (publicKey.isEmpty()) {
+						/* No addresses, wireguard not using it */
+						LOG.info("{} is free.", name);
+						ip = address(name);
+						maxIface = i;
+						break;
+					} else if (publicKey.get().equals(configuration.publicKey())) {
+						throw new IllegalStateException(String
+								.format("Peer with public key %s on %s is already active.", publicKey.get(), name));
+					} else {
+						LOG.info("{} is already in use.", name);
+					}
+				} else if (maxIface == -1) {
+					/* This one is the next free number */
+					maxIface = i;
+					LOG.info("{} is next free interface.", name);
+					break;
+				}
+			}
+			if (maxIface == -1)
+				throw new IOException(String.format("Exceeds maximum of %d interfaces.", MAX_INTERFACES));
+
+			if (ip == null) {
+				var nativeName = getInterfacePrefix() + maxIface;
+				LOG.info("No existing unused interfaces, creating new one {} for public key .", nativeName,
+						configuration.publicKey());
+				ip = map(interfaceName.orElse(nativeName), nativeName, "wireguard");
+				if (ip == null)
+					throw new IOException("Failed to create virtual IP address.");
+				LOG.info("Created {}", ip.shortName());
+			} else
+				LOG.info("Using {}", ip.shortName());
+		}
+		return ip;
 	}
 
     @Override 
@@ -212,19 +297,50 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 	@Override
 	protected final void onStop(VpnConfiguration configuration, VpnAdapter session) {
 		try {
-			if(defaultGateway().isPresent() && configuration.peers().contains(defaultGateway().get())) {
-				try {
-				    resetDefaulGateway();
+			try {
+				if(defaultGateway().isPresent() && configuration.peers().contains(defaultGateway().get())) {
+					try {
+					    resetDefaulGateway();
+					}
+					catch(Exception e) { 
+						LOG.error("Failed to tear down routing.", e);
+					}
 				}
-				catch(Exception e) { 
-					LOG.error("Failed to tear down routing.", e);
-				}
+			}
+			finally {
+				onStopped(configuration, session);
 			}
 		}
 		finally {
-			onStopped(configuration, session);
+			unmap(session.address().name());
 		}
 	}
+	
+	protected final void unmap(String name) {
+		try {
+			var nativeName = context().commands().privileged().task(new Prefs.RemoveKey(getNameToNativeNameNode(), name));
+			if(nativeName != null) {
+				context().commands().privileged().task(new Prefs.RemoveKey(getNativeNameToNameNode(), nativeName));
+			}
+			LOG.info("Unmapped interface names {} -> {}", name, nativeName == null ? "<null>" : nativeName);
+		} catch (Exception e) {
+			LOG.error("Failed to un-map interface names.", e);
+		}
+	}
+
+	protected final I map(String name, String nativeName, String type) throws IOException {
+		var addr = add(name, nativeName, type);
+		try {
+			context().commands().privileged().task(new Prefs.PutValue(getNameToNativeNameNode(), name, nativeName, PrefType.STRING));
+			context().commands().privileged().task(new Prefs.PutValue(getNativeNameToNameNode(), nativeName, name, PrefType.STRING));
+		} catch (Exception e) {
+			throw new IOException("Failed to map interface names", e);
+		}
+		LOG.info("Mapping interface names {} -> {}", name, nativeName);
+		return addr;
+	}
+
+	protected abstract I add(String name, String nativeName, String type) throws IOException;
 
 	protected void onStopped(VpnConfiguration configuration, VpnAdapter session) {
 	}
