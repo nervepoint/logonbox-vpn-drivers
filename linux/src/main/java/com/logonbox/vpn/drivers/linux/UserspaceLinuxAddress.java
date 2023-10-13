@@ -27,8 +27,8 @@ import java.io.IOException;
 
 public class UserspaceLinuxAddress extends AbstractLinuxAddress {
 
-    UserspaceLinuxAddress(String name, AbstractLinuxPlatformService platform) {
-        super(name, platform);
+    UserspaceLinuxAddress(String name, String nativeName, AbstractLinuxPlatformService platform) {
+        super(name, nativeName, platform);
     }
 
     @Override

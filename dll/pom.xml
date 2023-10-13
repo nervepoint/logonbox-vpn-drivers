@@ -136,7 +136,6 @@ ACTION
 				<dependency>
 					<groupId>com.github.hypfvieh</groupId>
 					<artifactId>dbus-java-transport-native-unixsocket</artifactId>
-					<version>4.3.1-SNAPSHOT</version>
 				</dependency>
 			</dependencies>
 		</profile>

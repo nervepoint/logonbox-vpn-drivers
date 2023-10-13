@@ -24,8 +24,8 @@ import java.io.IOException;
 
 public class KernelLinuxAddress extends AbstractLinuxAddress {
 
-    KernelLinuxAddress(String name, AbstractLinuxPlatformService platform) {
-        super(name, platform);
+    KernelLinuxAddress(String name, String nativeName, AbstractLinuxPlatformService platform) {
+        super(name, nativeName, platform);
     }
 
     @Override

@@ -27,8 +27,8 @@ import com.logonbox.vpn.drivers.lib.AbstractUnixAddress;
 
 public class KernelMacOsAddress extends AbstractUnixAddress<KernelMacOsPlatformService> {
 
-	public KernelMacOsAddress(KernelMacOsPlatformService platform) {
-		super(platform);
+	public KernelMacOsAddress(KernelMacOsPlatformService platform, String name, String nativeName) {
+		super(name, nativeName, platform);
 	}
 
 	@Override

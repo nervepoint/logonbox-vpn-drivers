@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
+import com.logonbox.vpn.drivers.lib.Prefs.PrefType;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
 import com.logonbox.vpn.drivers.lib.util.Util;
 
@@ -114,29 +115,69 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
 				throw ioe;
 		}
 	}
+	
+	protected final void unmap(String name) {
+		try {
+			var nativeName = context().commands().privileged().task(new Prefs.RemoveKey(getNameToNativeNameNode(), name));
+			if(nativeName != null) {
+				context().commands().privileged().task(new Prefs.RemoveKey(getNativeNameToNameNode(), nativeName));
+			}
+			LOG.info("Unmapped interface names {} -> {}", name, nativeName == null ? "<null>" : nativeName);
+		} catch (Exception e) {
+			LOG.error("Failed to un-map interface names.", e);
+		}
+	}
 
-	protected abstract I add(String name, String type) throws IOException;
+	protected final I map(String name, String nativeName, String type) throws IOException {
+		var addr = add(name, nativeName, type);
+		try {
+			context().commands().privileged().task(new Prefs.PutValue(getNameToNativeNameNode(), name, nativeName, PrefType.STRING));
+			context().commands().privileged().task(new Prefs.PutValue(getNativeNameToNameNode(), nativeName, name, PrefType.STRING));
+		} catch (Exception e) {
+			throw new IOException("Failed to map interface names", e);
+		}
+		LOG.info("Mapping interface names {} -> {}", name, nativeName);
+		return addr;
+	}
 
-	protected final I findAddress(Optional<String> interfaceName, VpnConfiguration configuration, boolean failIfInUse)
+	@Override
+	protected void onStopped(VpnConfiguration configuration, VpnAdapter session) {
+		unmap(session.address().name());
+	}
+
+	protected abstract I add(String name, String nativeName, String type) throws IOException;
+
+	protected final I findAddress(StartRequest startRequest, boolean failIfInUse)
 			throws IOException {
-		I ip = null;
 
 		var addresses = addresses();
+		var configuration = startRequest.configuration();
+		var resolver = new InterfaceNameResolver(this);
+		var result = resolver.resolve(configuration, startRequest.interfaceName(), startRequest.nativeInterfaceName());
+		var resolvedInterfaceName = result.resolvedName();
+		var interfaceName = result.iInterfaceName();
 
-		if (interfaceName.isPresent()) {
-			var name = interfaceName.get();
-			var addr = find(name, addresses);
+		I ip = null;
+		
+		/* If a particular native interface has been resolved, then see if it is
+		 * available. If it is, we can re-use if
+		 */
+		
+
+		if (resolvedInterfaceName.isPresent()) {
+			var nativeName = resolvedInterfaceName.get();
+			var addr = find(nativeName, addresses);
 			if (addr.isEmpty()) {
-				LOG.info("No existing unused interfaces, creating new one {} for public key .", name,
+				LOG.info("No existing unused interfaces, creating new one {} for public key .", nativeName,
 						configuration.publicKey());
-				ip = add(name, "wireguard");
+				ip = map(interfaceName.orElse(nativeName), nativeName, "wireguard");
 				if (ip == null)
 					throw new IOException("Failed to create virtual IP address.");
 				LOG.info("Created {}", ip.shortName());
 			} else {
-				var publicKey = getPublicKey(name);
+				var publicKey = getPublicKey(nativeName);
 				if (failIfInUse && publicKey.isPresent()) {
-					throw new IOException(MessageFormat.format("{0} is already in use", name));
+					throw new IOException(MessageFormat.format("{0} is already in use", nativeName));
 				}
 			}
 		}
@@ -176,13 +217,13 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
 				throw new IOException(String.format("Exceeds maximum of %d interfaces.", MAX_INTERFACES));
 
 			if (ip == null) {
-				var name = getInterfacePrefix() + maxIface;
-				LOG.info("No existing unused interfaces, creating new one {} for public key .", name,
+				var nativeName = getInterfacePrefix() + maxIface;
+				LOG.info("No existing unused interfaces, creating new one {} for public key .", nativeName,
 						configuration.publicKey());
-				ip = add(name, "wireguard");
+				ip = map(interfaceName.orElse(nativeName), nativeName, "wireguard");
 				if (ip == null)
 					throw new IOException("Failed to create virtual IP address.");
-				LOG.info("Created {}", name);
+				LOG.info("Created {}", ip.shortName());
 			} else
 				LOG.info("Using {}", ip.shortName());
 		}
@@ -204,7 +245,7 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
 			var privateKey = new StringBuffer();
 
 			for (var line : context.commands().privileged().output(context.nativeComponents().tool(Tool.WG), "show",
-					iface.name(), "dump")) {
+					iface.nativeName(), "dump")) {
 				var st = new StringTokenizer(line);
 				if (st.countTokens() == 4) {
 					privateKey.append(st.nextToken());
@@ -339,7 +380,7 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
 			try {
 				return new VpnAdapterConfiguration.Builder()
 						.fromFileContent(String.join(System.lineSeparator(), context.commands().privileged().output(
-								context.nativeComponents().tool(Tool.WG), "showconf", adapter.address().name())))
+								context.nativeComponents().tool(Tool.WG), "showconf", adapter.address().nativeName())))
 						.build();
 			} catch (ParseException e) {
 				throw new IOException("Failed to parse configuration.", e);

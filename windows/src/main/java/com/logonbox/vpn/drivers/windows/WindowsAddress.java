@@ -45,7 +45,7 @@ public class WindowsAddress extends AbstractVirtualInetAddress<WindowsPlatformSe
 	private final SystemCommands commands;
 
 	public WindowsAddress(String name, String displayName, WindowsPlatformService platform) {
-		super(platform, name);
+		super(name, displayName, platform);
 		this.displayName = displayName;
 		commands = platform.context().commands();
 	}

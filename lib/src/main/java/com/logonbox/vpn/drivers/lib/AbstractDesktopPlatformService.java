@@ -169,18 +169,19 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 	}
 
 	@Override
-	public final VpnAdapter start(Optional<String> interfaceName, VpnConfiguration configuration, Optional<VpnPeer> peer) throws IOException {		
+	public final VpnAdapter start(StartRequest startRequest) throws IOException {		
 	    
 	    var session = new VpnAdapter(this);
-
-        if(configuration.preUp().length > 0)  {
-            var p = configuration.preUp();
+        var config = startRequest.configuration();
+        
+		if(config.preUp().length > 0)  {
+            var p = config.preUp();
             LOG.info("Running pre-up commands. {}", String.join("; ", p).trim());
-            runHook(configuration, session, p);
+            runHook(config, session, p);
         };
 	    
         try {
-			onStart(interfaceName, configuration, session, peer);
+			onStart(startRequest, session);
 		} catch(IOException ioe) {
 			throw ioe;
 		} catch(RuntimeException re) {
@@ -190,7 +191,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 		}
     
         var gw = defaultGateway();
-        if(gw.isPresent() && configuration.peers().contains(gw.get())) {
+        if(gw.isPresent() && config.peers().contains(gw.get())) {
 			try {
 				onSetDefaultGateway(gw.get());
 			}
@@ -199,10 +200,10 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 			}
 		}
 
-        if(configuration.postUp().length > 0)  {
-		    var p = configuration.postUp();
+        if(config.postUp().length > 0)  {
+		    var p = config.postUp();
             LOG.info("Running post-up commands. {}", String.join("; ", p).trim());
-            runHook(configuration, session, p);
+            runHook(config, session, p);
 		};
 		
 		return session;
@@ -210,14 +211,22 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 
 	@Override
 	protected final void onStop(VpnConfiguration configuration, VpnAdapter session) {
-		if(defaultGateway().isPresent() && configuration.peers().contains(defaultGateway().get())) {
-			try {
-			    resetDefaulGateway();
-			}
-			catch(Exception e) { 
-				LOG.error("Failed to tear down routing.", e);
+		try {
+			if(defaultGateway().isPresent() && configuration.peers().contains(defaultGateway().get())) {
+				try {
+				    resetDefaulGateway();
+				}
+				catch(Exception e) { 
+					LOG.error("Failed to tear down routing.", e);
+				}
 			}
 		}
+		finally {
+			onStopped(configuration, session);
+		}
+	}
+
+	protected void onStopped(VpnConfiguration configuration, VpnAdapter session) {
 	}
 
     @Override
@@ -266,7 +275,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 		return isMatchesPrefix(nif);
 	}
 
-	protected abstract void onStart(Optional<String> interfaceName, VpnConfiguration configuration, VpnAdapter logonBoxVPNSession, Optional<VpnPeer> peer) throws Exception;
+	protected abstract void onStart(StartRequest startRequest, VpnAdapter session) throws Exception;
 	
 	protected void waitForFirstHandshake(VpnConfiguration configuration, VpnAdapter session, Instant connectionStarted, Optional<VpnPeer> peerOr, Duration timeout)
 			throws IOException {

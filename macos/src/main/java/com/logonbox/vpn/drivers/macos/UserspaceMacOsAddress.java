@@ -61,30 +61,23 @@ public class UserspaceMacOsAddress extends AbstractUnixAddress<UserspaceMacOsPla
 	private Set<String> addresses = new LinkedHashSet<>();
 	private boolean autoRoute4;
 	private boolean autoRoute6;
-    private final String nativeName;
 
 	private UserspaceMacOsAddress(String name, String nativeName, UserspaceMacOsPlatformService platform) throws IOException {
-		super(platform, name);
-		this.nativeName = nativeName;
-	}
-
-	@Override
-	public String nativeName() {
-	    return nativeName;
+		super(name, nativeName, platform);
 	}
 
 	public void addAddress(String address) throws IOException {
 		if (addresses.contains(address))
-			throw new IllegalStateException(String.format("Interface %s already has address %s", nativeName, address));
+			throw new IllegalStateException(String.format("Interface %s already has address %s", nativeName(), address));
 		if (addresses.size() > 0 && Util.isNotBlank(peer()))
 			throw new IllegalStateException(String.format(
-					"Interface %s is configured to have a single peer %s, so cannot add a second address %s", nativeName,
+					"Interface %s is configured to have a single peer %s, so cannot add a second address %s", nativeName(),
 					peer(), address));
 
 		if (address.matches(".*:.*"))
-			commands.privileged().logged().result(OsUtil.debugCommandArgs("ifconfig", nativeName, "inet6", address, "alias"));
+			commands.privileged().logged().result(OsUtil.debugCommandArgs("ifconfig", nativeName(), "inet6", address, "alias"));
 		else
-			commands.privileged().logged().result(OsUtil.debugCommandArgs("ifconfig", nativeName, "inet", address,
+			commands.privileged().logged().result(OsUtil.debugCommandArgs("ifconfig", nativeName(), "inet", address,
 					address.replace("/*", ""), "alias"));
 		addresses.add(address);
 	}
@@ -232,16 +225,16 @@ public class UserspaceMacOsAddress extends AbstractUnixAddress<UserspaceMacOsPla
 				continue;
 			if (l.length > 0 && l[0].equals("Internet6:")) {
 				ipv6 = true;
-			} else if (l.length > 3 && l[3].equals(nativeName)) {
+			} else if (l.length > 3 && l[3].equals(nativeName())) {
 				var gateway = l[1];
 				if(!getAddresses().contains(gateway)) {
-    				LOG.info("Removing route {} {} for {}", l[0], gateway, nativeName);
+    				LOG.info("Removing route {} {} for {}", l[0], gateway, nativeName());
     				if (ipv6) {
     					commands.privileged().logged().stdout(ProcessRedirect.DISCARD).result(OsUtil.debugCommandArgs("route", "-qn", "delete", "-inet6", "-ifp",
-    					        nativeName, l[0], gateway));
+    					        nativeName(), l[0], gateway));
     				} else {
     					commands.privileged().logged().stdout(ProcessRedirect.DISCARD).result(
-    							OsUtil.debugCommandArgs("route", "-qn", "delete", "-ifp", nativeName, l[0], gateway));
+    							OsUtil.debugCommandArgs("route", "-qn", "delete", "-ifp", nativeName(), l[0], gateway));
     				}
 				}
 			}
@@ -265,13 +258,13 @@ public class UserspaceMacOsAddress extends AbstractUnixAddress<UserspaceMacOsPla
 	}
 
 	protected File getSocketFile() {
-		return new File("/var/run/wireguard/" + nativeName + ".sock");
+		return new File("/var/run/wireguard/" + nativeName() + ".sock");
 	}
 
 	protected void setMtu() throws IOException {
 
 		int currentMtu = 0;
-		for (var line : commands.output(OsUtil.debugCommandArgs("ifconfig", nativeName))) {
+		for (var line : commands.output(OsUtil.debugCommandArgs("ifconfig", nativeName()))) {
 			var parts = Arrays.asList(line.split("\\s+"));
 			var idx = parts.indexOf("mtu");
 			if (idx == -1 && idx < parts.size() - 1)

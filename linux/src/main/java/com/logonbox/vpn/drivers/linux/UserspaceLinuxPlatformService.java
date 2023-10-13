@@ -33,13 +33,13 @@ public class UserspaceLinuxPlatformService extends AbstractLinuxPlatformService 
     }
 
     @Override
-    protected AbstractLinuxAddress add(String name, String type) throws IOException {
-        context().commands().privileged().logged().result(context().nativeComponents().tool(Tool.WIREGUARD_GO), name);
-        return find(name, addresses()).orElseThrow(() -> new IOException(MessageFormat.format("Could not find new network interface {0}", name)));
+    protected AbstractLinuxAddress add(String name, String nativeName, String type) throws IOException {
+        context().commands().privileged().logged().result(context().nativeComponents().tool(Tool.WIREGUARD_GO), nativeName);
+        return find(nativeName, addresses()).orElseThrow(() -> new IOException(MessageFormat.format("Could not find new network interface {0}", nativeName)));
     }
 
     @Override
-    protected AbstractLinuxAddress createAddress(String name) {
-        return new UserspaceLinuxAddress(name, this);
+    protected AbstractLinuxAddress createAddress(String name, String nativeName) {
+        return new UserspaceLinuxAddress(name, nativeName, this);
     }
 }

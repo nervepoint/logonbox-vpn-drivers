@@ -29,6 +29,7 @@ open module com.logonbox.vpn.drivers.lib {
     requires com.sshtools.liftlib;
     requires transitive com.sshtools.jini;
     requires static uk.co.bithatch.nativeimage.annotations;
+	requires transitive java.prefs;
     
     uses PlatformServiceFactory;
     uses DNSProvider.Factory;

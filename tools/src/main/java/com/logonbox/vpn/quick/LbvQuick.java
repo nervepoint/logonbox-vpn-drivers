@@ -22,6 +22,7 @@ import java.util.ServiceLoader;
 import java.util.StringTokenizer;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.stream.Collectors;
 
 import com.logonbox.vpn.drivers.lib.DNSProvider;
 import com.logonbox.vpn.drivers.lib.ElevatableSystemCommands;
@@ -31,6 +32,7 @@ import com.logonbox.vpn.drivers.lib.SystemCommands;
 import com.logonbox.vpn.drivers.lib.SystemConfiguration;
 import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.Vpn;
+import com.logonbox.vpn.drivers.lib.Vpn.Builder;
 import com.logonbox.vpn.drivers.lib.VpnAdapter;
 import com.logonbox.vpn.drivers.lib.VpnConfiguration;
 import com.sshtools.liftlib.OS;
@@ -43,7 +45,7 @@ import picocli.CommandLine.ParentCommand;
 import uk.co.bithatch.nativeimage.annotations.Resource;
 
 @Command(name = "lbv-quick", description = "Set up a WireGuard interface simply.", mixinStandardHelpOptions = true, subcommands = {
-        LbvQuick.Up.class, LbvQuick.Down.class, LbvQuick.Save.class, LbvQuick.Strip.class, LbvQuick.DNS.class, LbvQuick.DNSProviders.class })
+        LbvQuick.Up.class, LbvQuick.Down.class, LbvQuick.Save.class, LbvQuick.Strip.class, LbvQuick.Safe.class, LbvQuick.DNS.class, LbvQuick.DNSProviders.class })
 @Resource({ "windows-task\\.xml" })
 public class LbvQuick extends AbstractCommand implements SystemContext {
 
@@ -245,13 +247,17 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 	            if(file.isPresent())
 	            	bldr.withVpnConfiguration(file.get());
             }
+            onBuild(bldr);
 
             var vpn = bldr.build();
             vpn.platformService().context().commands().onLog(LbvQuick::logCommandLine);
             return onCall(vpn, file, ifaceName);
         }
         
-        protected abstract Integer onCall(Vpn vpn, Optional<Path> configFile, Optional<String> interfaceName) throws Exception;
+        protected void onBuild(Builder bldr) {
+        }
+
+		protected abstract Integer onCall(Vpn vpn, Optional<Path> configFile, Optional<String> interfaceName) throws Exception;
 
     }
 
@@ -261,8 +267,17 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
         @Option(names = { "-x", "--expire" }, paramLabel = "SECONDS", description = "Expire this connection after the specified number of seconds. ")
         private Optional<Long> expire;
 
+        @Option(names = { "-I",
+                "--native-iface" }, paramLabel = "NAME", description = "The native interface name to use. This is platform specific, for example on Mac OS this would default to `utun[number]`. On Windows it would be `net[number]`. On Linux, network interface names are more flexible, and this will default to the name derived from the configuration file name")
+        private Optional<String> nativeName;
+
 
         @Override
+		protected void onBuild(Builder bldr) {
+        	bldr.withNativeInterfaceName(nativeName);
+		}
+
+		@Override
         protected Integer onCall(Vpn vpn, Optional<Path> configFile, Optional<String> interfaceName) throws Exception {
             vpn.open();
             if(expire.isPresent()) 
@@ -288,9 +303,51 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
     @Command(name = "strip", description = "Output the stripped down configuration suitable for use with `lbv`.")
     public final static class Strip extends AbstractQuickCommand {
 
+        @Option(names = { "-o",
+                "--output" }, paramLabel = "PATH", description = "Path to output to. When ommitted, defaults to stdout.")
+        private Optional<Path> output;
+
         @Override
         protected Integer onCall(Vpn vpn, Optional<Path> configFile, Optional<String> interfaceName) throws Exception {
             vpn.adapter().configuration().write(System.out);
+
+        	if(output.isEmpty()) {
+        		vpn.adapter().configuration().write(System.out);
+        	}
+        	else {
+        		try(var out = Files.newOutputStream(output.get())) {
+        			vpn.adapter().configuration().write(out);
+        		}
+        	}
+            return 0;
+        }
+
+    }
+
+    @Command(name = "safe", description = "Remove a private key from a configuration and replace it with it's public key. Intended for use with piping configuration to the `down` command.")
+    public final static class Safe extends AbstractQuickCommand {
+
+        @Option(names = { "-o",
+                "--output" }, paramLabel = "PATH", description = "Path to output to. When ommitted, defaults to stdout.")
+        private Optional<Path> output;
+    	
+        @Override
+        protected Integer onCall(Vpn vpn, Optional<Path> configFile, Optional<String> interfaceName) throws Exception {
+        	var cfg = vpn.configuration();
+        	
+        	var bldr = new VpnConfiguration.Builder();
+        	bldr.fromConfiguration(cfg);
+        	bldr.withoutPrivateKey();
+        	
+        	var newCfg = bldr.build();
+        	if(output.isEmpty()) {
+        		newCfg.write(System.out);
+        	}
+        	else {
+        		try(var out = Files.newOutputStream(output.get())) {
+            		newCfg.write(out);
+        		}
+        	}
             return 0;
         }
 
@@ -474,7 +531,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 				 */
 				taskArgs.add("down");
 				taskArgs.add(configurationFile.toString());
-				var taskCmd = String.join(" ", taskArgs.stream().map(LbvQuick::wrapWithQuotes).toList());
+				var taskCmd = String.join(" ", taskArgs.stream().map(LbvQuick::wrapWithQuotes).collect(Collectors.toList()));
 				context.commands().privileged().pipeTo(taskCmd, cmds.toArray(new String[0]));
 			}
 			else {
@@ -506,7 +563,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 					str = str.replace("${cmd}", taskArgs.get(0));
 					str = str.replace("${cwd}", System.getProperty("user.dir"));
 					str = str.replace("${args}", String.join(" ", 
-							taskArgs.subList(1, taskArgs.size()).stream().map(LbvQuick::wrapWithEncodedQuotes).toList()));
+							taskArgs.subList(1, taskArgs.size()).stream().map(LbvQuick::wrapWithEncodedQuotes).collect(Collectors.toList())));
 					
 					try(var out = new PrintWriter(Files.newBufferedWriter(xmlFile))) {
 						out.println(str);

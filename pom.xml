@@ -36,6 +36,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <native.image.annotations.version>0.9.0</native.image.annotations.version>
+        <dbus.version>4.3.1</dbus.version>
     </properties>
     <modules>
         <module>lib</module>
@@ -95,6 +96,20 @@
             <scope>provided</scope>
         </dependency>
     </dependencies>
+    <dependencyManagement>
+	    <dependencies>
+			<dependency>
+				<groupId>com.github.hypfvieh</groupId>
+				<artifactId>dbus-java-core</artifactId>
+				<version>${dbus.version}</version>
+			</dependency>
+            <dependency>
+                <groupId>com.github.hypfvieh</groupId>
+                <artifactId>dbus-java-transport-native-unixsocket</artifactId>
+				<version>${dbus.version}</version>
+            </dependency>
+	    </dependencies>
+	</dependencyManagement>
     <build>
         <plugins>
             <plugin>

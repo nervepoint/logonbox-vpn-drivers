@@ -26,21 +26,17 @@ public abstract class AbstractVirtualInetAddress<P extends PlatformService<?>> i
 	public final static String TABLE_OFF = "off";
 	
 	private int mtu;
-	private String name;
+	private final String name;
+	private final String nativeName;
 	private String peer;
 	private String table = TABLE_AUTO;
 	protected P platform;
     protected final SystemCommands commands;
 
-	public AbstractVirtualInetAddress(P platform) {
-		super();
-		this.platform = platform;
-	    commands = platform.context().commands();
-	}
-
-	public AbstractVirtualInetAddress(P platform, String name) {
+	public AbstractVirtualInetAddress(String name, String nativeName, P platform) {
 		super();
 		this.name = name;
+		this.nativeName = nativeName;
 		this.platform = platform;
 	    commands = platform.context().commands();
 	}
@@ -73,6 +69,11 @@ public abstract class AbstractVirtualInetAddress<P extends PlatformService<?>> i
 	@Override
 	public final int getMtu() {
 		return mtu;
+	}
+
+	@Override
+	public final String nativeName() {
+		return nativeName;
 	}
 
 	@Override

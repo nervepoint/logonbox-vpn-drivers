@@ -267,8 +267,14 @@ public interface VpnConfiguration extends VpnAdapterConfiguration {
         	ifaceSection.putAll("PreDown", preDown());
         if(preUp().length >0)
         	ifaceSection.putAll("PostDown", postDown());
+
+        if(!dns().isEmpty()) {
+        	ifaceSection.putAll("DNS", dns().toArray(new String[0]));
+        }
         
-        
+        mtu().ifPresent(mtu -> ifaceSection.put("MTU", mtu));
+        table().ifPresent(table -> ifaceSection.put("Table", table));
+                
         for(var peer : peers()) {
         	VpnAdapterConfiguration.writePeer(doc, peer);
         }

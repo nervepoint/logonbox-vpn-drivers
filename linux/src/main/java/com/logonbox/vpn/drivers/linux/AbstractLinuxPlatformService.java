@@ -26,14 +26,12 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.io.Writer;
-import java.net.InterfaceAddress;
 import java.net.NetworkInterface;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
@@ -41,10 +39,10 @@ import org.slf4j.LoggerFactory;
 
 import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
 import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
+import com.logonbox.vpn.drivers.lib.StartRequest;
 import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.VpnAdapter;
 import com.logonbox.vpn.drivers.lib.VpnConfiguration;
-import com.logonbox.vpn.drivers.lib.VpnPeer;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
 
 public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPlatformService<AbstractLinuxAddress> {
@@ -72,7 +70,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
                 if (!r.startsWith(" ")) {
                     String[] a = r.split(":");
                     String name = a[1].trim();
-                    l.add(lastLink = createAddress(name));
+                    l.add(lastLink = createAddress(nativeNameToInterfaceName(name).orElse(name), name));
                     state = IpAddressState.MAC;
                 } else if (lastLink != null) {
                     r = r.trim();
@@ -111,14 +109,14 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 
     @Override
     protected final AbstractLinuxAddress createVirtualInetAddress(NetworkInterface nif) throws IOException {
-        var ip = createAddress(nif.getName());
-        for (InterfaceAddress addr : nif.getInterfaceAddresses()) {
+        var ip = createAddress(nativeNameToInterfaceName(nif.getName()).orElse(nif.getName()), nif.getName());
+        for (var addr : nif.getInterfaceAddresses()) {
             ip.getAddresses().add(addr.getAddress().toString());
         }
         return ip;
     }
 
-    protected abstract AbstractLinuxAddress createAddress(String name);
+    protected abstract AbstractLinuxAddress createAddress(String name, String nativeName);
 
     @Override
     protected final String getDefaultGateway() throws IOException {
@@ -137,9 +135,10 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
     }
 
     @Override
-    protected final void onStart(Optional<String> interfaceName, VpnConfiguration configuration, VpnAdapter session,
-            Optional<VpnPeer> peer) throws IOException {
-        var ip = findAddress(interfaceName, configuration, true);
+    protected final void onStart(StartRequest startRequest, VpnAdapter session) throws IOException {
+		var configuration  = startRequest.configuration();
+		var peer = startRequest.peer();
+        var ip = findAddress(startRequest, true);
 
         /* Set the address reserved */
         if (configuration.addresses().size() > 0)

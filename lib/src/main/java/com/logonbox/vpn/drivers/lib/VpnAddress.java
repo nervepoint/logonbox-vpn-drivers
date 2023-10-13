@@ -63,17 +63,13 @@ public interface VpnAddress {
     String displayName();
 
     default String shortName() {
-        var name = name();
-        var nativeName = nativeName();
-        if(nativeName.equals(name))
-            return name;
+        if(hasVirtualName())
+            return String.format("%s (%s)", name(), nativeName());
         else
-            return String.format("%s (%s)", name, nativeName);
+            return name();
     }
 
-    default String nativeName() {
-        return name();
-    }
+    String nativeName();
     
     default boolean hasVirtualName() {
     	return !name().equals(nativeName());

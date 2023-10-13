@@ -46,6 +46,7 @@ import org.slf4j.LoggerFactory;
 
 import com.logonbox.vpn.drivers.lib.AbstractDesktopPlatformService;
 import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
+import com.logonbox.vpn.drivers.lib.StartRequest;
 import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.VpnAdapter;
 import com.logonbox.vpn.drivers.lib.VpnAdapterConfiguration;
@@ -287,8 +288,9 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 	}
 
 	@Override
-	protected void onStart(Optional<String> interfaceName, VpnConfiguration configuration, VpnAdapter session,
-			Optional<VpnPeer> peer) throws Exception {
+	protected void onStart(StartRequest startRequest, VpnAdapter session) throws Exception {
+		var configuration  = startRequest.configuration();
+		var peer = startRequest.peer();
 		WindowsAddress ip = null;
 
 		/*

@@ -29,17 +29,16 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
 import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
+import com.logonbox.vpn.drivers.lib.StartRequest;
 import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.VpnAdapter;
 import com.logonbox.vpn.drivers.lib.VpnConfiguration;
-import com.logonbox.vpn.drivers.lib.VpnPeer;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
 
 public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformService<UserspaceMacOsAddress> {
@@ -60,7 +59,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 	}
 
 	@Override
-	protected UserspaceMacOsAddress add(String name, String type) throws IOException {
+	protected UserspaceMacOsAddress add(String name, String nativeName, String type) throws IOException {
 		var priv = context().commands().privileged();
 		priv.result("mkdir", "/var/run/wireguard");
 		var tool = context().nativeComponents().tool(Tool.WIREGUARD_GO);
@@ -141,9 +140,12 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 	}
 
 	@Override
-	protected void onStart(Optional<String> interfaceName, VpnConfiguration configuration, VpnAdapter session,
-			Optional<VpnPeer> peer) throws IOException {
-		var ip = findAddress(interfaceName, configuration, true);
+	protected void onStart(StartRequest startRequest, VpnAdapter session) throws IOException {
+		
+		var configuration  = startRequest.configuration();
+		var peer = startRequest.peer();
+		
+		var ip = findAddress(startRequest, true);
 
 		var tempFile = Files.createTempFile("wg", "cfg");
 		try {

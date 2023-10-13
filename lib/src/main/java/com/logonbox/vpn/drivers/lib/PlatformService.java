@@ -76,14 +76,11 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	/**
 	 * Connect, optionally waiting for the first handshake from the given peer.
 	 * 
-	 * @param interfaceName TODO
-	 * @param configuration the configuration
-	 * @param peer          peer from which to wait for the first handshake from
-	 * 
+	 * @param startRequest start request
 	 * @return the session that can be used to control the interface
 	 * @throws IOException on any error
 	 */
-	VpnAdapter start(Optional<String> interfaceName, VpnConfiguration configuration, Optional<VpnPeer> peer)
+	VpnAdapter start(StartRequest startRequest)
 			throws IOException;
 
 	/**
@@ -112,7 +109,7 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	List<ADDR> addresses();
 
 	/**
-	 * Get all adapters. These are {@link VpnAddress}es that have beeon configured
+	 * Get all adapters. These are {@link VpnAddress}es that have been configured
 	 * as wireguard adapters. An adapter always has an address, but an address may
 	 * not (yet) have an adapter.
 	 * 
@@ -282,5 +279,22 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	 * @throws IOException if peer cannot be removed
 	 */
 	void remove(VpnAdapter vpnAdapter, String publicKey) throws IOException;
+	
+	/**
+	 * Get the last native name of an interface given its wireguard interface
+	 * name. 
+	 * 
+	 * @param name wireguard interface name (e.g. derived from configuration file name)
+	 * @return native name of interface
+	 */
+	Optional<String> interfaceNameToNativeName(String name);
+	
+	/**
+	 * Get the last registered wireguard interface name given the native interface name.
+	 * 
+	 * @param name native interface name
+	 * @return wireguard interface name
+	 */
+	Optional<String> nativeNameToInterfaceName(String name);
 
 }

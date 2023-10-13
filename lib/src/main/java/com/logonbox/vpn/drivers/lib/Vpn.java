@@ -19,6 +19,7 @@ public final class Vpn implements Closeable {
     public final static class Builder {
 
         private Optional<String> interfaceName = Optional.empty();
+        private Optional<String> nativeInterfaceName = Optional.empty();
         private Optional<PlatformService<?>> platformService = Optional.empty();
         private Optional<VpnConfiguration> vpnConfiguration = Optional.empty();
         private Optional<VpnPeer> vpnPeer = Optional.empty();
@@ -64,6 +65,15 @@ public final class Vpn implements Closeable {
             return this;
         }
 
+        public Builder withNativeInterfaceName(String nativeInterfaceName) {
+            return withNativeInterfaceName(Optional.of(nativeInterfaceName));
+        }
+        
+        public Builder withNativeInterfaceName(Optional<String> nativeInterfaceName) {
+            this.nativeInterfaceName = nativeInterfaceName;
+            return this;
+        }
+
         public Builder withInterfaceName(String interfaceName) {
             return withInterfaceName(Optional.of(interfaceName));
         }
@@ -95,6 +105,7 @@ public final class Vpn implements Closeable {
     private final VpnConfiguration cfg;
     private final Optional<VpnPeer> peer;
     private final Optional<String> interfaceName;
+    private final Optional<String> nativeInterfaceName;
 
     private Optional<VpnAdapter> adapter = Optional.empty();
 
@@ -102,6 +113,7 @@ public final class Vpn implements Closeable {
     private Vpn(Builder builder) {
         onAddScriptEnvironment = builder.onAddScriptEnvironment;
         interfaceName = builder.interfaceName;
+        nativeInterfaceName = builder.nativeInterfaceName;
         cfg = builder.vpnConfiguration.orElseThrow(() -> new IllegalStateException("No VPN configuration supplied."));
         
         /* If no specific peer, then try to find the first with an endpoint address and
@@ -123,20 +135,36 @@ public final class Vpn implements Closeable {
             platformService = PlatformService.create(builder.systemContext.orElseGet(() -> new VpnSystemContext(builder.onAlert, builder.systemConfiguration)));
         }
         
-		adapter = peer.map(p -> {
+        if(interfaceName.isPresent()) {
 			try {
-				if(interfaceName.isPresent()) {
-					try {
-						return Optional.of(platformService.adapter(interfaceName.get()));
-					}
-					catch(IllegalArgumentException iae) {
-					}
-				}
-				return platformService.getByPublicKey(p.publicKey());
-			} catch (IOException e) {
+				adapter = Optional.of(platformService.adapter(new InterfaceNameResolver(platformService).resolve(cfg, interfaceName, nativeInterfaceName).resolvedName().orElseThrow(()-> new IllegalArgumentException("Could not resolve interface name."))));
+			}
+			catch(Exception iae) {
+			}
+		}
+        else {
+			try {
+				adapter = platformService.getByPublicKey(cfg.publicKey());
+			} 
+			catch (IOException e) {
 				throw new UncheckedIOException(e);
 			}
-		}).orElse(Optional.empty());
+        }
+        
+//		adapter = peer.map(p -> {
+//			try {
+//				if(interfaceName.isPresent()) {
+//					try {
+//						return Optional.of(platformService.adapter(new InterfaceNameResolver(platformService).resolve(cfg, interfaceName, nativeInterfaceName).resolvedName().orElseThrow(()-> new IllegalArgumentException("Could not resolve interface name."))));
+//					}
+//					catch(Exception iae) {
+//					}
+//				}
+//				return platformService.getByPublicKey(p.publicKey());
+//			} catch (IOException e) {
+//				throw new UncheckedIOException(e);
+//			}
+//		}).orElse(Optional.empty());
     }
     
     public boolean started() {
@@ -144,11 +172,18 @@ public final class Vpn implements Closeable {
     }
     
     public void open() throws IOException {
- /* Either start a new session, or find an existing one */
+    	/* Either start a new session, or find an existing one */
+    	
         if(adapter.isPresent())
             throw new IllegalStateException(MessageFormat.format("`{0}` already exists", adapter().address().shortName()));
         
-        adapter = Optional.of(platformService.start(interfaceName, cfg, peer));
+        var req = new StartRequest.Builder(cfg).
+        		withNativeInterfaceName(nativeInterfaceName).
+        		withInterfaceName(interfaceName).
+        		withPeer(peer).
+        		build();
+        
+        adapter = Optional.of(platformService.start(req));
     }
     
     public Optional<String> interfaceName() {

@@ -20,19 +20,17 @@
  */
 package com.logonbox.vpn.drivers.macos;
 
-import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
-import com.logonbox.vpn.drivers.lib.SystemContext;
-import com.logonbox.vpn.drivers.lib.VpnAdapter;
-import com.logonbox.vpn.drivers.lib.VpnConfiguration;
-import com.logonbox.vpn.drivers.lib.VpnPeer;
+import java.io.IOException;
+import java.net.NetworkInterface;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.net.NetworkInterface;
-import java.util.List;
-import java.util.Optional;
+import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
+import com.logonbox.vpn.drivers.lib.StartRequest;
+import com.logonbox.vpn.drivers.lib.SystemContext;
+import com.logonbox.vpn.drivers.lib.VpnAdapter;
 
 public class KernelMacOsPlatformService extends AbstractUnixDesktopPlatformService<KernelMacOsAddress> {
 
@@ -63,7 +61,7 @@ public class KernelMacOsPlatformService extends AbstractUnixDesktopPlatformServi
 	}
 
 	@Override
-	protected void onStart(Optional<String> interfaceName, VpnConfiguration configuration, VpnAdapter logonBoxVPNSession, Optional<VpnPeer> peer)
+	protected void onStart(StartRequest startRequest, VpnAdapter session)
 			throws IOException {
 		throw new UnsupportedOperationException("TODO");
 	}
@@ -79,7 +77,7 @@ public class KernelMacOsPlatformService extends AbstractUnixDesktopPlatformServi
     }
 
     @Override
-    protected KernelMacOsAddress add(String name, String type) throws IOException {
+    protected KernelMacOsAddress add(String name, String nativeName, String type) throws IOException {
         throw new UnsupportedOperationException("TODO");
     }
 

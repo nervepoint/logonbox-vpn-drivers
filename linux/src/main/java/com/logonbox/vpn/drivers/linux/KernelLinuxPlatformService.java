@@ -32,13 +32,13 @@ public class KernelLinuxPlatformService extends AbstractLinuxPlatformService {
     }
 
     @Override
-    protected AbstractLinuxAddress add(String name, String type) throws IOException {
-        context().commands().privileged().logged().result("ip", "link", "add", "dev", name, "type", type);
-        return find(name, addresses()).orElseThrow(() -> new IOException(MessageFormat.format("Could not find new network interface {0}", name)));
+    protected AbstractLinuxAddress add(String name, String nativeName, String type) throws IOException {
+        context().commands().privileged().logged().result("ip", "link", "add", "dev", nativeName, "type", type);
+        return find(nativeName, addresses()).orElseThrow(() -> new IOException(MessageFormat.format("Could not find new network interface {0}", nativeName)));
     }
 
     @Override
-    protected AbstractLinuxAddress createAddress(String name) {
-        return new KernelLinuxAddress(name, this);
+    protected AbstractLinuxAddress createAddress(String name, String nativeName) {
+        return new KernelLinuxAddress(name, nativeName, this);
     }
 }

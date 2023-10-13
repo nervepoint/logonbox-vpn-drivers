@@ -34,6 +34,7 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.prefs.Preferences;
 
 public abstract class AbstractPlatformService<I extends VpnAddress> implements PlatformService<I> {
 	final static Logger LOG = LoggerFactory.getLogger(AbstractPlatformService.class);
@@ -75,6 +76,42 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
     }
 
     @Override
+	public Optional<String> nativeNameToInterfaceName(String name) {
+    	var map = getNativeNameToNameNode();
+    	try {
+	    	var pref = context().commands().privileged().task(new Prefs.GetValue(map, name, ""));
+			return pref.equals("") ? Optional.empty() : Optional.of(pref);
+    	}
+    	catch(Exception e) {
+    		throw new IllegalStateException(e);
+    	}
+	}
+
+    @Override
+	public Optional<String> interfaceNameToNativeName(String name) {
+    	var map = getNameToNativeNameNode();
+    	try {
+	    	var pref = context().commands().privileged().task(new Prefs.GetValue(map, name, ""));
+			return pref.equals("") ? Optional.empty() : Optional.of(pref);
+    	}
+    	catch(Exception e) {
+    		throw new IllegalStateException(e);
+    	}
+	}
+
+	protected Preferences getNameToNativeNameNode() {
+		var sys = Preferences.systemNodeForPackage(AbstractPlatformService.class);
+    	var map = sys.node("iface2Native");
+		return map;
+	}
+
+	protected Preferences getNativeNameToNameNode() {
+		var sys = Preferences.systemNodeForPackage(AbstractPlatformService.class);
+    	var map = sys.node("native2Iface");
+		return map;
+	}
+
+	@Override
     public SystemContext context() {
         if(context == null)
             throw new IllegalStateException("Service not started.");
@@ -174,16 +211,16 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
 		}
 	}
 
-	protected final Optional<I> find(String name, Iterable<I> links) {
+	protected final Optional<I> find(String nativeName, Iterable<I> links) {
 		for (var link : links)
-			if (Objects.equals(name, link.name()))
+			if (Objects.equals(nativeName, link.nativeName()))
 				return Optional.of(link);
 		return Optional.empty();
 	}
 
-    protected final Optional<VpnAdapter> findAdapter(String name, Iterable<VpnAdapter> links) {
+    protected final Optional<VpnAdapter> findAdapter(String nativeName, Iterable<VpnAdapter> links) {
         for (var link : links)
-            if (Objects.equals(name, link.address().name()))
+            if (Objects.equals(nativeName, link.address().nativeName()))
                 return Optional.of(link);
         return Optional.empty();
     }

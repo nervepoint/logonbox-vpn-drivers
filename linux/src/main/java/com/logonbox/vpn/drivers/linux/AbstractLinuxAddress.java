@@ -53,8 +53,8 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
     private Set<String> addresses = new LinkedHashSet<>();
     private boolean haveSetFirewall;
 
-    AbstractLinuxAddress(String name, AbstractLinuxPlatformService platform) {
-        super(platform, name);
+    AbstractLinuxAddress(String name, String nativeName, AbstractLinuxPlatformService platform) {
+        super(name, nativeName, platform);
         haveSetFirewall = calcFirewallSet();
     }
 
@@ -428,7 +428,7 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
     private int getFWMark(String table) {
         try {
             Collection<String> lines = commands.privileged().output(platform.context().nativeComponents().tool(Tool.WG), "show",
-                    name(), "fwmark");
+                    nativeName(), "fwmark");
             if (lines.isEmpty())
                 throw new IOException();
             else {

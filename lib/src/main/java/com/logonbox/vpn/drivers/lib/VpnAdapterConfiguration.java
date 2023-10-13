@@ -144,6 +144,12 @@ public interface VpnAdapterConfiguration extends Serializable {
             return (B) this;
         }
 
+        @SuppressWarnings("unchecked")
+        public B withoutPrivateKey() {
+        	this.privateKey = null;
+        	return (B)this;
+        }
+        
         public B withPrivateKey(String privateKey) {
             return withPrivateKey(Optional.of(privateKey));
         }
@@ -193,15 +199,15 @@ public interface VpnAdapterConfiguration extends Serializable {
 	class DefaultVpnAdapterConfiguration implements VpnAdapterConfiguration {
 
         private final int listenPort;
-        private final String privateKey;
+        private final Optional<String> privateKey;
         private final String publicKey;
         private final List<VpnPeer> peers;
         private final int fwMark;
 
         DefaultVpnAdapterConfiguration(AbstractBuilder<?> builder) {
             listenPort = builder.listenPort.orElse(0);
-            privateKey = builder.privateKey.orElse(Keys.genkey().getBase64PrivateKey());
-            publicKey = builder.publicKey.orElse(Keys.pubkey(privateKey).getBase64PublicKey());
+            privateKey = builder.privateKey == null ? Optional.empty() : Optional.of(builder.privateKey.orElse(Keys.genkey().getBase64PrivateKey()));
+            publicKey = builder.publicKey.orElseGet(() -> Keys.pubkey(privateKey.orElseThrow(() -> new IllegalStateException("No public key, and no private key, so public key cannot be derived."))).getBase64PublicKey());
             peers = Collections.unmodifiableList(new ArrayList<>(builder.peers));
             fwMark = builder.fwMark.orElse(0);
         }
@@ -218,7 +224,7 @@ public interface VpnAdapterConfiguration extends Serializable {
 
         @Override
         public final String privateKey() {
-            return privateKey;
+            return privateKey.orElseThrow(() -> new IllegalStateException("Configuration has no private key."));
         }
 
         @Override
@@ -300,7 +306,12 @@ public interface VpnAdapterConfiguration extends Serializable {
         var doc = INI.create();
         
         var ifaceSection = doc.create("Interface");
-        ifaceSection.put("PrivateKey", adapter.privateKey());
+        try {
+        	ifaceSection.put("PrivateKey", adapter.privateKey());
+        }
+        catch(IllegalStateException ise) {
+        	ifaceSection.put("PublicKey", adapter.publicKey());
+        }
         adapter.listenPort().ifPresent(p -> ifaceSection.put("ListenPort", p));
         adapter.fwMark().ifPresent(p -> ifaceSection.put("FwMark", p));
         
