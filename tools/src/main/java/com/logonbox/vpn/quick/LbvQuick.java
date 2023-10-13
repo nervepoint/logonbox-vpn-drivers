@@ -3,9 +3,12 @@ package com.logonbox.vpn.quick;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -14,6 +17,7 @@ import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +38,7 @@ import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.Vpn;
 import com.logonbox.vpn.drivers.lib.Vpn.Builder;
 import com.logonbox.vpn.drivers.lib.VpnAdapter;
+import com.logonbox.vpn.drivers.lib.VpnAdapterConfiguration;
 import com.logonbox.vpn.drivers.lib.VpnConfiguration;
 import com.sshtools.liftlib.OS;
 
@@ -212,7 +217,13 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
         @ParentCommand
         protected LbvQuick parent;
 
-        @Parameters(arity = "1", paramLabel = "CONFIG_FILE | INTERFACE", description = "CONFIG_FILE is a configuration file, whose filename is the interface name followed by `.conf'. Otherwise, INTERFACE is an interface name, with configuration found at in the system specific configuration search path (or that provided by the --configuration-search-path option).")
+        @Parameters(arity = "1", paramLabel = "CONFIG_FILE | URL | INTERFACE", description = 
+        		"CONFIG_FILE is a configuration file, whose filename is the interface name " 
+        		+ "followed by `.conf'. It can also be the entire content of a configuration file "
+        		+ "if it starts with '['. A URL is also possible, which includes data URL. " 
+        		+ "Otherwise, INTERFACE is an interface name, with "
+        		+ "configuration found at in the system specific configuration search path "
+        		+ "(or that provided by the --configuration-search-path option).")
         private Path configFileOrInterface;
 
         @Override
@@ -223,29 +234,46 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 
             Optional<String> ifaceName = Optional.empty();
             var bldr = new Vpn.Builder().withSystemContext(parent);
-            if(configFileOrInterface.toString().equals("-")) {
+            
+            
+            var cfgStr = configFileOrInterface.toString();
+			if(cfgStr.equals("[")) {
             	bldr.withVpnConfiguration(new InputStreamReader(System.in));
             }
+            else if(cfgStr.equals("-")) {
+            	bldr.withVpnConfiguration(new InputStreamReader(System.in));
+            }
+            else if(cfgStr.startsWith("data:text/plain;base64,")) {
+            	bldr.withVpnConfiguration(new String(Base64.getDecoder().decode(cfgStr.substring(23)), "UTF-8"));
+            }
             else {
-	            if (Files.exists(configFileOrInterface)) {
-	                var iface = parent.toInterfaceName(configFileOrInterface);
-	                ifaceName = Optional.of(iface);
-					bldr.withInterfaceName(iface);
-	                file = Optional.of(configFileOrInterface);
-	            }
-	            else {
-	                var iface = configFileOrInterface.toString();
-	                bldr.withInterfaceName(iface);
-	                ifaceName = Optional.of(iface);
-	                try {
-	                	file = Optional.of(parent.findConfig(iface));
-	                }
-	                catch(IOException ioe) {
-	                	file = Optional.empty();
-	                }
-	            }
-	            if(file.isPresent())
-	            	bldr.withVpnConfiguration(file.get());
+            	try {
+            		var url = new URL(cfgStr);
+            		try(var in = url.openStream()) {
+            			bldr.withVpnConfiguration(new InputStreamReader(in));
+            		}
+            	}
+            	catch(MalformedURLException murle) {
+		            if (Files.exists(configFileOrInterface)) {
+		                var iface = parent.toInterfaceName(configFileOrInterface);
+		                ifaceName = Optional.of(iface);
+						bldr.withInterfaceName(iface);
+		                file = Optional.of(configFileOrInterface);
+		            }
+		            else {
+		                var iface = cfgStr;
+		                bldr.withInterfaceName(iface);
+		                ifaceName = Optional.of(iface);
+		                try {
+		                	file = Optional.of(parent.findConfig(iface));
+		                }
+		                catch(IOException ioe) {
+		                	file = Optional.empty();
+		                }
+		            }
+		            if(file.isPresent())
+		            	bldr.withVpnConfiguration(file.get());
+            	}
             }
             onBuild(bldr);
 
@@ -300,37 +328,62 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 
     }
 
-    @Command(name = "strip", description = "Output the stripped down configuration suitable for use with `lbv`.")
-    public final static class Strip extends AbstractQuickCommand {
+    protected enum Encoding {
+    	PLAIN, DATA_URI
+    }
 
-        @Option(names = { "-o",
-                "--output" }, paramLabel = "PATH", description = "Path to output to. When ommitted, defaults to stdout.")
+    protected abstract static class AbstractOutputCommand extends AbstractQuickCommand {
+
+        @Option(names = { "-o",         "--output" }, paramLabel = "PATH", description = "Path to output to. When ommitted, defaults to stdout.")
         private Optional<Path> output;
+        
+        @Option(names = { "-E", "--output-encoding" }, paramLabel = "ENCODING", description = "How to encode the output.")
+        private Encoding encoding = Encoding.PLAIN;
 
-        @Override
-        protected Integer onCall(Vpn vpn, Optional<Path> configFile, Optional<String> interfaceName) throws Exception {
-            vpn.adapter().configuration().write(System.out);
-
+    	
+        protected void output(VpnAdapterConfiguration cfg) throws Exception {
         	if(output.isEmpty()) {
-        		vpn.adapter().configuration().write(System.out);
+        		output(System.out, cfg);
         	}
         	else {
         		try(var out = Files.newOutputStream(output.get())) {
-        			vpn.adapter().configuration().write(out);
+            		output(out, cfg);
         		}
         	}
+        }
+
+        protected void output(OutputStream out, VpnAdapterConfiguration cfg) throws Exception {
+        	switch(encoding) {
+        	case DATA_URI:
+        		var str = cfg.write();
+        		var bldr = new StringBuilder();
+        		bldr.append("data:text/plain;base64,");
+        		bldr.append(Base64.getEncoder().encodeToString(str.getBytes("UTF-8")));
+        		out.write(bldr.toString().getBytes("UTF-8"));
+        		break;
+        	default:
+        		cfg.write(out);
+        		break;
+        	}
+        	out.flush();
+        }
+
+    }
+
+    @Command(name = "strip", description = "Output the stripped down configuration suitable for use with `lbv`.")
+    public final static class Strip extends AbstractOutputCommand {
+
+        @Override
+        protected Integer onCall(Vpn vpn, Optional<Path> configFile, Optional<String> interfaceName) throws Exception {
+        	output(vpn.adapter().configuration());
             return 0;
         }
 
     }
 
     @Command(name = "safe", description = "Remove a private key from a configuration and replace it with it's public key. Intended for use with piping configuration to the `down` command.")
-    public final static class Safe extends AbstractQuickCommand {
+    public final static class Safe extends AbstractOutputCommand {
 
-        @Option(names = { "-o",
-                "--output" }, paramLabel = "PATH", description = "Path to output to. When ommitted, defaults to stdout.")
-        private Optional<Path> output;
-    	
         @Override
         protected Integer onCall(Vpn vpn, Optional<Path> configFile, Optional<String> interfaceName) throws Exception {
         	var cfg = vpn.configuration();
@@ -339,15 +392,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
         	bldr.fromConfiguration(cfg);
         	bldr.withoutPrivateKey();
         	
-        	var newCfg = bldr.build();
-        	if(output.isEmpty()) {
-        		newCfg.write(System.out);
-        	}
-        	else {
-        		try(var out = Files.newOutputStream(output.get())) {
-            		newCfg.write(out);
-        		}
-        	}
+        	output(bldr.build());
             return 0;
         }
 
