@@ -25,6 +25,7 @@ import java.util.Objects;
 
 import uk.co.bithatch.nativeimage.annotations.Serialization;
 
+@Deprecated
 public class NetSHDNSProvider implements DNSProvider {
     private final static Logger LOG = LoggerFactory.getLogger(NetSHDNSProvider.class);
 

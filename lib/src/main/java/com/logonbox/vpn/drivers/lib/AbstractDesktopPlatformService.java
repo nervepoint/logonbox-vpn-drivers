@@ -235,7 +235,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 
 	protected Path extractCommand(String platform, String arch, String name) throws IOException {
 		LOG.info("Extracting command {} for platform {} on arch {}", name, platform, arch);
-		try(InputStream in = getClass().getResource("/" + platform + "-" + arch + "/" + name).openStream()) {
+		try(var in = getClass().getResource("/" + platform + "-" + arch + "/" + name).openStream()) {
 			Path path = getTempCommandDir().resolve(name);
 			try(OutputStream out = Files.newOutputStream(path)) {
 				in.transferTo(out);

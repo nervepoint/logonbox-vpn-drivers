@@ -304,7 +304,13 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 
 		/* Install service for the network interface */
 		var tool = Paths.get(context().nativeComponents().tool(Tool.NETWORK_CONFIGURATION_SERVICE));
-		var install = context().commands().privileged().logged().task(new InstallService(ip.nativeName(), cwd.toAbsolutePath().toString(), confDir.toAbsolutePath().toString(), tool.toAbsolutePath().toString(), transformedConfiguration.write())).booleanValue();
+		var install = context().commands().privileged().logged().task(new InstallService(
+			ip.nativeName(), 
+			cwd.toAbsolutePath().toString(), 
+			confDir.toAbsolutePath().toString(), 
+			tool.toAbsolutePath().toString(), 
+			transformedConfiguration.write())
+		).booleanValue();
 		/*
 		 * About to start connection. The "last handshake" should be this value or later
 		 * if we get a valid connection
@@ -346,7 +352,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 					context.configuration().connectTimeout().get());
 		}
 
-		/* DNS */
+		/* DNS (optional with Windows kernel driver) */
 		try {
 			dns(configuration, ip);
 		} catch (IOException | RuntimeException ioe) {
@@ -402,6 +408,11 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 	protected void transformInterface(VpnConfiguration configuration, VpnConfiguration.Builder writer) {
 		if (!configuration.addresses().isEmpty()) {
 			writer.withAddresses(configuration.addresses());
+		}
+		
+		var dnsProvider = dns();
+		if(dnsProvider.isEmpty() || dnsProvider.get() instanceof NullDNSProvider) {
+			writer.withDns(configuration.dns());
 		}
 	}
 

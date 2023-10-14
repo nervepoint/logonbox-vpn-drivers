@@ -13,6 +13,7 @@ public class WindowsDNSProviderFactory implements DNSProvider.Factory {
     @Override
     public <P extends DNSProvider> Class<P>[] available() {
         return new Class[] {
+        	NullDNSProvider.class,
             NetSHDNSProvider.class
         };
     }
@@ -20,16 +21,19 @@ public class WindowsDNSProviderFactory implements DNSProvider.Factory {
     @Override
     public DNSProvider create(Optional<Class<? extends DNSProvider>> clazz) {
         if(clazz.isPresent()) {
-            /* Don't use reflection her for native images' sake */
+            /* Don't use reflection here for native images' sake */
             var clazzVal = clazz.get();
             if(clazzVal.equals(NetSHDNSProvider.class)) {
                 return new NetSHDNSProvider();
+            }
+            else if(clazzVal.equals(NullDNSProvider.class)) {
+                return new NullDNSProvider();
             }
             else
                 throw new IllegalArgumentException(clazzVal.toString());
         }
         else {
-            return create(Optional.of(NetSHDNSProvider.class));
+            return create(Optional.of(NullDNSProvider.class));
         }
     }
     

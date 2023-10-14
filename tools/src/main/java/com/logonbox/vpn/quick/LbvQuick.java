@@ -353,10 +353,10 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
             if(!vpn.started())
                 throw new IOException(MessageFormat.format("`{0}` is not a VPN interface.", vpn.interfaceName().get()));
             try {
-            	vpn.close();
+            	unexpire(parent, vpn);
             }
             finally {
-            	unexpire(parent, vpn);
+            	vpn.close();
             }
             return 0;
         }
