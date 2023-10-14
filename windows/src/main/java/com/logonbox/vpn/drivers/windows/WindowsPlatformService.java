@@ -59,6 +59,7 @@ import com.logonbox.vpn.drivers.windows.WindowsSystemServices.Status;
 import com.logonbox.vpn.drivers.windows.WindowsSystemServices.Win32Service;
 import com.logonbox.vpn.drivers.windows.WindowsSystemServices.XAdvapi32;
 import com.logonbox.vpn.drivers.windows.WindowsSystemServices.XWinsvc;
+import com.logonbox.vpn.drivers.windows.WireguardLibrary.Key;
 import com.sshtools.liftlib.ElevatedClosure;
 import com.sun.jna.Native;
 import com.sun.jna.platform.win32.Advapi32;
@@ -482,6 +483,148 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 	@Serialization
 	public final static class GetInformation implements ElevatedClosure<VpnInterfaceInformation, Serializable> {
 
+		@Serialization
+		public static final class WindowsVpnInterfaceInformation implements VpnInterfaceInformation {
+			private String ifacePublicKey;
+			private ArrayList<VpnPeerInformation> peers;
+			private long txV;
+			private int ifaceListenPort;
+			private String ifacePrivateKey;
+			private long hs;
+			private long rxV;
+			private String name;
+			
+			public WindowsVpnInterfaceInformation() {
+			}
+
+			public WindowsVpnInterfaceInformation(String name, String ifacePublicKey, ArrayList<VpnPeerInformation> peers, long txV,
+					int ifaceListenPort, String ifacePrivateKey, long hs, long rxV) {
+				this.ifacePublicKey = ifacePublicKey;
+				this.peers = peers;
+				this.txV = txV;
+				this.ifaceListenPort = ifaceListenPort;
+				this.ifacePrivateKey = ifacePrivateKey;
+				this.hs = hs;
+				this.rxV = rxV;
+				this.name = name;
+			}
+
+			@Override
+			public long tx() {
+				return txV;
+			}
+
+			@Override
+			public Optional<String> error() {
+				return Optional.empty();
+			}
+
+			@Override
+			public long rx() {
+				return rxV;
+			}
+
+			@Override
+			public List<VpnPeerInformation> peers() {
+				return peers;
+			}
+
+			@Override
+			public String interfaceName() {
+				return name;
+			}
+
+			@Override
+			public Instant lastHandshake() {
+				return Instant.ofEpochMilli(hs);
+			}
+
+			@Override
+			public Optional<Integer> listenPort() {
+				return Optional.of(ifaceListenPort);
+			}
+
+			@Override
+			public Optional<Integer> fwmark() {
+				return Optional.empty();
+			}
+
+			@Override
+			public String publicKey() {
+				return ifacePublicKey;
+			}
+
+			@Override
+			public String privateKey() {
+				return ifacePrivateKey;
+			}
+		}
+
+		@Serialization
+		public static final class WindowsVpnPeerInformation implements VpnPeerInformation {
+			private Instant thisHandshake;
+			private Key peerPresharedKey;
+			private long pRx;
+			private String peerPublicKey;
+			private List<String> allowedIps;
+			private long pTx;
+			
+			public WindowsVpnPeerInformation() {
+			}
+
+			public WindowsVpnPeerInformation(Instant thisHandshake, Key peerPresharedKey, long pRx,
+					String peerPublicKey, List<String> allowedIps, long pTx) {
+				this.thisHandshake = thisHandshake;
+				this.peerPresharedKey = peerPresharedKey;
+				this.pRx = pRx;
+				this.peerPublicKey = peerPublicKey;
+				this.allowedIps = allowedIps;
+				this.pTx = pTx;
+			}
+
+			@Override
+			public long tx() {
+				return pTx;
+			}
+
+			@Override
+			public long rx() {
+				return pRx;
+			}
+
+			@Override
+			public Instant lastHandshake() {
+				return thisHandshake;
+			}
+
+			@Override
+			public Optional<String> error() {
+				return Optional.empty();
+			}
+
+			@Override
+			public Optional<InetSocketAddress> remoteAddress() {
+				/* TODO: Not available? */
+				return Optional.empty();
+			}
+
+			@Override
+			public String publicKey() {
+				return peerPublicKey;
+			}
+
+			@Override
+			public Optional<String> presharedKey() {
+				return peerPresharedKey == null ? Optional.empty()
+						: Optional.of(peerPresharedKey.toString());
+			}
+
+			@Override
+			public List<String> allowedIps() {
+				return allowedIps;
+			}
+		}
+
 		private String name;
 		private String nativeName;
 
@@ -513,49 +656,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 					var pRx = peer.rxBytes;
 					var peerPublicKey = peer.publicKey.toString();
 					var peerPresharedKey = peer.presharedKey;
-					peers.add(new VpnPeerInformation() {
-						@Override
-						public long tx() {
-							return pTx;
-						}
-
-						@Override
-						public long rx() {
-							return pRx;
-						}
-
-						@Override
-						public Instant lastHandshake() {
-							return thisHandshake;
-						}
-
-						@Override
-						public Optional<String> error() {
-							return Optional.empty();
-						}
-
-						@Override
-						public Optional<InetSocketAddress> remoteAddress() {
-							/* TODO: Not available? */
-							return Optional.empty();
-						}
-
-						@Override
-						public String publicKey() {
-							return peerPublicKey;
-						}
-
-						@Override
-						public Optional<String> presharedKey() {
-							return peerPresharedKey == null ? Optional.empty()
-									: Optional.of(peerPresharedKey.toString());
-						}
-
-						@Override
-						public List<String> allowedIps() {
-							return allowedIps;
-						}
-					});
+					peers.add(new WindowsVpnPeerInformation(thisHandshake, peerPresharedKey, pRx, peerPublicKey, allowedIps, pTx));
 				}
 				
 				var ifacePublicKey = wgIface.publicKey.toString();
@@ -565,58 +666,8 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 				var rxV = rx.get();
 				var hs = lastHandshake.get();
 
-				return new VpnInterfaceInformation() {
-
-					@Override
-					public long tx() {
-						return txV;
-					}
-
-					@Override
-					public Optional<String> error() {
-						return Optional.empty();
-					}
-
-					@Override
-					public long rx() {
-						return rxV;
-					}
-
-					@Override
-					public List<VpnPeerInformation> peers() {
-						return peers;
-					}
-
-					@Override
-					public String interfaceName() {
-						return name;
-					}
-
-					@Override
-					public Instant lastHandshake() {
-						return Instant.ofEpochMilli(hs);
-					}
-
-					@Override
-					public Optional<Integer> listenPort() {
-						return Optional.of(ifaceListenPort);
-					}
-
-					@Override
-					public Optional<Integer> fwmark() {
-						return Optional.empty();
-					}
-
-					@Override
-					public String publicKey() {
-						return ifacePublicKey;
-					}
-
-					@Override
-					public String privateKey() {
-						return ifacePrivateKey;
-					}
-				};
+				return new WindowsVpnInterfaceInformation(name, ifacePublicKey, peers, txV, ifaceListenPort, ifacePrivateKey, hs,
+						rxV);
 			}
 		}
 	}

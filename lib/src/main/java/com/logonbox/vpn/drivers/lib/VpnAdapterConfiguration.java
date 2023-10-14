@@ -158,8 +158,13 @@ public interface VpnAdapterConfiguration extends Serializable {
 
         @SuppressWarnings("unchecked")
         public B withPrivateKey(Optional<String> privateKey) {
-            this.privateKey = privateKey;
-            return (B) this;
+        	if(privateKey.isPresent() && ( "PRIVATE_KEY_NOT_AVAILABLE".equals(privateKey.get()) || "".equals(privateKey.get())))  {
+        		return withoutPrivateKey();
+        	}
+        	else {
+	            this.privateKey = privateKey;
+	            return (B) this;
+        	}
         }
 
         public B withPublicKey(String publicKey) {

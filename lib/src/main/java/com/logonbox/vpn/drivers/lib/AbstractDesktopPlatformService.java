@@ -92,7 +92,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 			var nativeName = resolvedInterfaceName.get();
 			var addr = find(nativeName, addresses);
 			if (addr.isEmpty()) {
-				LOG.info("No existing unused interfaces, creating new one {} for public key .", nativeName,
+				LOG.info("No existing unused interfaces, creating new one {} for public key {}.", nativeName,
 						configuration.publicKey());
 				ip = map(interfaceName.orElse(nativeName), nativeName, "wireguard");
 				if (ip == null)
