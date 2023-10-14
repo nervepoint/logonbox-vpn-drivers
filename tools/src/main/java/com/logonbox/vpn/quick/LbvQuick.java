@@ -12,7 +12,9 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.DateFormat;
 import java.text.MessageFormat;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -32,6 +34,8 @@ import com.logonbox.vpn.drivers.lib.DNSProvider;
 import com.logonbox.vpn.drivers.lib.ElevatableSystemCommands;
 import com.logonbox.vpn.drivers.lib.NativeComponents;
 import com.logonbox.vpn.drivers.lib.PlatformService;
+import com.logonbox.vpn.drivers.lib.Prefs;
+import com.logonbox.vpn.drivers.lib.Prefs.PrefType;
 import com.logonbox.vpn.drivers.lib.SystemCommands;
 import com.logonbox.vpn.drivers.lib.SystemConfiguration;
 import com.logonbox.vpn.drivers.lib.SystemContext;
@@ -50,7 +54,9 @@ import picocli.CommandLine.ParentCommand;
 import uk.co.bithatch.nativeimage.annotations.Resource;
 
 @Command(name = "lbv-quick", description = "Set up a WireGuard interface simply.", mixinStandardHelpOptions = true, subcommands = {
-        LbvQuick.Up.class, LbvQuick.Down.class, LbvQuick.Save.class, LbvQuick.Strip.class, LbvQuick.Safe.class, LbvQuick.DNS.class, LbvQuick.DNSProviders.class })
+        LbvQuick.Up.class, LbvQuick.Down.class, LbvQuick.Expire.class, LbvQuick.Unexpire.class,
+        LbvQuick.Strip.class, LbvQuick.Safe.class, LbvQuick.DNS.class, LbvQuick.DNSProviders.class
+})
 @Resource({ "windows-task\\.xml" })
 public class LbvQuick extends AbstractCommand implements SystemContext {
 
@@ -224,7 +230,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
         		+ "Otherwise, INTERFACE is an interface name, with "
         		+ "configuration found at in the system specific configuration search path "
         		+ "(or that provided by the --configuration-search-path option).")
-        private Path configFileOrInterface;
+        private String configFileOrInterface;
 
         @Override
         public Integer call() throws Exception {
@@ -236,32 +242,32 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
             var bldr = new Vpn.Builder().withSystemContext(parent);
             
             
-            var cfgStr = configFileOrInterface.toString();
-			if(cfgStr.equals("[")) {
+			if(configFileOrInterface.equals("[")) {
             	bldr.withVpnConfiguration(new InputStreamReader(System.in));
             }
-            else if(cfgStr.equals("-")) {
+            else if(configFileOrInterface.equals("-")) {
             	bldr.withVpnConfiguration(new InputStreamReader(System.in));
             }
-            else if(cfgStr.startsWith("data:text/plain;base64,")) {
-            	bldr.withVpnConfiguration(new String(Base64.getDecoder().decode(cfgStr.substring(23)), "UTF-8"));
+            else if(configFileOrInterface.startsWith("data:text/plain;base64,")) {
+            	bldr.withVpnConfiguration(new String(Base64.getDecoder().decode(configFileOrInterface.substring(23)), "UTF-8"));
             }
             else {
             	try {
-            		var url = new URL(cfgStr);
+            		var url = new URL(configFileOrInterface);
             		try(var in = url.openStream()) {
             			bldr.withVpnConfiguration(new InputStreamReader(in));
             		}
             	}
             	catch(MalformedURLException murle) {
-		            if (Files.exists(configFileOrInterface)) {
-		                var iface = parent.toInterfaceName(configFileOrInterface);
+            		var asFile = Paths.get(configFileOrInterface);
+		            if (Files.exists(asFile)) {
+		                var iface = parent.toInterfaceName(asFile);
 		                ifaceName = Optional.of(iface);
 						bldr.withInterfaceName(iface);
-		                file = Optional.of(configFileOrInterface);
+		                file = Optional.of(asFile);
 		            }
 		            else {
-		                var iface = cfgStr;
+		                var iface = configFileOrInterface;
 		                bldr.withInterfaceName(iface);
 		                ifaceName = Optional.of(iface);
 		                try {
@@ -292,8 +298,8 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
     @Command(name = "up", description = "Bring a VPN interface up.")
     public final static class Up extends AbstractQuickCommand {
 
-        @Option(names = { "-x", "--expire" }, paramLabel = "SECONDS", description = "Expire this connection after the specified number of seconds. ")
-        private Optional<Long> expire;
+        @Option(names = { "-x", "--expire" }, paramLabel = "INTERVAL | TIME | DATE-TIME", description = "Expire this connection after the specified number of seconds. ")
+        private Optional<String> expire;
 
         @Option(names = { "-I",
                 "--native-iface" }, paramLabel = "NAME", description = "The native interface name to use. This is platform specific, for example on Mac OS this would default to `utun[number]`. On Windows it would be `net[number]`. On Linux, network interface names are more flexible, and this will default to the name derived from the configuration file name")
@@ -309,10 +315,33 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
         protected Integer onCall(Vpn vpn, Optional<Path> configFile, Optional<String> interfaceName) throws Exception {
             vpn.open();
             if(expire.isPresent()) 
-            	expire(parent, vpn, expire.get(), configFile.orElseThrow(() -> new IllegalStateException("Must use a configuration file with expiry option.")));
+            	expire(parent, vpn, parseWhenToSeconds(expire.get()));
             return 0;
         }
 
+    }
+
+    @Command(name = "expire", description = "Expire an existing connection at a certain time.")
+    public final static class Expire extends AbstractQuickCommand {
+
+        @Parameters(arity = "1", paramLabel = "INTERVAL | TIME | DATE-TIME", description = "When to expire this connection. This accepts a number of formats.")
+        private String when;
+
+		@Override
+        protected Integer onCall(Vpn vpn, Optional<Path> configFile, Optional<String> interfaceName) throws Exception {
+           	expire(parent, vpn, parseWhenToSeconds(when));
+            return 0;
+        }
+    }
+
+    @Command(name = "unexpire", description = "Remove a connections expiry.")
+    public final static class Unexpire extends AbstractQuickCommand {
+
+		@Override
+        protected Integer onCall(Vpn vpn, Optional<Path> configFile, Optional<String> interfaceName) throws Exception {
+           	unexpire(parent, vpn);
+            return 0;
+        }
     }
 
     @Command(name = "down", description = "Take a VPN interface down.")
@@ -322,10 +351,59 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
         protected Integer onCall(Vpn vpn, Optional<Path> configFile, Optional<String> interfaceName) throws Exception {
             if(!vpn.started())
                 throw new IOException(MessageFormat.format("`{0}` is not a VPN interface.", vpn.interfaceName().get()));
-            vpn.close();
+            try {
+            	vpn.close();
+            }
+            finally {
+            	unexpire(parent, vpn);
+            }
             return 0;
         }
 
+    }
+    
+    static long parseWhenToSeconds(String when) {
+    	var parts = when.split("\\s+");
+    	var whenTime = 0l;
+    	if(parts.length == 1) {
+        	var timefmt = DateFormat.getDateInstance(DateFormat.SHORT);
+    		try {
+				whenTime  = timefmt.parse(parts[0]).getTime();
+			} catch (ParseException e) {
+				when = when.toLowerCase();
+				if(when.endsWith("s")) {
+					return Long.parseLong(when.substring(when.length() - 1));
+				}
+				else if(when.endsWith("m")) {
+					return Long.parseLong(when.substring(when.length() - 1)) * 60;
+				}
+				else if(when.endsWith("h")) {
+					return Long.parseLong(when.substring(when.length() - 1)) * 3600;
+				}
+				else if(when.endsWith("d")) {
+					return Long.parseLong(when.substring(when.length() - 1)) * 3600 * 24;
+				}
+				else {
+					return Long.parseLong(when);
+				}
+			}
+    	}
+    	else if(parts.length == 2) {
+        	var datefmt = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT);
+        	try {
+				whenTime  = datefmt.parse(when).getTime();
+			} catch (ParseException e) {
+				throw new IllegalArgumentException("Incorrect short datetime format for this locale.", e);
+			}
+    	}
+    	else 
+    		throw new IllegalArgumentException("Unexpected number of elements in datetime or interval string.");
+    	
+    	var now = System.currentTimeMillis();
+    	if(whenTime <= now) {
+    		throw new IllegalArgumentException("Specified datetime is in the past.");
+    	}
+    	return Math.max(1, ( whenTime - now ) / 1000);
     }
 
     protected enum Encoding {
@@ -355,11 +433,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
         protected void output(OutputStream out, VpnAdapterConfiguration cfg) throws Exception {
         	switch(encoding) {
         	case DATA_URI:
-        		var str = cfg.write();
-        		var bldr = new StringBuilder();
-        		bldr.append("data:text/plain;base64,");
-        		bldr.append(Base64.getEncoder().encodeToString(str.getBytes("UTF-8")));
-        		out.write(bldr.toString().getBytes("UTF-8"));
+        		out.write(cfg.toDataUri().getBytes("UTF-8"));
         		break;
         	default:
         		cfg.write(out);
@@ -500,6 +574,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 		
 		if(cmd.toLowerCase().contains("java")) {
 			
+			newArgList.add(cmd);
 			
 			/* TODO: Windows does not give us our own arguments :( I think it's this
 			 * bug - https://bugs.openjdk.org/browse/JDK-8176725. For now, I am
@@ -547,7 +622,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 	}
 
 	private static String wrapWithQuotes(String arg) {
-		if(arg.contains(" "))
+		if(arg.contains(" ") || arg.contains(";"))
 			return "'" + arg + "'";
 		else
 			return arg;
@@ -559,25 +634,29 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 		else
 			return arg;
 	}
-	
-	
-	private final static void expire(SystemContext context, Vpn vpn, long seconds, Path configurationFile) throws IOException {
-		var taskArgs = getThisCommand();
+
+	private final static void unexpire(SystemContext context, Vpn vpn) throws IOException {
+		unexpire(context, vpn, true);
+	}
+
+	private final static void unexpire(SystemContext context, Vpn vpn, boolean log) throws IOException {
 		if(OS.isLinux()) {
 			if(OS.hasCommand("at")) {
-				/* NOTE at only has 'second' resolution */
-				var time = Math.max(1, seconds / 60);
-				var cmds = Arrays.asList("at", "-M", "now + " + time + " minutes");
-				logCommandLine(cmds.toArray(new String[0]));
-				
-				/* TODO we may need to record the job ID to match against the public key
-				 * if the VPN is taken down manually and then brought up again. It could
-				 * potentially take down *that* VPN unintentionally. See how it goes ..
-				 */
-				taskArgs.add("down");
-				taskArgs.add(configurationFile.toString());
-				var taskCmd = String.join(" ", taskArgs.stream().map(LbvQuick::wrapWithQuotes).collect(Collectors.toList()));
-				context.commands().privileged().pipeTo(taskCmd, cmds.toArray(new String[0]));
+				try {
+					var jobId = Long.parseLong(context.commands().privileged().task(new Prefs.GetValue(
+							true, LbvQuick.class.getPackageName().replace('.', '/') + "/jobs", vpn.adapter().address().nativeName(), null)
+					));
+					try {
+						maybeLogCommands(context, log).result("atrm", 
+								String.valueOf(jobId));
+					}
+					finally {
+						context.commands().privileged().task(new Prefs.RemoveKey(
+								true, LbvQuick.class.getPackageName().replace('.', '/') + "/jobs", vpn.adapter().address().nativeName())
+						);
+					}
+				} catch (Exception e) {
+				}
 			}
 			else {
 				throw new UnsupportedOperationException("Expiry requires that the `at` command be installed on Linux.");
@@ -585,10 +664,79 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 		}
 		else if(OS.isWindows()) {
 			if(OS.hasCommand("schtasks")) {
-				/* NOTE schtasks also only has 'second' resolution */
+				maybeLogCommands(context, log).result("schtasks", 
+						"/delete", 
+						"/f", 
+						"/tn", "VpnExpiry_" + vpn.adapter().information().interfaceName());
+			}
+			else {
+				throw new UnsupportedOperationException("Expiry requires that the `schtasks` command be installed on Windows.");
+			}
+		}
+		else if(OS.isMacOs()) {
+			var task = LbvQuick.class.getPackage().getName() + ".expire." + vpn.adapter().address().nativeName(); 
+			maybeLogCommands(context, log).result(
+				"launchctl", 
+				"stop", 
+				task
+			);
+			maybeLogCommands(context, log).result(
+				"rm", "-f", "/Library/LaunchAgents/" + task + ".plist"
+			);
+		}
+	}
+
+	private static SystemCommands maybeLogCommands(SystemContext context, boolean log) {
+		if(log)
+			return context.commands().privileged().logged();
+		else
+			return context.commands().privileged();
+	}
+	
+	private final static void expire(SystemContext context, Vpn vpn, long seconds) throws IOException {
+		unexpire(context, vpn, false);
+		
+		var taskArgs = getThisCommand();
+		taskArgs.add("down");
+		taskArgs.add(vpn.configuration().toDataUri());
+		
+		System.out.println(String.join(" ", taskArgs));
+		
+		if(OS.isLinux()) {
+			if(OS.hasCommand("at")) {
+				/* NOTE at only has 'minute' resolution */
+				var time = Math.max(1, seconds / 60);
+				var cmds = Arrays.asList("at", "-M", "now + " + time + " minutes");
+				logCommandLine(cmds.toArray(new String[0]));
 				
-				taskArgs.add("down");
-				taskArgs.add(configurationFile.toString());
+				var taskCmd = String.join(" ", taskArgs.stream().map(LbvQuick::wrapWithQuotes).collect(Collectors.toList()));
+				for(var line : context.commands().privileged().pipeTo(taskCmd, cmds.toArray(new String[0]))) {
+					if(line.startsWith("job ")) {
+						var args = line.split("\\s+");
+						if(args.length > 1) {
+							try {
+								var jobId = Long.parseLong(args[1]);
+								context.commands().privileged().task(new Prefs.PutValue(
+										true, LbvQuick.class.getPackageName().replace('.', '/') + "/jobs", vpn.adapter().address().nativeName(), jobId, PrefType.LONG
+								));
+								return;
+							}
+							catch(Exception e) {
+								context.alert("Failed to save job ID for scheduled expiry, expiry may not work as expected");
+							}
+						}
+					}
+				}
+				context.alert("Failed to find job ID for scheduled expiry, expiry may not work as expected");
+			}
+			else {
+				throw new UnsupportedOperationException("Expiry requires that the `at` command be installed on Linux.");
+			}
+		}
+		else if(OS.isWindows()) {
+			if(OS.hasCommand("schtasks")) {
+				/* NOTE schtasks also only has 'minute' resolution */
+				
 				
 				/* Stupidly, you can't turn off power management on tasks created
 				 * by schtasks! So instead we use raw task XML. Dumbdumbdumbdumb
@@ -614,15 +762,15 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 						out.println(str);
 					}
 					
-					var cmds = Arrays.asList(
+					var cmds = new String[] {
 							"schtasks", 
 							"/create", 
 							"/f", 
 							"/tn", "VpnExpiry_" + vpn.adapter().information().interfaceName(),
 							"/xml", xmlFile.toString()
-					);
-					logCommandLine(cmds.toArray(new String[0]));
-					context.commands().privileged().run(cmds.toArray(new String[0]));
+					};
+					logCommandLine(cmds);
+					context.commands().privileged().run(cmds);
 				}
 				finally {
 					Files.delete(xmlFile);
@@ -631,6 +779,32 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 			else {
 				throw new UnsupportedOperationException("Expiry requires that the `schtasks` command be installed on Windows.");
 			}
+		}
+		else if(OS.isMacOs()) {
+				
+			var wrt = new StringWriter();
+			try(var in = new InputStreamReader(LbvQuick.class.getResourceAsStream("/macos-task.plist"), "UTF-16")) {
+				in.transferTo(wrt);
+			}
+			var str = wrt.toString();
+			var task = LbvQuick.class.getPackage().getName() + ".expire." + vpn.adapter().address().nativeName(); 
+			str = str.replace("${task}", task);
+			str = str.replace("${args}", String.join(System.lineSeparator(), 
+					taskArgs.subList(1, taskArgs.size()).stream().map(s -> "<string>" + s + "</string>").collect(Collectors.toList())));
+			
+
+			context.commands().privileged().run(new String[] {
+				"sh", "-c",
+				"echo '" + str + "' > /Library/LaunchAgents/" + task + ".plist"
+			});
+			
+			var cmds = new String[] {
+				"launchctl", 
+				"start", 
+				task
+			};
+			logCommandLine(cmds);
+			context.commands().privileged().run(cmds);
 		}
 		else
 			throw new UnsupportedOperationException("Expiry is not supported on this platform.");

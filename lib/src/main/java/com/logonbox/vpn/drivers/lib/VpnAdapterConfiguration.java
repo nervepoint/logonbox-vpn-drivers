@@ -39,12 +39,14 @@ import java.io.Reader;
 import java.io.Serializable;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -262,6 +264,18 @@ public interface VpnAdapterConfiguration extends Serializable {
             return Optional.empty();
         else
             return Optional.of(peers().get(0));
+    }
+    
+    default String toDataUri() {
+		var str = write();
+		var bldr = new StringBuilder();
+		bldr.append("data:text/plain;base64,");
+		try {
+			bldr.append(Base64.getEncoder().encodeToString(str.getBytes("UTF-8")));
+		} catch (UnsupportedEncodingException e) {
+			throw new UnsupportedOperationException();
+		}
+		return bldr.toString();
     }
     
     default String write() {
