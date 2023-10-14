@@ -268,13 +268,14 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 		            }
 		            else {
 		                var iface = configFileOrInterface;
-		                bldr.withInterfaceName(iface);
 		                ifaceName = Optional.of(iface);
 		                try {
 		                	file = Optional.of(parent.findConfig(iface));
+			                bldr.withInterfaceName(iface);
 		                }
 		                catch(IOException ioe) {
 		                	file = Optional.empty();
+			                bldr.withNativeInterfaceName(iface);
 		                }
 		            }
 		            if(file.isPresent())

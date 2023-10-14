@@ -114,7 +114,62 @@ public final class Vpn implements Closeable {
         onAddScriptEnvironment = builder.onAddScriptEnvironment;
         interfaceName = builder.interfaceName;
         nativeInterfaceName = builder.nativeInterfaceName;
-        cfg = builder.vpnConfiguration.orElseThrow(() -> new IllegalStateException("No VPN configuration supplied."));
+        
+        /* Either start a new session, or find an existing one */
+        
+        if (builder.platformService.isPresent()) {
+            platformService = builder.platformService.get();
+        } else {
+            platformService = PlatformService.create(builder.systemContext.orElseGet(() -> new VpnSystemContext(builder.onAlert, builder.systemConfiguration)));
+        }
+
+        //cfg = builder.vpnConfiguration.orElseThrow(() -> new IllegalStateException("No VPN configuration supplied."));
+        
+        if(builder.vpnConfiguration.isPresent()) {
+        	cfg = builder.vpnConfiguration.get();
+	        
+	        if(interfaceName.isPresent()) {
+				try {
+					adapter = Optional.of(platformService.adapter(new InterfaceNameResolver(platformService).resolve(cfg, interfaceName, nativeInterfaceName).resolvedName().orElseThrow(()-> new IllegalArgumentException("Could not resolve interface name."))));
+				}
+				catch(Exception iae) {
+				}
+			}
+	        else {
+				try {
+					adapter = platformService.getByPublicKey(cfg.publicKey());
+				} 
+				catch (IOException e) {
+					throw new UncheckedIOException(e);
+				}
+	        }
+        }
+        else {
+        	if(nativeInterfaceName.isPresent()) {
+        		var nativeName = nativeInterfaceName.get();
+				var nativeAdapter = platformService.adapter(nativeName);
+        		
+        		cfg = new VpnConfiguration.Builder().
+        				fromConfiguration(nativeAdapter.configuration()).build();
+        		
+        		platformService.context().alert("Full configuration of interface {0} is not known. Both starting and stopping the interface may leave some incorrect configuration, e.g. DNS, routes, firewall.", nativeName);
+        		
+        		adapter = Optional.of(nativeAdapter); 
+        	}
+        	else if(interfaceName.isPresent()) {
+        		var wireguardInterfaceName = interfaceName.get();
+				var nativeAdapter = platformService.adapter(platformService.interfaceNameToNativeName(wireguardInterfaceName).orElseThrow(() -> new IllegalStateException(MessageFormat.format("No native interface for this wireguard interface name, {0}", wireguardInterfaceName))));
+				
+				cfg = new VpnConfiguration.Builder().
+        				fromConfiguration(nativeAdapter.configuration()).build();
+        		
+        		platformService.context().alert("Full configuration of interface {0} is not known. Both starting and stopping the interface may leave some incorrect configuration, e.g. DNS, routes, firewall.", wireguardInterfaceName);
+        		
+        		adapter = Optional.of(nativeAdapter);
+        	}
+        	else
+        		throw new IllegalStateException("No interface supplied, and no configuration supplied. What now?");
+        }
         
         /* If no specific peer, then try to find the first with an endpoint address and
          * assume that's the one to use.
@@ -125,46 +180,7 @@ public final class Vpn implements Closeable {
                     return Optional.of(p);
             }
             return Optional.empty();
-        }); 
-
-        /* Either start a new session, or find an existing one */
-        
-        if (builder.platformService.isPresent()) {
-            platformService = builder.platformService.get();
-        } else {
-            platformService = PlatformService.create(builder.systemContext.orElseGet(() -> new VpnSystemContext(builder.onAlert, builder.systemConfiguration)));
-        }
-        
-        if(interfaceName.isPresent()) {
-			try {
-				adapter = Optional.of(platformService.adapter(new InterfaceNameResolver(platformService).resolve(cfg, interfaceName, nativeInterfaceName).resolvedName().orElseThrow(()-> new IllegalArgumentException("Could not resolve interface name."))));
-			}
-			catch(Exception iae) {
-			}
-		}
-        else {
-			try {
-				adapter = platformService.getByPublicKey(cfg.publicKey());
-			} 
-			catch (IOException e) {
-				throw new UncheckedIOException(e);
-			}
-        }
-        
-//		adapter = peer.map(p -> {
-//			try {
-//				if(interfaceName.isPresent()) {
-//					try {
-//						return Optional.of(platformService.adapter(new InterfaceNameResolver(platformService).resolve(cfg, interfaceName, nativeInterfaceName).resolvedName().orElseThrow(()-> new IllegalArgumentException("Could not resolve interface name."))));
-//					}
-//					catch(Exception iae) {
-//					}
-//				}
-//				return platformService.getByPublicKey(p.publicKey());
-//			} catch (IOException e) {
-//				throw new UncheckedIOException(e);
-//			}
-//		}).orElse(Optional.empty());
+        });
     }
     
     public boolean started() {
