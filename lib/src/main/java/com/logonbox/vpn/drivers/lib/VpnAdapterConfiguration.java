@@ -199,15 +199,19 @@ public interface VpnAdapterConfiguration extends Serializable {
 	class DefaultVpnAdapterConfiguration implements VpnAdapterConfiguration {
 
         private final int listenPort;
-        private final Optional<String> privateKey;
+        private final String privateKey;
         private final String publicKey;
         private final List<VpnPeer> peers;
         private final int fwMark;
 
         DefaultVpnAdapterConfiguration(AbstractBuilder<?> builder) {
             listenPort = builder.listenPort.orElse(0);
-            privateKey = builder.privateKey == null ? Optional.empty() : Optional.of(builder.privateKey.orElse(Keys.genkey().getBase64PrivateKey()));
-            publicKey = builder.publicKey.orElseGet(() -> Keys.pubkey(privateKey.orElseThrow(() -> new IllegalStateException("No public key, and no private key, so public key cannot be derived."))).getBase64PublicKey());
+            privateKey = builder.privateKey == null ? null : builder.privateKey.orElse(Keys.genkey().getBase64PrivateKey());
+            publicKey = builder.publicKey.orElseGet(() -> {
+            	if(privateKey == null)
+            		throw new IllegalStateException("No public key, and no private key, so public key cannot be derived.");
+            	return Keys.pubkey(privateKey).getBase64PublicKey();
+            });
             peers = Collections.unmodifiableList(new ArrayList<>(builder.peers));
             fwMark = builder.fwMark.orElse(0);
         }
@@ -224,7 +228,9 @@ public interface VpnAdapterConfiguration extends Serializable {
 
         @Override
         public final String privateKey() {
-            return privateKey.orElseThrow(() -> new IllegalStateException("Configuration has no private key."));
+        	if(privateKey == null)
+        		throw new IllegalStateException("Configuration has no private key.");
+            return privateKey;
         }
 
         @Override

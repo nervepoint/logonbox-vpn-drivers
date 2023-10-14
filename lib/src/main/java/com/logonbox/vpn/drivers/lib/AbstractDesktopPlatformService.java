@@ -79,7 +79,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 		var resolver = new InterfaceNameResolver(this);
 		var result = resolver.resolve(configuration, startRequest.interfaceName(), startRequest.nativeInterfaceName());
 		var resolvedInterfaceName = result.resolvedName();
-		var interfaceName = result.iInterfaceName();
+		var interfaceName = result.interfaceName();
 
 		I ip = null;
 		

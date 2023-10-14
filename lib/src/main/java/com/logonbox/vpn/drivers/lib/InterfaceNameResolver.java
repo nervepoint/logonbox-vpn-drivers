@@ -21,7 +21,7 @@ public final class InterfaceNameResolver {
 			this.resolvedName = resolvedName;
 		}
 
-		public Optional<String> iInterfaceName() {
+		public Optional<String> interfaceName() {
 			return interfaceName;
 		}
 
@@ -89,6 +89,10 @@ public final class InterfaceNameResolver {
 		 * native name available
 		 */
 		var resolvedInterfaceName = nativeInterfaceName.isPresent() ? nativeInterfaceName : interfaceName;
+		if(resolvedInterfaceName.isPresent() && !platform.isValidNativeInterfaceName(resolvedInterfaceName.get())) {
+			LOG.info("Resolved interface name {} is not valid as a native interface name on this platform, will pick next available.", resolvedInterfaceName.get());
+			resolvedInterfaceName = Optional.empty();
+		}
 		
 		return new Result(interfaceName, nativeInterfaceName, resolvedInterfaceName);
 	}

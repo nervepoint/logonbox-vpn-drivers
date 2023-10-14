@@ -226,6 +226,11 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
     }
 
 	@Override
+	public boolean isValidNativeInterfaceName(String ifaceName) {
+		return ifaceName.startsWith(getInterfacePrefix()) && ifaceName.length() < 17 && ifaceName.matches("[a-z]+[0-9]+");
+	}
+
+	@Override
 	public final I address(String name) {
 		return find(name, addresses()).orElseThrow(() -> new IllegalArgumentException(String.format("No address %s", name)));
 	}

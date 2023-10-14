@@ -60,6 +60,11 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
         super(INTERFACE_PREFIX, context);
     }
 
+	@Override
+	public boolean isValidNativeInterfaceName(String ifaceName) {
+		return ifaceName.length() < 17 && !ifaceName.matches(".*\\s+.*") && !ifaceName.contains(" ");
+	}
+
     @Override
     public final List<AbstractLinuxAddress> addresses() {
         List<AbstractLinuxAddress> l = new ArrayList<>();

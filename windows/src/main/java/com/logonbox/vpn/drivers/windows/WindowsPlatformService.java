@@ -21,6 +21,7 @@
 package com.logonbox.vpn.drivers.windows;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.Serializable;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
@@ -166,6 +167,8 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 	}
 
 	private List<WindowsAddress> ips(boolean wireguardInterface) {
+		/* https://stackoverflow.com/questions/38803545/java-networkinterface-getname-broken-on-windows */
+			
 		Set<WindowsAddress> ips = new LinkedHashSet<>();
 
 		/* netsh first */
@@ -232,11 +235,6 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 		} catch (Exception e) {
 			LOG.error("Failed to list interfaces via Java.", e);
 		}
-
-		if(wireguardInterface)
-			ips.addAll(super.addresses().stream().filter(addr -> isWireGuardInterface(addr)).collect(Collectors.toList()));
-		else
-			ips.addAll(super.addresses());
 
 		return new ArrayList<WindowsAddress>(ips);
 	}
@@ -305,7 +303,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 
 		/* Install service for the network interface */
 		var tool = Paths.get(context().nativeComponents().tool(Tool.NETWORK_CONFIGURATION_SERVICE));
-		var install = context().commands().privileged().logged().task(new InstallService(ip.nativeName(), cwd.toAbsolutePath().toString(), confDir.toAbsolutePath().toString(), tool.toAbsolutePath().toString(), transformedConfiguration)).booleanValue();
+		var install = context().commands().privileged().logged().task(new InstallService(ip.nativeName(), cwd.toAbsolutePath().toString(), confDir.toAbsolutePath().toString(), tool.toAbsolutePath().toString(), transformedConfiguration.write())).booleanValue();
 		/*
 		 * About to start connection. The "last handshake" should be this value or later
 		 * if we get a valid connection
@@ -379,17 +377,16 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 
 	@Override
 	protected WindowsAddress createVirtualInetAddress(NetworkInterface nif) throws IOException {
-		return new WindowsAddress(nativeNameToInterfaceName(nif.getName()).orElse(nif.getName()), nif.getName(), nif.getDisplayName(), this);
+		throw new UnsupportedOperationException("Windows network interface names from Java's NetworkInterface are just made up and bear no resemblance to reality.");
 	}
 
 	@Override
 	protected boolean isWireGuardInterface(NetworkInterface nif) {
-		return super.isWireGuardInterface(nif) &&  nif.getDisplayName().startsWith(WIREGUARD_TUNNEL);
+		return nif.getDisplayName().startsWith(WIREGUARD_TUNNEL);
 	}
 
 	protected boolean isWireGuardInterface(WindowsAddress nif) {
-		return isMatchesPrefix(nif) && (
-				 nif.displayName().startsWith(WIREGUARD_TUNNEL) || isMatchesPrefix(nif.displayName()));
+		return  nif.displayName().startsWith(WIREGUARD_TUNNEL) || isMatchesPrefix(nif.displayName());
 	}
 
 	protected boolean isMatchesPrefix(WindowsAddress nif) {
@@ -421,7 +418,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 	@Override
 	public VpnInterfaceInformation information(VpnAdapter vpnAdapter) {
 		try {
-			return context().commands().privileged().logged().task(new GetInformation(vpnAdapter.address().name()));
+			return context().commands().privileged().logged().task(new GetInformation(vpnAdapter.address().name(), vpnAdapter.address().nativeName()));
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		} catch (Exception e) {
@@ -432,7 +429,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 	@Override
 	public VpnAdapterConfiguration configuration(VpnAdapter vpnAdapter) {
 		try {
-			return context().commands().privileged().logged().task(new GetConfiguration(vpnAdapter.address().name()));
+			return context().commands().privileged().logged().task(new GetConfiguration(vpnAdapter.address().nativeName()));
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		} catch (Exception e) {
@@ -444,20 +441,20 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 	@Serialization
 	public final static class GetConfiguration implements ElevatedClosure<VpnAdapterConfiguration, Serializable> {
 
-		private String name;
+		private String nativeName;
 
 		public GetConfiguration() {
 		}
 
-		GetConfiguration(String name) {
-			this.name = name;
+		GetConfiguration(String nativeName) {
+			this.nativeName = nativeName;
 		}
 
 		@Override
 		public VpnAdapterConfiguration call(ElevatedClosure<VpnAdapterConfiguration, Serializable> proxy)
 				throws Exception {
 			var cfgBldr = new VpnAdapterConfiguration.Builder();
-			try (var adapter = new WireguardLibrary.Adapter(name)) {
+			try (var adapter = new WireguardLibrary.Adapter(nativeName)) {
 				var wgIface = adapter.getConfiguration();
 				cfgBldr.withPrivateKey(wgIface.privateKey.toString());
 				cfgBldr.withPublicKey(wgIface.publicKey.toString());
@@ -486,19 +483,21 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 	public final static class GetInformation implements ElevatedClosure<VpnInterfaceInformation, Serializable> {
 
 		private String name;
+		private String nativeName;
 
 		public GetInformation() {
 		}
 
-		GetInformation(String name) {
+		GetInformation(String name, String nativeName) {
 			this.name = name;
+			this.nativeName = nativeName;
 		}
 
 		@Override
 		public VpnInterfaceInformation call(ElevatedClosure<VpnInterfaceInformation, Serializable> proxy)
 				throws Exception {
 			var lastHandshake = new AtomicLong(0);
-			try (var adapter = new WireguardLibrary.Adapter(name)) {
+			try (var adapter = new WireguardLibrary.Adapter(nativeName)) {
 				var wgIface = adapter.getConfiguration();
 				var tx = new AtomicLong(0);
 				var rx = new AtomicLong(0);
@@ -543,7 +542,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 
 						@Override
 						public String publicKey() {
-							return peerPublicKey.toString();
+							return peerPublicKey;
 						}
 
 						@Override
@@ -562,12 +561,15 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 				var ifacePublicKey = wgIface.publicKey.toString();
 				var ifacePrivateKey = wgIface.privateKey.toString();
 				var ifaceListenPort = wgIface.listenPort;
+				var txV = tx.get();
+				var rxV = rx.get();
+				var hs = lastHandshake.get();
 
 				return new VpnInterfaceInformation() {
 
 					@Override
 					public long tx() {
-						return tx.get();
+						return txV;
 					}
 
 					@Override
@@ -577,7 +579,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 
 					@Override
 					public long rx() {
-						return rx.get();
+						return rxV;
 					}
 
 					@Override
@@ -592,7 +594,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 
 					@Override
 					public Instant lastHandshake() {
-						return Instant.ofEpochMilli(lastHandshake.get());
+						return Instant.ofEpochMilli(hs);
 					}
 
 					@Override
@@ -650,12 +652,12 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 		private String cwd;
 		private String exe;
 		private String confDir;
-		private VpnConfiguration configuration;
+		private String configuration;
 
 		public InstallService() {
 		}
 
-		InstallService(String name, String cwd, String confDir, String exe, VpnConfiguration configuration) {
+		InstallService(String name, String cwd, String confDir, String exe, String configuration) {
 			this.name = name;
 			this.cwd = cwd;
 			this.exe = exe;
@@ -684,7 +686,9 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 						Kernel32Util.formatMessageFromLastErrorCode(err)));
 			}
 			
-			configuration.write(Paths.get(confDir).resolve(name + ".conf"));
+			try(var wrtr = new PrintWriter(Files.newBufferedWriter(Paths.get(confDir).resolve(name + ".conf")))) {
+				wrtr.println(configuration);	
+			}
 
 			try (var srvs = new WindowsSystemServices()) {
 				var install = false;

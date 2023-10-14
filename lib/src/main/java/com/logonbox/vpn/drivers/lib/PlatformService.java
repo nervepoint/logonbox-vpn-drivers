@@ -177,20 +177,20 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	/**
 	 * Get a {@link VpnAdapter} given its short name.
 	 * 
-	 * @param name name
+	 * @param nativeName name
 	 * @return address
 	 */
-	VpnAdapter adapter(String name);
+	VpnAdapter adapter(String nativeName);
 
 	/**
 	 * Get if a {@link VpnAdapter} exists given its short name.
 	 * 
-	 * @param name name
+	 * @param nativeName name
 	 * @return exists
 	 */
-	default boolean adapterExists(String name) {
+	default boolean adapterExists(String nativeName) {
 		for (var addr : adapters()) {
-			if (addr.address().name().equals(name))
+			if (addr.address().name().equals(nativeName))
 				return true;
 		}
 		return false;
@@ -209,7 +209,7 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	 * @throws IOException
 	 */
 	default Instant getLatestHandshake(VpnAddress address, String publicKey) throws IOException {
-		return adapter(address.name()).latestHandshake(publicKey);
+		return adapter(address.nativeName()).latestHandshake(publicKey);
 	}
 
 	/**
@@ -296,5 +296,7 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	 * @return wireguard interface name
 	 */
 	Optional<String> nativeNameToInterfaceName(String name);
+
+	boolean isValidNativeInterfaceName(String string);
 
 }
