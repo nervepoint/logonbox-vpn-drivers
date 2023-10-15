@@ -6,6 +6,9 @@ import org.slf4j.bridge.SLF4JBridgeHandler;
 
 import java.util.Optional;
 import java.util.concurrent.Callable;
+import java.util.logging.Handler;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
 
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
@@ -36,16 +39,39 @@ public abstract class AbstractCommand implements Callable<Integer> {
     }
     
     public final void initCommand() throws Exception {
-        System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", level.orElse(Level.WARN).name());
+        var defaultLevel = level.orElse(Level.WARN);
+		System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", defaultLevel.name());
         SLF4JBridgeHandler.removeHandlersForRootLogger();
         SLF4JBridgeHandler.install();
+        Logger rootLogger = LogManager.getLogManager().getLogger("");
+        rootLogger.setLevel(toJulLevel(defaultLevel));
+        for (Handler h : rootLogger.getHandlers()) {
+            h.setLevel(toJulLevel(defaultLevel));
+        }
         if(socketPath.isPresent()) {
             Helper.main(new String[] { socketPath.get() });
             System.exit(0);
         }
     }
     
-    boolean verboseExceptions() {
+    private static java.util.logging.Level toJulLevel(Level defaultLevel) {
+    	switch(defaultLevel) {
+    	case TRACE:
+    		return java.util.logging.Level.FINEST;
+    	case DEBUG:
+    		return java.util.logging.Level.FINE;
+    	case INFO:
+    		return java.util.logging.Level.INFO;
+    	case WARN:
+    		return java.util.logging.Level.WARNING;
+    	case ERROR:
+    		return java.util.logging.Level.SEVERE;
+    	default:
+    		return java.util.logging.Level.OFF;
+    	}
+	}
+
+	boolean verboseExceptions() {
         return verboseExceptions;
     }
     

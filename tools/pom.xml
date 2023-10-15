@@ -199,6 +199,7 @@ ACTION
                                         <buildArg>--report-unsupported-elements-at-runtime</buildArg>
                                         <buildArg>-R:MaxHeapSize=64m</buildArg>
 										<buildArg>${graalvm.march}</buildArg>
+										<buildArg>--install-exit-handlers</buildArg>
                                         
                                         <!--TODO This should not be necessary! For some reason native-image-annotations is not working for these -->
                                         <buildArg>-H:IncludeResources=win32.*</buildArg>
@@ -223,6 +224,7 @@ ACTION
                                         <buildArg>--report-unsupported-elements-at-runtime</buildArg>
                                         <buildArg>-R:MaxHeapSize=64m</buildArg>
 										<buildArg>${graalvm.march}</buildArg>
+										<buildArg>--install-exit-handlers</buildArg>
                                         
                                         <!--TODO This should not be necessary! For some reason native-image-annotations is not working for these -->
                                         <buildArg>-H:IncludeResources=win32.*</buildArg>

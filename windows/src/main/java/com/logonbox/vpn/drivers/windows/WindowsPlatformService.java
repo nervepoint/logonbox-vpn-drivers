@@ -59,7 +59,6 @@ import com.logonbox.vpn.drivers.windows.WindowsSystemServices.Status;
 import com.logonbox.vpn.drivers.windows.WindowsSystemServices.Win32Service;
 import com.logonbox.vpn.drivers.windows.WindowsSystemServices.XAdvapi32;
 import com.logonbox.vpn.drivers.windows.WindowsSystemServices.XWinsvc;
-import com.logonbox.vpn.drivers.windows.WireguardLibrary.Key;
 import com.sshtools.liftlib.ElevatedClosure;
 import com.sun.jna.Native;
 import com.sun.jna.platform.win32.Advapi32;
@@ -573,8 +572,8 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 
 		@Serialization
 		public static final class WindowsVpnPeerInformation implements VpnPeerInformation {
-			private Instant thisHandshake;
-			private Key peerPresharedKey;
+			private long thisHandshake;
+			private String presharedKey;
 			private long pRx;
 			private String peerPublicKey;
 			private List<String> allowedIps;
@@ -583,10 +582,10 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 			public WindowsVpnPeerInformation() {
 			}
 
-			public WindowsVpnPeerInformation(Instant thisHandshake, Key peerPresharedKey, long pRx,
+			public WindowsVpnPeerInformation(long thisHandshake, String presharedKey, long pRx,
 					String peerPublicKey, List<String> allowedIps, long pTx) {
 				this.thisHandshake = thisHandshake;
-				this.peerPresharedKey = peerPresharedKey;
+				this.presharedKey = presharedKey;
 				this.pRx = pRx;
 				this.peerPublicKey = peerPublicKey;
 				this.allowedIps = allowedIps;
@@ -605,7 +604,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 
 			@Override
 			public Instant lastHandshake() {
-				return thisHandshake;
+				return Instant.ofEpochMilli(thisHandshake);
 			}
 
 			@Override
@@ -626,8 +625,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 
 			@Override
 			public Optional<String> presharedKey() {
-				return peerPresharedKey == null ? Optional.empty()
-						: Optional.of(peerPresharedKey.toString());
+				return Optional.ofNullable(presharedKey);
 			}
 
 			@Override
@@ -661,13 +659,13 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 					lastHandshake.set(Math.max(lastHandshake.get(), thisHandshake.toEpochMilli()));
 					tx.addAndGet(peer.txBytes);
 					rx.addAndGet(peer.rxBytes);
-					var allowedIps = Arrays.asList(peer.allowedIPs).stream()
-							.map(a -> String.format("%s/%d", a.address.getHostAddress(), a.cidr)).collect(Collectors.toList());
-					var pTx = peer.txBytes;
-					var pRx = peer.rxBytes;
-					var peerPublicKey = peer.publicKey.toString();
-					var peerPresharedKey = peer.presharedKey;
-					peers.add(new WindowsVpnPeerInformation(thisHandshake, peerPresharedKey, pRx, peerPublicKey, allowedIps, pTx));
+					peers.add(new WindowsVpnPeerInformation(thisHandshake.toEpochMilli(),
+							peer.presharedKey == null ? null : peer.presharedKey.toString(), peer.rxBytes,
+							peer.publicKey.toString(),
+							new ArrayList<>(Arrays.asList(peer.allowedIPs).stream()
+									.map(a -> String.format("%s/%d", a.address.getHostAddress(), a.cidr))
+									.collect(Collectors.toList())),
+							peer.txBytes));
 				}
 				
 				var ifacePublicKey = wgIface.publicKey.toString();
