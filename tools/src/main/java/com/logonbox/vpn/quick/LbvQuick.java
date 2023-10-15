@@ -701,8 +701,6 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 		taskArgs.add("down");
 		taskArgs.add(vpn.configuration().toDataUri());
 		
-		System.out.println(String.join(" ", taskArgs));
-		
 		if(OS.isLinux()) {
 			if(OS.hasCommand("at")) {
 				/* NOTE at only has 'minute' resolution */
