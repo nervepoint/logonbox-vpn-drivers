@@ -133,6 +133,7 @@ public interface VpnPeer extends Serializable {
 		}
 
 		@SuppressWarnings("serial")
+	    @Serialization
 		static class DefaultVpnPeer implements VpnPeer {
 
 			private final int endpointPort;
@@ -147,7 +148,7 @@ public interface VpnPeer extends Serializable {
 				endpointPort = builder.endpointPort.orElse(0);
 				endpointAddress = builder.endpointAddress.orElse(null);
 				publicKey = builder.publicKey.orElseThrow(() -> new IllegalStateException("No public key"));
-				allowedIps = Collections.unmodifiableList(new ArrayList<>(builder.allowedIps));
+				allowedIps = new ArrayList<>(builder.allowedIps);
 				presharedKey = builder.presharedKey.orElse(null);
 			}
 
@@ -178,7 +179,7 @@ public interface VpnPeer extends Serializable {
 
 			@Override
 			public List<String> allowedIps() {
-				return allowedIps;
+				return Collections.unmodifiableList(allowedIps);
 			}
 
 		}

@@ -203,6 +203,7 @@ public interface VpnAdapterConfiguration extends Serializable {
     }
     
     @SuppressWarnings("serial")
+    @Serialization
 	class DefaultVpnAdapterConfiguration implements VpnAdapterConfiguration {
 
         private final int listenPort;
@@ -219,7 +220,7 @@ public interface VpnAdapterConfiguration extends Serializable {
             		throw new IllegalStateException("No public key, and no private key, so public key cannot be derived.");
             	return Keys.pubkey(privateKey).getBase64PublicKey();
             });
-            peers = Collections.unmodifiableList(new ArrayList<>(builder.peers));
+            peers = new ArrayList<>(builder.peers);
             fwMark = builder.fwMark.orElse(0);
         }
 
@@ -242,7 +243,7 @@ public interface VpnAdapterConfiguration extends Serializable {
 
         @Override
         public final List<VpnPeer> peers() {
-            return peers;
+            return Collections.unmodifiableList(peers);
         }
 
         @Override
