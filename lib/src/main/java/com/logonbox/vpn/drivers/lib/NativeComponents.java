@@ -77,7 +77,7 @@ public class NativeComponents {
 	}
 
 	public enum Tool {
-		WIREGUARD_GO, WG, NETWORK_CONFIGURATION_SERVICE, WIREGUARD_LIB;
+		WIREGUARD_GO, WG, NETWORK_CONFIGURATION_SERVICE, WIREGUARD;
 
 		boolean searchPath() {
 			switch (this) {
@@ -90,7 +90,7 @@ public class NativeComponents {
 		
 		boolean library() {
 			switch(this) {
-			case WIREGUARD_LIB:
+			case WIREGUARD:
 				return true;
 			default:
 				return false;
@@ -170,7 +170,7 @@ public class NativeComponents {
 
 	private Path toolPath(Tool tool) throws IOException {
 		var os = os();
-		var toolFilename = tool.exeFilename(os);
+		var toolFilename = tool.toolFilename(os);
 
 		if (tool.searchPath()) {
 			var path = OsUtil.getPathOfCommandInPath(toolFilename);

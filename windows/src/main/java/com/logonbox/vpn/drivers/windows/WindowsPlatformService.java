@@ -134,6 +134,20 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 
 	public WindowsPlatformService(SystemContext context) {
 		super(INTERFACE_PREFIX, context);
+		
+
+		var wireguardDll = Paths.get("C:\\Windows\\System32\\wireguard.dll");
+		if(!Files.exists(wireguardDll)) {
+			/* TODO: At some point, check if this is really still needed. I'm sure ive see it work without it */
+			var tool = Paths.get(context().nativeComponents().tool(Tool.WIREGUARD));
+			try {
+				context.alert("Installing wireguard.dll");
+				context.commands().privileged().result("cmd", "/c", "copy", "/y", tool.toAbsolutePath().toString(), wireguardDll.toString());
+			}
+			catch(Exception e) {
+				LOG.warn("Failed to install wireguard DLL to C:\\Windows\\System32. You may have connectivity problems.", e);
+			}
+		}
 	}
 
 	@FunctionalInterface
@@ -302,6 +316,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 		var transformedConfiguration = transform(configuration);
 
 		/* Install service for the network interface */
+		context.alert("Installing service for {0}", ip.nativeName());
 		var tool = Paths.get(context().nativeComponents().tool(Tool.NETWORK_CONFIGURATION_SERVICE));
 		var install = context().commands().privileged().logged().task(new InstallService(
 			ip.nativeName(), 
@@ -322,6 +337,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 		} catch (InterruptedException e) {
 		}
 		LOG.info("Service should be settled.");
+		context.alert("Service for {0} started", ip.nativeName());
 
 		if (ip.isUp()) {
 			LOG.info("Service for {} is already up.", ip.shortName());

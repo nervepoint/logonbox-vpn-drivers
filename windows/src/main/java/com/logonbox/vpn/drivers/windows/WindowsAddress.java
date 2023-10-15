@@ -54,6 +54,7 @@ public class WindowsAddress extends AbstractVirtualInetAddress<WindowsPlatformSe
 	public void delete() throws IOException {
 		synchronized (lock) {
 			try {
+				platform.context().alert("Uninstalling service for {0}", nativeName());
 				commands.privileged().logged().task(new Uninstall(getServiceName()));
 			} catch (IOException ioe) {
 				throw ioe;
@@ -67,6 +68,7 @@ public class WindowsAddress extends AbstractVirtualInetAddress<WindowsPlatformSe
 	public void down() throws IOException {
 		synchronized (lock) {
 			try {
+				platform.context().alert("Stopping service for {0}", nativeName());
 				commands.privileged().logged().task(new Stop(getServiceName()));
 			} catch (IOException ioe) {
 				throw ioe;
