@@ -5,7 +5,7 @@ import com.logonbox.vpn.drivers.lib.DNSProvider;
 import java.util.Optional;
 
 /**
- * Decides which DNS intergration to use on Mac. Currently networksetup and 2
+ * Decides which DNS integration to use on Mac. Currently networksetup and 2
  * modes of scutil are supported.
  */
 public class MacOsDNSProviderFactory implements DNSProvider.Factory {

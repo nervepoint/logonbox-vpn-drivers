@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.io.UncheckedIOException;
+import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -227,15 +228,22 @@ public class UserspaceMacOsAddress extends AbstractUnixAddress<UserspaceMacOsPla
 				ipv6 = true;
 			} else if (l.length > 3 && l[3].equals(nativeName())) {
 				var gateway = l[1];
-				if(!getAddresses().contains(gateway)) {
-    				LOG.info("Removing route {} {} for {}", l[0], gateway, nativeName());
-    				if (ipv6) {
-    					commands.privileged().logged().stdout(ProcessRedirect.DISCARD).result(OsUtil.debugCommandArgs("route", "-qn", "delete", "-inet6", "-ifp",
-    					        nativeName(), l[0], gateway));
-    				} else {
-    					commands.privileged().logged().stdout(ProcessRedirect.DISCARD).result(
-    							OsUtil.debugCommandArgs("route", "-qn", "delete", "-ifp", nativeName(), l[0], gateway));
-    				}
+				try {
+					InetAddress.getByName(gateway);
+					if(!getAddresses().contains(gateway)) {
+						LOG.info("Removing route {} {} for {}", l[0], gateway, nativeName());
+						if (ipv6) {
+							commands.privileged().logged().stdout(ProcessRedirect.DISCARD).result(
+									OsUtil.debugCommandArgs("route", "-qn", "delete", "-inet6", "-ifp",
+											nativeName(), l[0], gateway));
+						} else {
+							commands.privileged().logged().stdout(ProcessRedirect.DISCARD).result(
+									OsUtil.debugCommandArgs("route", "-qn", "delete", "-ifp", nativeName(), l[0], gateway));
+						}
+					}
+				}
+				catch(Exception e) {
+					
 				}
 			}
 		}
@@ -375,7 +383,7 @@ public class UserspaceMacOsAddress extends AbstractUnixAddress<UserspaceMacOsPla
     public static UserspaceMacOsAddress ofNativeName(String nativeName,
             UserspaceMacOsPlatformService platformService) {
         try {
-            var name = platformService.context().commands().task(new GetName(nativeName));
+            var name = platformService.context().commands().privileged().task(new GetName(nativeName));
             return new UserspaceMacOsAddress(name, nativeName, platformService);
         } catch(IOException ioe) {
             throw new UncheckedIOException(ioe);
@@ -438,7 +446,7 @@ public class UserspaceMacOsAddress extends AbstractUnixAddress<UserspaceMacOsPla
         public String call(ElevatedClosure<String, Serializable> proxy) throws Exception {
             var dir = Paths.get("/var/run/wireguard");
             if(Files.exists(dir)) {
-				try(var nameFiles = Files.newDirectoryStream(dir, f->f.getFileName().endsWith(".name"))) {
+				try(var nameFiles = Files.newDirectoryStream(dir, f->f.getFileName().toString().endsWith(".name"))) {
 	                for(var f : nameFiles) {
 	                    String iface;
 	                    try(var in = Files.newBufferedReader(f)) {

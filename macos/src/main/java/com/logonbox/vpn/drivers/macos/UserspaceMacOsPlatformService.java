@@ -61,7 +61,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 	@Override
 	protected UserspaceMacOsAddress add(String name, String nativeName, String type) throws IOException {
 		var priv = context().commands().privileged();
-		priv.result("mkdir", "/var/run/wireguard");
+		priv.result("mkdir", "-p", "/var/run/wireguard");
 		var tool = context().nativeComponents().tool(Tool.WIREGUARD_GO);
 		priv.logged().env(Map.of("WG_TUN_NAME_FILE", String.format("/var/run/wireguard/%s.name", name))).result(tool, "utun");
         var addr = new UserspaceMacOsAddress(name, nativeName, this);
@@ -94,7 +94,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 		try {
 			var state = IpAddressState.HEADER;
 			for (var r : context().commands().output("ifconfig")) {
-				if (!r.startsWith(" ")) {
+				if (!r.startsWith(" ") && !r.startsWith("\t")) {
 					var a = r.split(":");
 					var name = a[0].trim();
 					l.add(lastLink = UserspaceMacOsAddress.ofNativeName(name, this));
