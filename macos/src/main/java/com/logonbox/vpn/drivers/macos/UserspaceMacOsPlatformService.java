@@ -64,7 +64,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 		priv.result("mkdir", "/var/run/wireguard");
 		var tool = context().nativeComponents().tool(Tool.WIREGUARD_GO);
 		priv.logged().env(Map.of("WG_TUN_NAME_FILE", String.format("/var/run/wireguard/%s.name", name))).result(tool, "utun");
-        var addr = UserspaceMacOsAddress.ofName(name, this);
+        var addr = new UserspaceMacOsAddress(name, nativeName, this);
         if(!addr.nativeName().startsWith("utun")) {
         	throw new IOException(MessageFormat.format("Native network interface name should start with 'utun', but it is ''{0}''", addr.nativeName()));
         }

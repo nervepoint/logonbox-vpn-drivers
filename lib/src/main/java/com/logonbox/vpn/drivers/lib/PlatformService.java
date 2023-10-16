@@ -161,21 +161,21 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	ADDR address(String name);
 
 	/**
-	 * Get if a {@link VpnAddress} exists given its short name.
+	 * Get if a {@link VpnAddress} exists given its native interface name
 	 * 
-	 * @param name name
+	 * @param nativeName name
 	 * @return exists
 	 */
-	default boolean addressExists(String name) {
+	default boolean addressExists(String nativeName) {
 		for (var addr : addresses()) {
-			if (addr.name().equals(name))
+			if (addr.name().equals(nativeName))
 				return true;
 		}
 		return false;
 	}
 
 	/**
-	 * Get a {@link VpnAdapter} given its short name.
+	 * Get a {@link VpnAdapter} given its native interface name.
 	 * 
 	 * @param nativeName name
 	 * @return address
@@ -183,14 +183,14 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	VpnAdapter adapter(String nativeName);
 
 	/**
-	 * Get if a {@link VpnAdapter} exists given its short name.
+	 * Get if a {@link VpnAdapter} exists given its native interface name.
 	 * 
 	 * @param nativeName name
 	 * @return exists
 	 */
 	default boolean adapterExists(String nativeName) {
 		for (var addr : adapters()) {
-			if (addr.address().name().equals(nativeName))
+			if (addr.address().nativeName().equals(nativeName))
 				return true;
 		}
 		return false;

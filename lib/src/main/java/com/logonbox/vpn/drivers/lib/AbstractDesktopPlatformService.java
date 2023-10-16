@@ -603,6 +603,8 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 		var addr = session.address();
         env.put("LBVPN_IP_MAC", addr.getMac());
         env.put("LBVPN_IP_NAME", addr.name());
+        env.put("LBVPN_IP_NATIVE_NAME", addr.nativeName());
+        env.put("LBVPN_IP_SHORT_NAME", addr.shortName());
         env.put("LBVPN_IP_DISPLAY_NAME", addr.displayName());
         env.put("LBVPN_IP_PEER", addr.peer());
         env.put("LBVPN_IP_TABLE", addr.table());

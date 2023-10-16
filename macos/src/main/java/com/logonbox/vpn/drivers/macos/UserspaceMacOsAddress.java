@@ -62,7 +62,7 @@ public class UserspaceMacOsAddress extends AbstractUnixAddress<UserspaceMacOsPla
 	private boolean autoRoute4;
 	private boolean autoRoute6;
 
-	private UserspaceMacOsAddress(String name, String nativeName, UserspaceMacOsPlatformService platform) throws IOException {
+	UserspaceMacOsAddress(String name, String nativeName, UserspaceMacOsPlatformService platform) throws IOException {
 		super(name, nativeName, platform);
 	}
 
