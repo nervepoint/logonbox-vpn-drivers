@@ -641,14 +641,44 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 	}
 
 	private final static void unexpire(SystemContext context, Vpn vpn, boolean log) throws IOException {
+		var cmds = context.commands().privileged();
+		var loggedCmds = log ? cmds.logged() : cmds;
 		if(OS.isLinux()) {
-			if(OS.hasCommand("at")) {
+			if(OS.hasCommand("systemd-run")) {
 				try {
-					var jobId = Long.parseLong(context.commands().privileged().task(new Prefs.GetValue(
-							true, LbvQuick.class.getPackageName().replace('.', '/') + "/jobs", vpn.adapter().address().nativeName(), null)
-					));
+					var jobStr = context.commands().privileged()
+							.task(new Prefs.GetValue(true, LbvQuick.class.getPackageName().replace('.', '/') + "/jobs",
+									vpn.adapter().address().nativeName(), null));
+					if (jobStr == null) {
+						return;
+					}
 					try {
-						maybeLogCommands(context, log).result("atrm", 
+						if (cmds.result("systemctl", "--quiet", "stop", jobStr) == 0) {
+							cmds.result("rm", "-f", "/var/run/systemd/transient/" + jobStr + ".timer");
+							cmds.result("rm", "-f", "/var/run/systemd/transient/" + jobStr + ".service");
+							cmds.result("systemctl", "daemon-reload");
+							context.alert("Expiry timer unit removed");
+						}
+					} finally {
+						context.commands().privileged()
+								.task(new Prefs.RemoveKey(true,
+										LbvQuick.class.getPackageName().replace('.', '/') + "/jobs",
+										vpn.adapter().address().nativeName()));
+					}
+				} catch (Exception e) {
+				}
+			}
+			else if(OS.hasCommand("at")) {
+				try {
+					var jobStr = context.commands().privileged().task(new Prefs.GetValue(
+							true, LbvQuick.class.getPackageName().replace('.', '/') + "/jobs", vpn.adapter().address().nativeName(), null)
+					);
+					if(jobStr == null) {
+						return;
+					}
+					var jobId = Long.parseLong(jobStr);
+					try {
+						loggedCmds.result("atrm", 
 								String.valueOf(jobId));
 					}
 					finally {
@@ -665,7 +695,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 		}
 		else if(OS.isWindows()) {
 			if(OS.hasCommand("schtasks")) {
-				maybeLogCommands(context, log).result("schtasks", 
+				loggedCmds.result("schtasks", 
 						"/delete", 
 						"/f", 
 						"/tn", "VpnExpiry_" + vpn.adapter().information().interfaceName());
@@ -676,22 +706,15 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 		}
 		else if(OS.isMacOs()) {
 			var task = LbvQuick.class.getPackage().getName() + ".expire." + vpn.adapter().address().nativeName(); 
-			maybeLogCommands(context, log).result(
+			loggedCmds.result(
 				"launchctl", 
 				"stop", 
 				task
 			);
-			maybeLogCommands(context, log).result(
+			loggedCmds.result(
 				"rm", "-f", "/Library/LaunchAgents/" + task + ".plist"
 			);
 		}
-	}
-
-	private static SystemCommands maybeLogCommands(SystemContext context, boolean log) {
-		if(log)
-			return context.commands().privileged().logged();
-		else
-			return context.commands().privileged();
 	}
 	
 	private final static void expire(SystemContext context, Vpn vpn, long seconds) throws IOException {
@@ -702,7 +725,32 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 		taskArgs.add(vpn.configuration().toDataUri());
 		
 		if(OS.isLinux()) {
-			if(OS.hasCommand("at")) {
+			if(OS.hasCommand("systemd-run")) {
+				var fmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+				var cmds = new ArrayList<String>(Arrays.asList(
+						"systemd-run",
+						"--description=Expire " + vpn.adapter().address().shortName(),
+						"--on-calendar=" + fmt.format(new Date(System.currentTimeMillis() + (seconds * 1000)))));
+				logCommandLine(cmds.toArray(new String[0]));
+				cmds.addAll(taskArgs);
+				for(var line : context.commands().privileged().output(cmds.toArray(new String[0]))) {
+					var split = line.split("\\s+");
+					for(var arg : split) {
+						if(arg.endsWith(".timer")) {
+							try {
+								context.commands().privileged().task(new Prefs.PutValue(
+										true, LbvQuick.class.getPackageName().replace('.', '/') + "/jobs", vpn.adapter().address().nativeName(), arg, PrefType.STRING
+								));
+								return;
+							}
+							catch(Exception e) {
+							}
+						}
+					}
+				}
+				context.alert("Failed to find timer ID for scheduled expiry, expiry may not work as expected");
+			}
+			else if(OS.hasCommand("at")) {
 				/* NOTE at only has 'minute' resolution */
 				var time = Math.max(1, seconds / 60);
 				var cmds = Arrays.asList("at", "-M", "now + " + time + " minutes");
@@ -721,7 +769,6 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 								return;
 							}
 							catch(Exception e) {
-								context.alert("Failed to save job ID for scheduled expiry, expiry may not work as expected");
 							}
 						}
 					}
@@ -729,7 +776,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 				context.alert("Failed to find job ID for scheduled expiry, expiry may not work as expected");
 			}
 			else {
-				throw new UnsupportedOperationException("Expiry requires that the `at` command be installed on Linux.");
+				throw new UnsupportedOperationException("Expiry requires that either `systemd` or the `at` command be installed on Linux.");
 			}
 		}
 		else if(OS.isWindows()) {
