@@ -129,7 +129,6 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 						else {
 							LOG.info("{} appears to be being used by something other than wireguard, skipping.", name);
 						}
-						break;
 					} else if (publicKey.get().equals(configuration.publicKey())) {
 						throw new IllegalStateException(String
 								.format("Peer with public key %s on %s is already active.", publicKey.get(), name));
