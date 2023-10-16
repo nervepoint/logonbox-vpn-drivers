@@ -4,6 +4,7 @@ import com.sshtools.liftlib.Helper;
 
 import org.slf4j.bridge.SLF4JBridgeHandler;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.logging.Handler;
@@ -28,6 +29,9 @@ public abstract class AbstractCommand implements Callable<Integer> {
 
     @Option(names = { "-X", "--verbose-exceptions" }, description = "Show verbose exception traces on errors.")
     private boolean verboseExceptions;
+
+    @Option(names = { "-D", "--sysprop" }, description = "Set a system property.")
+    private List<String> systemProperties;
     
     @Spec
     CommandSpec spec;
@@ -40,6 +44,17 @@ public abstract class AbstractCommand implements Callable<Integer> {
     
     public final void initCommand() throws Exception {
         var defaultLevel = level.orElse(Level.WARN);
+        
+        for(var str: systemProperties) {
+        	var idx = str.indexOf('=');
+        	if(idx == -1) {
+        		System.setProperty(str, "true");
+        	}
+        	else {
+        		System.setProperty(str.substring(0, idx), str.substring(idx + 1));
+        	}
+        }
+        
 		System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", defaultLevel.name());
         SLF4JBridgeHandler.removeHandlersForRootLogger();
         SLF4JBridgeHandler.install();
