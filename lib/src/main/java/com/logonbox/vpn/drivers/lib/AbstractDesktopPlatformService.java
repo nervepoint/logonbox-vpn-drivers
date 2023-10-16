@@ -119,10 +119,16 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 					/* Interface exists, is it connected? */
 					var publicKey = getPublicKey(name);
 					if (publicKey.isEmpty()) {
-						/* No addresses, wireguard not using it */
-						LOG.info("{} is free.", name);
-						ip = address(name);
-						maxIface = i;
+						/* No addresses, wireguard not using it, but something else might be */
+						var mappedTo = nativeNameToInterfaceName(name); 
+						if(mappedTo.isPresent()) {
+							LOG.info("{} is in use, mapped to {}.", name, mappedTo.get());
+							ip = address(name);
+							maxIface = i;
+						}
+						else {
+							LOG.info("{} appears to be being used by something other than wireguard, skipping.", name);
+						}
 						break;
 					} else if (publicKey.get().equals(configuration.publicKey())) {
 						throw new IllegalStateException(String
@@ -149,7 +155,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 					throw new IOException("Failed to create virtual IP address.");
 				LOG.info("Created {}", ip.shortName());
 			} else
-				LOG.info("Using {}", ip.shortName());
+				LOG.info("Using existing {}", ip.shortName());
 		}
 		return ip;
 	}
