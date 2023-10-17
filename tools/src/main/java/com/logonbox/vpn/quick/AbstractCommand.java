@@ -45,14 +45,16 @@ public abstract class AbstractCommand implements Callable<Integer> {
     public final void initCommand() throws Exception {
         var defaultLevel = level.orElse(Level.WARN);
         
-        for(var str: systemProperties) {
-        	var idx = str.indexOf('=');
-        	if(idx == -1) {
-        		System.setProperty(str, "true");
-        	}
-        	else {
-        		System.setProperty(str.substring(0, idx), str.substring(idx + 1));
-        	}
+        if(systemProperties != null) {
+	        for(var str: systemProperties) {
+	        	var idx = str.indexOf('=');
+	        	if(idx == -1) {
+	        		System.setProperty(str, "true");
+	        	}
+	        	else {
+	        		System.setProperty(str.substring(0, idx), str.substring(idx + 1));
+	        	}
+	        }
         }
         
 		System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", defaultLevel.name());

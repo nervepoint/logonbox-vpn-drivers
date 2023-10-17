@@ -37,6 +37,7 @@ import com.logonbox.vpn.drivers.lib.PlatformService;
 import com.logonbox.vpn.drivers.lib.Prefs;
 import com.logonbox.vpn.drivers.lib.Prefs.PrefType;
 import com.logonbox.vpn.drivers.lib.SystemCommands;
+import com.logonbox.vpn.drivers.lib.SystemCommands.ProcessRedirect;
 import com.logonbox.vpn.drivers.lib.SystemConfiguration;
 import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.Vpn;
@@ -347,16 +348,25 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 
     @Command(name = "down", description = "Take a VPN interface down.")
     public final static class Down extends AbstractQuickCommand {
+    	 @Option(names = { "--delay-expire" }, description = "Delay removal of the expiry job.")
+         private boolean delayExpire;
 
         @Override
         protected Integer onCall(Vpn vpn, Optional<Path> configFile, Optional<String> interfaceName) throws Exception {
             if(!vpn.started())
                 throw new IOException(MessageFormat.format("`{0}` is not a VPN interface.", vpn.interfaceName().get()));
             try {
-            	unexpire(parent, vpn);
+            	if(!delayExpire)
+            		unexpire(parent, vpn);
             }
             finally {
-            	vpn.close();
+            	try {
+            		vpn.close();
+            	}
+            	finally {
+            		if(delayExpire)
+                		unexpire(parent, vpn);
+            	}
             }
             return 0;
         }
@@ -575,7 +585,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 		
 		if(cmd.toLowerCase().contains("java")) {
 			
-			newArgList.add(cmd);
+			newArgList.add(Paths.get(cmd).toAbsolutePath().toString());
 			
 			/* TODO: Windows does not give us our own arguments :( I think it's this
 			 * bug - https://bugs.openjdk.org/browse/JDK-8176725. For now, I am
@@ -617,7 +627,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 			}
 		}
 		else {
-			newArgList.add(cmd);
+			newArgList.add(Paths.get(cmd).toAbsolutePath().toString());
 		}
 		return newArgList;
 	}
@@ -706,13 +716,15 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 		}
 		else if(OS.isMacOs()) {
 			var task = LbvQuick.class.getPackage().getName() + ".expire." + vpn.adapter().address().nativeName(); 
-			loggedCmds.result(
+			var file = "/Library/LaunchDaemons/" + task + ".plist";
+			
+			loggedCmds.stderr(ProcessRedirect.DISCARD).result(
 				"launchctl", 
-				"stop", 
-				task
+				"unload", 
+				file
 			);
 			loggedCmds.result(
-				"rm", "-f", "/Library/LaunchAgents/" + task + ".plist"
+				"rm", "-f", file
 			);
 		}
 	}
@@ -827,27 +839,27 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 			}
 		}
 		else if(OS.isMacOs()) {
-				
+			taskArgs.add("--delay-expire");
 			var wrt = new StringWriter();
-			try(var in = new InputStreamReader(LbvQuick.class.getResourceAsStream("/macos-task.plist"), "UTF-16")) {
+			try(var in = new InputStreamReader(LbvQuick.class.getResourceAsStream("/macos-task.plist"), "UTF-8")) {
 				in.transferTo(wrt);
 			}
 			var str = wrt.toString();
 			var task = LbvQuick.class.getPackage().getName() + ".expire." + vpn.adapter().address().nativeName(); 
 			str = str.replace("${task}", task);
+			str = str.replace("${nativeName}", vpn.adapter().address().nativeName());
 			str = str.replace("${args}", String.join(System.lineSeparator(), 
-					taskArgs.subList(1, taskArgs.size()).stream().map(s -> "<string>" + s + "</string>").collect(Collectors.toList())));
-			
-
+					taskArgs.stream().map(s -> "<string>" + s + "</string>").collect(Collectors.toList())));
+			var file = "/Library/LaunchDaemons/" + task + ".plist";
 			context.commands().privileged().run(new String[] {
 				"sh", "-c",
-				"echo '" + str + "' > /Library/LaunchAgents/" + task + ".plist"
+				"echo '" + str + "' > " + file
 			});
 			
 			var cmds = new String[] {
 				"launchctl", 
-				"start", 
-				task
+				"load", 
+				file
 			};
 			logCommandLine(cmds);
 			context.commands().privileged().run(cmds);
