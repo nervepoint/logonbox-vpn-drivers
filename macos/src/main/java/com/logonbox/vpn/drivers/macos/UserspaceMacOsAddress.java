@@ -22,19 +22,14 @@ package com.logonbox.vpn.drivers.macos;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.Serializable;
-import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,9 +39,6 @@ import com.logonbox.vpn.drivers.lib.SystemCommands.ProcessRedirect;
 import com.logonbox.vpn.drivers.lib.util.IpUtil;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
 import com.logonbox.vpn.drivers.lib.util.Util;
-import com.sshtools.liftlib.ElevatedClosure;
-
-import uk.co.bithatch.nativeimage.annotations.Serialization;
 
 public class UserspaceMacOsAddress extends AbstractUnixAddress<UserspaceMacOsPlatformService> {
 	enum IpAddressState {
@@ -63,7 +55,7 @@ public class UserspaceMacOsAddress extends AbstractUnixAddress<UserspaceMacOsPla
 	private boolean autoRoute4;
 	private boolean autoRoute6;
 
-	UserspaceMacOsAddress(String name, String nativeName, UserspaceMacOsPlatformService platform) throws IOException {
+	public UserspaceMacOsAddress(String name, String nativeName, UserspaceMacOsPlatformService platform) throws IOException {
 		super(name, nativeName, platform);
 	}
 
@@ -365,101 +357,4 @@ public class UserspaceMacOsAddress extends AbstractUnixAddress<UserspaceMacOsPla
 		}
 
 	}
-
-
-    public static UserspaceMacOsAddress ofName(String name,
-            UserspaceMacOsPlatformService platformService) {
-        try {
-            return new UserspaceMacOsAddress(name, platformService.context().commands().privileged().task(new GetNativeName(name)), platformService);
-        } catch(IOException ioe) {
-            throw new UncheckedIOException(ioe);
-        } catch(RuntimeException re) {
-            throw re;
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    public static UserspaceMacOsAddress ofNativeName(String nativeName,
-            UserspaceMacOsPlatformService platformService) {
-        try {
-            var name = platformService.context().commands().privileged().task(new GetName(nativeName));
-            return new UserspaceMacOsAddress(name, nativeName, platformService);
-        } catch(IOException ioe) {
-            throw new UncheckedIOException(ioe);
-        } catch(RuntimeException re) {
-            throw re;
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
-    @SuppressWarnings("serial")
-    @Serialization
-    public final static class GetNativeName implements ElevatedClosure<String, Serializable> {
-
-        private String name;
-
-        public GetNativeName() {
-        }
-
-        GetNativeName(String name) {
-            this.name = name;
-        }
-
-        @Override
-        public String call(ElevatedClosure<String, Serializable> proxy) throws Exception {
-            var namePath = Paths.get(String.format("/var/run/wireguard/%s.name", name));
-            if(!Files.exists(namePath))
-                return name;
-
-            String iface;
-            try(var in = Files.newBufferedReader(namePath)) {
-                iface = in.readLine();
-            }
-            var socketPath = Paths.get(String.format("/var/run/wireguard/%s.sock", iface));
-            if(!Files.exists(socketPath))
-                return name;
-
-            var secDiff = Files.getLastModifiedTime(socketPath).to(TimeUnit.SECONDS) - Files.getLastModifiedTime(namePath).to(TimeUnit.SECONDS) ;
-            if(secDiff > 2 || secDiff < -2)
-                return name;
-
-            return iface;
-        }
-    }
-
-    @SuppressWarnings("serial")
-    @Serialization
-    public final static class GetName implements ElevatedClosure<String, Serializable> {
-
-        private String realInterace;
-
-        public GetName() {
-        }
-
-        GetName(String realInterace) {
-            this.realInterace = realInterace;
-        }
-
-        @Override
-        public String call(ElevatedClosure<String, Serializable> proxy) throws Exception {
-            var dir = Paths.get("/var/run/wireguard");
-            if(Files.exists(dir)) {
-				try(var nameFiles = Files.newDirectoryStream(dir, f->f.getFileName().toString().endsWith(".name"))) {
-	                for(var f : nameFiles) {
-	                    String iface;
-	                    try(var in = Files.newBufferedReader(f)) {
-	                        iface = in.readLine();
-	                    }
-	                    if(realInterace.equals(iface)) {
-	                        var n = f.getFileName().toString();
-	                        return n.substring(0, n.lastIndexOf('.'));
-	                    }
-	                }
-	            }
-            }
-            return realInterace;
-        }
-    }
 }

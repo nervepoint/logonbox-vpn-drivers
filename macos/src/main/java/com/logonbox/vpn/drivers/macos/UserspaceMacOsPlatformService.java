@@ -28,7 +28,6 @@ import java.text.MessageFormat;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,7 +62,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 		var priv = context().commands().privileged();
 		priv.result("mkdir", "-p", "/var/run/wireguard");
 		var tool = context().nativeComponents().tool(Tool.WIREGUARD_GO);
-		priv.logged().env(Map.of("WG_TUN_NAME_FILE", String.format("/var/run/wireguard/%s.name", name))).result(tool, "utun");
+		priv.logged().result(tool, nativeName);
         var addr = new UserspaceMacOsAddress(name, nativeName, this);
         if(!addr.nativeName().startsWith("utun")) {
         	throw new IOException(MessageFormat.format("Native network interface name should start with 'utun', but it is ''{0}''", addr.nativeName()));
@@ -97,7 +96,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 				if (!r.startsWith(" ") && !r.startsWith("\t")) {
 					var a = r.split(":");
 					var name = a[0].trim();
-					l.add(lastLink = UserspaceMacOsAddress.ofNativeName(name, this));
+					l.add(lastLink = new UserspaceMacOsAddress(nativeNameToInterfaceName(name).orElse(name), name, this));
 					state = IpAddressState.MAC;
 				} else if (lastLink != null) {
 					r = r.trim();
@@ -132,7 +131,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 
 	@Override
 	protected UserspaceMacOsAddress createVirtualInetAddress(NetworkInterface nif) throws IOException {
-		var ip = UserspaceMacOsAddress.ofNativeName(nif.getName(), this);
+		var ip = new UserspaceMacOsAddress(nativeNameToInterfaceName(nif.getName()).orElse(nif.getName()), nif.getName(), this);
 		for (var addr : nif.getInterfaceAddresses()) {
 			ip.getAddresses().add(addr.getAddress().toString());
 		}

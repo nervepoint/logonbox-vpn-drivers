@@ -21,7 +21,6 @@
 package com.logonbox.vpn.drivers.lib;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -648,5 +647,105 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 	}
 
 	protected abstract void runCommand(List<String> commands) throws IOException;
-	
+
+	// TODO I'd like to replace the use of preferences on all platforms to use files
+	// in a state directory (/var/run/wireguard) as the code below used to do in the mac impl.
+	// for now preferences are fine until everything else is working
+
+
+//    public static UserspaceMacOsAddress ofName(String name,
+//            UserspaceMacOsPlatformService platformService) {
+//        try {
+//            return new UserspaceMacOsAddress(name, platformService.context().commands().privileged().task(new GetNativeName(name)), platformService);
+//        } catch(IOException ioe) {
+//            throw new UncheckedIOException(ioe);
+//        } catch(RuntimeException re) {
+//            throw re;
+//        } catch (Exception e) {
+//            throw new IllegalStateException(e);
+//        }
+//    }
+//
+//    public static UserspaceMacOsAddress ofNativeName(String nativeName,
+//            UserspaceMacOsPlatformService platformService) {
+//        try {
+//            var name = platformService.context().commands().privileged().task(new GetName(nativeName));
+//            return new UserspaceMacOsAddress(name, nativeName, platformService);
+//        } catch(IOException ioe) {
+//            throw new UncheckedIOException(ioe);
+//        } catch(RuntimeException re) {
+//            throw re;
+//        } catch (Exception e) {
+//            throw new IllegalStateException(e);
+//        }
+//    }
+
+//    @SuppressWarnings("serial")
+//    @Serialization
+//    public final static class GetNativeName implements ElevatedClosure<String, Serializable> {
+//
+//        private String name;
+//
+//        public GetNativeName() {
+//        }
+//
+//        GetNativeName(String name) {
+//            this.name = name;
+//        }
+//
+//        @Override
+//        public String call(ElevatedClosure<String, Serializable> proxy) throws Exception {
+//            var namePath = Paths.get(String.format("/var/run/wireguard/%s.name", name));
+//            if(!Files.exists(namePath))
+//                return name;
+//
+//            String iface;
+//            try(var in = Files.newBufferedReader(namePath)) {
+//                iface = in.readLine();
+//            }
+//            var socketPath = Paths.get(String.format("/var/run/wireguard/%s.sock", iface));
+//            if(!Files.exists(socketPath))
+//                return name;
+//
+//            var secDiff = Files.getLastModifiedTime(socketPath).to(TimeUnit.SECONDS) - Files.getLastModifiedTime(namePath).to(TimeUnit.SECONDS) ;
+//            if(secDiff > 2 || secDiff < -2)
+//                return name;
+//
+//            return iface;
+//        }
+//    }
+//
+//    @SuppressWarnings("serial")
+//    @Serialization
+//    public final static class GetName implements ElevatedClosure<String, Serializable> {
+//
+//        private String realInterace;
+//
+//        public GetName() {
+//        }
+//
+//        GetName(String realInterace) {
+//            this.realInterace = realInterace;
+//        }
+//
+//        @Override
+//        public String call(ElevatedClosure<String, Serializable> proxy) throws Exception {
+//            var dir = Paths.get("/var/run/wireguard");
+//            if(Files.exists(dir)) {
+//				try(var nameFiles = Files.newDirectoryStream(dir, f->f.getFileName().toString().endsWith(".name"))) {
+//	                for(var f : nameFiles) {
+//	                    String iface;
+//	                    try(var in = Files.newBufferedReader(f)) {
+//	                        iface = in.readLine();
+//	                    }
+//	                    if(realInterace.equals(iface)) {
+//	                        var n = f.getFileName().toString();
+//	                        return n.substring(0, n.lastIndexOf('.'));
+//	                    }
+//	                }
+//	            }
+//            }
+//            return realInterace;
+//        }
+//    }
 }
