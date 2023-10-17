@@ -2,8 +2,27 @@ using System;
 using System.Runtime.InteropServices;
 
 static class LbvDll
-{
+{	
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct GraalCreateIsolateParams
+    {
+        public int version;
+        public long reservedAddressSpaceSize;
+        public string auxiliaryImagePath;
+        public long auxiliaryImageReservedSpaceSize;
+    }
+    
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct GraalIsolate
+    {        
+    }
+    
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct GraalIsolateThread
 
+    {        
+    }
+        
     /*
      * Create a new isolate, considering the passed parameters (which may be NULL).
      *
@@ -15,7 +34,7 @@ static class LbvDll
      */
     //int graal_create_isolate(graal_create_isolate_params_t* params, graal_isolate_t** isolate, graal_isolatethread_t** thread);
     [DllImport("../../target/liblbv.so", SetLastError = false, EntryPoint = "graal_create_isolate")]
-    public static extern int GraalCreateIsolate([In] in IntPtr parms, [Out] out IntPtr isolate, [Out] out IntPtr thread);
+    public static extern int GraalCreateIsolate([In] ref GraalCreateIsolateParams parms, [Out] out IntPtr isolate, [Out] out IntPtr thread);
 
     /*
      * Tears down the isolate of the passed (and still attached) isolate thread,

@@ -57,7 +57,7 @@ public final class Vpn implements Closeable {
         }
         
         public Builder withVpnConfiguration(String content) throws IOException, ParseException {
-            return withVpnConfiguration(new StringReader(content));
+            return withVpnConfiguration(new StringReader(content.trim()));
         }
         
         public Builder withSystemConfiguration(SystemConfiguration systemConfiguration) {
