@@ -5,10 +5,10 @@ import java.util.Optional;
 public final class StartRequest {
 
 	public final static class Builder {
-		private Optional<String> nativeInterfaceName;
-		private Optional<String> interfaceName;
+		private Optional<String> nativeInterfaceName = Optional.empty();
+		private Optional<String> interfaceName = Optional.empty();
 		private final VpnConfiguration configuration;
-		private Optional<VpnPeer> peer;
+		private Optional<VpnPeer> peer = Optional.empty();
 		
 		public Builder(VpnConfiguration configuration) {
 			this.configuration = configuration;

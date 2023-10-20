@@ -20,6 +20,8 @@ import com.logonbox.vpn.drivers.lib.util.OsUtil;
 import com.sshtools.liftlib.OS;
 
 public class NativeComponents {
+    /* TODO this needs to deal with updating the extracted binaries */
+    
 	final static Logger LOG = LoggerFactory.getLogger(NativeComponents.class);
 
 	public enum Arch {
