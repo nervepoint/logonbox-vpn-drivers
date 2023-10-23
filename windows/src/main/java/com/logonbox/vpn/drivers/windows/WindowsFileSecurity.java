@@ -38,6 +38,9 @@ import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.ResourceBundle;
 
+import uk.co.bithatch.nativeimage.annotations.Bundle;
+
+@Bundle
 public class WindowsFileSecurity {
 
     public final static ResourceBundle BUNDLE = ResourceBundle.getBundle(WindowsFileSecurity.class.getName());
