@@ -55,12 +55,12 @@ ACTION
 		<!--<graalvm.pgo>-Ob</graalvm.pgo>-->
 	</properties>
 	<dependencies>
-		<dependency>
+		<!-- <dependency>
 			<groupId>org.graalvm.sdk</groupId>
 			<artifactId>graal-sdk</artifactId>
 			<version>23.0.1</version>
 			<scope>provided</scope>
-		</dependency>
+		</dependencies> -->
 
 		<dependency>
 			<groupId>org.slf4j</groupId>

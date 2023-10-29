@@ -29,7 +29,7 @@ open module com.logonbox.vpn.drivers.os {
     exports com.logonbox.vpn.drivers.linux;
     requires transitive com.logonbox.vpn.drivers.lib;
     
-    requires commons.ip.math;
+    requires com.github.jgonian.ipmath;
     requires org.slf4j;
     requires org.freedesktop.dbus;
     requires com.sshtools.liftlib;

@@ -25,7 +25,7 @@ open module com.logonbox.vpn.drivers.lib {
     exports com.logonbox.vpn.drivers.lib;
     exports com.logonbox.vpn.drivers.lib.util;
     requires transitive org.slf4j;
-    requires commons.ip.math;
+    requires com.github.jgonian.ipmath;
     requires com.sshtools.liftlib;
     requires transitive com.sshtools.jini;
     requires static uk.co.bithatch.nativeimage.annotations;
