@@ -57,7 +57,7 @@ pipeline {
         				}
         				
         				tar file: 'target/tools/logonbox-vpn-tools-linux-x64.tar.gz',
-        				    glob: 'lbv*',  excluded: '*.txt', overwrite: true,
+        				    glob: 'lbv*',  exclude: '*.txt', overwrite: true,
         				    compress: true, dir: 'tools/target'
 					}
 				}
@@ -86,7 +86,7 @@ pipeline {
         				}
                         
                         tar file: 'target/tools/logonbox-vpn-tools-macos-x64.tar.gz',
-                            glob: 'lbv*',  excluded: '*.txt', overwrite: true,
+                            glob: 'lbv*',  exclude: '*.txt', overwrite: true,
                             compress: true, dir: 'tools/target'
 					}
 				}
@@ -115,7 +115,7 @@ pipeline {
         				}
                         
                         zip zipFile: 'target/tools/logonbox-vpn-tools-windows-x64.tar.gz',
-                            glob: 'lbv*',  excluded: '*.txt', overwrite: true,
+                            glob: 'lbv*',  exclude: '*.txt', overwrite: true,
                             dir: 'tools/target'
 					}
 				}
