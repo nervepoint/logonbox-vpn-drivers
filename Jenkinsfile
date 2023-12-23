@@ -38,7 +38,7 @@ pipeline {
 				 */
 				stage ('Linux 64 bit LogonBox VPN Drivers') {
 					agent {
-						label 'install4j && linux && x86_64'
+						label 'linux && x86_64'
 					}
 					steps {
                     
@@ -93,7 +93,7 @@ pipeline {
 				 */
 				stage ('MacOS LogonBox VPN Drivers') {
 					agent {
-						label 'install4j && macos'
+						label 'macos && x86_64'
 					}
 					steps {
                     
@@ -152,7 +152,7 @@ pipeline {
 				    /* when { expression { false } } */
 				    
 					agent {
-						label 'install4j && windows'
+						label 'windows && x86_64'
 					}
 					steps {
                     
