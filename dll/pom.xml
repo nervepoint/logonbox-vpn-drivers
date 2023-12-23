@@ -150,6 +150,22 @@ ACTION
 
 			<build>
 				<plugins>
+                    <plugin>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <configuration>
+                                    <target>
+                                        <mkdir dir="${basedir}/target/lib"/>
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
 					<plugin>
 						<groupId>org.graalvm.buildtools</groupId>
 						<artifactId>native-maven-plugin</artifactId>
@@ -171,6 +187,8 @@ ACTION
                                         <!--TODO This should not be necessary! For some reason native-image-annotations is not working for these -->
                                         <buildArg>-H:IncludeResources=win32.*</buildArg>
 										<buildArg>-H:Log=registerResource:verbose</buildArg>
+                                        <buildArg>-o</buildArg>
+                                        <buildArg>target/lib/${graalvm.libName}</buildArg>
                                     </buildArgs>
                                      <metadataRepository>
                                         <enabled>true</enabled>
