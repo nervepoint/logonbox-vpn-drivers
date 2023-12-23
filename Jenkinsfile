@@ -43,7 +43,7 @@ pipeline {
 					steps {
                     
                         script {
-                            env.FULLVERSION = getFullVersion()
+                            env.FULL_VERSION = getFullVersion()
                             echo "Full Version : ${env.FULLVERSION}"
                         }
                         
@@ -95,7 +95,7 @@ pipeline {
 					steps {
                     
                         script {
-                            env.FULLVERSION = getFullVersion()
+                            env.FULL_VERSION = getFullVersion()
                             echo "Full Version : ${env.FULLVERSION}"
                         }
                         
@@ -151,7 +151,7 @@ pipeline {
 					steps {
                     
                         script {
-                            env.FULLVERSION = getFullVersion()
+                            env.FULL_VERSION = getFullVersion()
                             echo "Full Version : ${env.FULLVERSION}"
                         }
                         
