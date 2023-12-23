@@ -37,7 +37,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <native.image.annotations.version>0.9.1-SNAPSHOT</native.image.annotations.version>
         <dbus.version>4.3.1</dbus.version>
-        <graalvm.version>0.9.25</graalvm.version>
+        <graalvm.version>0.9.28</graalvm.version>
     </properties>
     <modules>
         <module>lib</module>
