@@ -195,3 +195,14 @@ pipeline {
 		}
 	}
 }
+
+/* Create full version number from Maven POM version and the build number
+ *
+ * TODO make into a reusable library - https://stackoverflow.com/questions/47628248/how-to-create-methods-in-jenkins-declarative-pipeline
+ */
+String getFullVersion() {
+    def pom = readMavenPom file: "pom.xml"
+    pom_version_array = pom.version.split('\\.')
+    suffix_array = pom_version_array[2].split('-')
+    return pom_version_array[0] + '.' + pom_version_array[1] + "." + suffix_array[0] + "-${BUILD_NUMBER}"
+}
