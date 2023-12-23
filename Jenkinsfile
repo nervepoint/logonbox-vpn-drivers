@@ -143,7 +143,7 @@ pipeline {
 				stage ('Windows LogonBox VPN Drivers') {
 				
 				    /* TEMPORARY */
-				    when { expression { false } }
+				    /* when { expression { false } } */
 				    
 					agent {
 						label 'install4j && windows'
