@@ -42,18 +42,6 @@ ACTION
     <artifactId>logonbox-vpn-tools</artifactId>
     <name>LogonBox VPN Drivers - Example Utility</name>
     <packaging>jar</packaging>
-    <properties>
-        <graalvm.version>0.9.27</graalvm.version>
-        <graalvm.pgo></graalvm.pgo>
-        <graalvm.compatibility></graalvm.compatibility>
-		<graalvm.firstArgs>-H:+UnlockExperimentalVMOptions</graalvm.firstArgs>
-        <graalvm.march></graalvm.march>
-		<!-- Not in Graal CE ... confusing -->
-		<!--<graalvm.march>-march=compatibility</graalvm.march>--> 
-        <!-- Commented out quick build mode - has less optiisations, smaller
-		size, lower throuput -->
-        <!--<graalvm.pgo>-Ob</graalvm.pgo>-->
-    </properties>
     <dependencies>
         <dependency>
             <groupId>com.sshtools</groupId>
@@ -159,30 +147,6 @@ ACTION
         </profile>
         <!-- Graal Native Image -->
         <profile>
-            <id>quick-build</id>
-            <properties>
-                <graalvm.pgo>-Ob</graalvm.pgo>
-            </properties>
-        </profile>
-        <profile>
-            <id>instrument</id>
-            <properties>
-                <graalvm.pgo>--pgo-instrument</graalvm.pgo>
-            </properties>
-        </profile>
-        <profile>
-            <id>instrumented</id>
-            <properties>
-                <graalvm.pgo>--pgo=${basedir}/default.iprof</graalvm.pgo>
-            </properties>
-        </profile>
-        <profile>
-            <id>compatibility</id>
-            <properties>
-                <graalvm.march>-march=compatibility</graalvm.march>
-            </properties>
-        </profile>
-        <profile>
             <id>native-image</id>
 
             <build>
@@ -202,11 +166,9 @@ ACTION
                                     <mainClass>com.logonbox.vpn.quick.Lbv</mainClass>
                                     <imageName>lbv</imageName>
                                     <buildArgs>
-										<buildArg>${graalvm.firstArgs}</buildArg>
 										<buildArg>-H:Log=registerResource:verbose</buildArg>
                                         <buildArg>--report-unsupported-elements-at-runtime</buildArg>
                                         <buildArg>-R:MaxHeapSize=64m</buildArg>
-										<buildArg>${graalvm.march}</buildArg>
 										<buildArg>--install-exit-handlers</buildArg>
                                         
                                         <!--TODO This should not be necessary! For some reason native-image-annotations is not working for these -->
@@ -227,11 +189,9 @@ ACTION
                                     <mainClass>com.logonbox.vpn.quick.LbvQuick</mainClass>
                                     <imageName>lbv-quick</imageName>
                                     <buildArgs>
-										<buildArg>${graalvm.firstArgs}</buildArg>
 										<buildArg>-H:Log=registerResource:verbose</buildArg>
                                         <buildArg>--report-unsupported-elements-at-runtime</buildArg>
                                         <buildArg>-R:MaxHeapSize=64m</buildArg>
-										<buildArg>${graalvm.march}</buildArg>
 										<buildArg>--install-exit-handlers</buildArg>
                                         
                                         <!--TODO This should not be necessary! For some reason native-image-annotations is not working for these -->
