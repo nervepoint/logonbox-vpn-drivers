@@ -44,6 +44,8 @@ ACTION
 	<packaging>jar</packaging>
 	<properties>
 		<graalvm.libName>liblbv</graalvm.libName>
+        <graalvm.outputDir>${project.build.directory}/lib</graalvm.outputDir>
+        <graalvm.libPath>${graalvm.outputDir}/${graalvm.libName}</graalvm.libPath>
 	</properties>
 	<dependencies>
 		<!-- <dependency>
@@ -102,6 +104,8 @@ ACTION
 			<properties>				
 				<graalvm.libName>lbv</graalvm.libName>
 				<graalvm.firstArgs>-H:+UnlockExperimentalVMOptions -H:+AddAllCharsets</graalvm.firstArgs>
+                <graalvm.outputDir>${project.build.directory}\lib</graalvm.outputDir>
+                <graalvm.libPath>${graalvm.outputDir}\${graalvm.libName}</graalvm.libPath>
 			</properties>
 			<dependencies>
 				<dependency>
@@ -160,7 +164,7 @@ ACTION
                                 </goals>
                                 <configuration>
                                     <target>
-                                        <mkdir dir="${project.build.directory}/lib"/>
+                                        <mkdir dir="${graalvm.outputDir}"/>
                                     </target>
                                 </configuration>
                             </execution>
@@ -188,7 +192,7 @@ ACTION
                                         <buildArg>-H:IncludeResources=win32.*</buildArg>
 										<buildArg>-H:Log=registerResource:verbose</buildArg>
                                         <buildArg>-o</buildArg>
-                                        <buildArg>${project.build.directory}/lib/${graalvm.libName}</buildArg>
+                                        <buildArg>${graalvm.libPath}</buildArg>
                                     </buildArgs>
                                      <metadataRepository>
                                         <enabled>true</enabled>
