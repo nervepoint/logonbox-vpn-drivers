@@ -47,7 +47,9 @@ ACTION
         <graalvm.pgo></graalvm.pgo>
         <graalvm.compatibility></graalvm.compatibility>
 		<graalvm.firstArgs>-H:+UnlockExperimentalVMOptions</graalvm.firstArgs>
-		<graalvm.march>-march=compatibility</graalvm.march>
+        <graalvm.march></graalvm.march>
+		<!-- Not in Graal CE ... confusing -->
+		<!--<graalvm.march>-march=compatibility</graalvm.march>--> 
         <!-- Commented out quick build mode - has less optiisations, smaller
 		size, lower throuput -->
         <!--<graalvm.pgo>-Ob</graalvm.pgo>-->
@@ -172,6 +174,12 @@ ACTION
             <id>instrumented</id>
             <properties>
                 <graalvm.pgo>--pgo=${basedir}/default.iprof</graalvm.pgo>
+            </properties>
+        </profile>
+        <profile>
+            <id>compatibility</id>
+            <properties>
+                <graalvm.march>-march=compatibility</graalvm.march>
             </properties>
         </profile>
         <profile>
