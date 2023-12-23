@@ -29,3 +29,4 @@ replay_pid*
 **/.settings
 /builddir/
 *.lock
+/reports/
