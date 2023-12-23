@@ -160,7 +160,7 @@ ACTION
                                 </goals>
                                 <configuration>
                                     <target>
-                                        <mkdir dir="target/lib"/>
+                                        <mkdir dir="${project.build.directory}/lib"/>
                                     </target>
                                 </configuration>
                             </execution>
@@ -188,7 +188,7 @@ ACTION
                                         <buildArg>-H:IncludeResources=win32.*</buildArg>
 										<buildArg>-H:Log=registerResource:verbose</buildArg>
                                         <buildArg>-o</buildArg>
-                                        <buildArg>target/lib/${graalvm.libName}</buildArg>
+                                        <buildArg>${project.build.directory}/lib/${graalvm.libName}</buildArg>
                                     </buildArgs>
                                      <metadataRepository>
                                         <enabled>true</enabled>
