@@ -70,14 +70,26 @@
         </license>
     </licenses>
     <distributionManagement>
+        
+        <repository>
+            <id>opensource-releases</id>
+            <url>https://artifactory.jadaptive.com/opensource-releases</url>
+        </repository>
         <snapshotRepository>
+            <id>opensource-snapshots</id>
+            <url>https://artifactory.jadaptive.com/opensource-snapshots</url>
+        </snapshotRepository>
+        
+        
+        <!-- TODO We do not currently have com.logonbox group registered for Maven Central -->
+       <!-- <snapshotRepository>
             <id>ossrh-sshtools</id>
             <url>https://oss.sonatype.org/content/repositories/snapshots</url>
         </snapshotRepository>
         <repository>
             <id>ossrh-sshtools</id>
             <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-        </repository>
+        </repository>-->
     </distributionManagement>
     <scm>
         <url>https://github.com/nervepoint/logonbox-vpn-drivers</url>

@@ -41,6 +41,12 @@ pipeline {
 						label 'install4j && linux && x86_64'
 					}
 					steps {
+                    
+                        script {
+                            env.FULLVERSION = getFullVersion()
+                            echo "Full Version : ${env.FULLVERSION}"
+                        }
+                        
 						configFileProvider([
 					 			configFile(
 					 				fileId: 'bb62be43-6246-4ab5-9d7a-e1f35e056d69',  
@@ -56,9 +62,26 @@ pipeline {
 					 		}
         				}
         				
-        				tar file: 'target/tools/logonbox-vpn-tools-linux-x64.tar.gz',
+        				tar file: 'packages/logonbox-vpn-tools-linux-x64-' + env.FULL_VERSION + '.tar.gz',
         				    glob: 'lbv*',  exclude: '*.txt', overwrite: true,
         				    compress: true, dir: 'tools/target'
+        				    
+                
+                        s3Upload(
+                            consoleLogLevel: 'INFO', 
+                            dontSetBuildResultOnFailure: false, 
+                            dontWaitForConcurrentBuildCompletion: false, 
+                            entries: [[
+                                bucket: 'logonbox-packages/logonbox-vpn-drivers/' + env.FULL_VERSION, 
+                                noUploadOnFailure: true, 
+                                selectedRegion: 'eu-west-1', 
+                                sourceFile: 'packages/*', 
+                                storageClass: 'STANDARD', 
+                                useServerSideEncryption: false]], 
+                            pluginFailureResultConstraint: 'FAILURE', 
+                            profileName: 'LogonBox Buckets', 
+                            userMetadata: []
+                        )
 					}
 				}
 				
@@ -70,6 +93,12 @@ pipeline {
 						label 'install4j && macos'
 					}
 					steps {
+                    
+                        script {
+                            env.FULLVERSION = getFullVersion()
+                            echo "Full Version : ${env.FULLVERSION}"
+                        }
+                        
 						configFileProvider([
 					 			configFile(
 					 				fileId: 'bb62be43-6246-4ab5-9d7a-e1f35e056d69',  
@@ -85,9 +114,26 @@ pipeline {
 					 		}
         				}
                         
-                        tar file: 'target/tools/logonbox-vpn-tools-macos-x64.tar.gz',
+                        tar file: 'packages/logonbox-vpn-tools-macos-x64-' + env.FULL_VERSION + '.tar.gz',
                             glob: 'lbv*',  exclude: '*.txt', overwrite: true,
                             compress: true, dir: 'tools/target'
+                            
+                
+                        s3Upload(
+                            consoleLogLevel: 'INFO', 
+                            dontSetBuildResultOnFailure: false, 
+                            dontWaitForConcurrentBuildCompletion: false, 
+                            entries: [[
+                                bucket: 'logonbox-packages/logonbox-vpn-drivers/' + env.FULL_VERSION, 
+                                noUploadOnFailure: true, 
+                                selectedRegion: 'eu-west-1', 
+                                sourceFile: 'packages/*', 
+                                storageClass: 'STANDARD', 
+                                useServerSideEncryption: false]], 
+                            pluginFailureResultConstraint: 'FAILURE', 
+                            profileName: 'LogonBox Buckets', 
+                            userMetadata: []
+                        )
 					}
 				}
 				
@@ -95,10 +141,20 @@ pipeline {
 				 * Windows installers
 				 */
 				stage ('Windows LogonBox VPN Drivers') {
+				
+				    /* TEMPORARY */
+				    when { expression { false } }
+				    
 					agent {
 						label 'install4j && windows'
 					}
 					steps {
+                    
+                        script {
+                            env.FULLVERSION = getFullVersion()
+                            echo "Full Version : ${env.FULLVERSION}"
+                        }
+                        
 						configFileProvider([
 					 			configFile(
 					 				fileId: 'bb62be43-6246-4ab5-9d7a-e1f35e056d69',  
@@ -114,30 +170,28 @@ pipeline {
 					 		}
         				}
                         
-                        zip zipFile: 'target/tools/logonbox-vpn-tools-windows-x64.tar.gz',
+                        zip zipFile: 'packages/logonbox-vpn-tools-windows-x64-' + env.FULL_VERSION + '.zip',
                             glob: 'lbv*',  exclude: '*.txt', overwrite: true,
                             dir: 'tools/target'
+                
+                        s3Upload(
+                            consoleLogLevel: 'INFO', 
+                            dontSetBuildResultOnFailure: false, 
+                            dontWaitForConcurrentBuildCompletion: false, 
+                            entries: [[
+                                bucket: 'logonbox-packages/logonbox-vpn-drivers/' + env.FULL_VERSION, 
+                                noUploadOnFailure: true, 
+                                selectedRegion: 'eu-west-1', 
+                                sourceFile: 'packages/*', 
+                                storageClass: 'STANDARD', 
+                                useServerSideEncryption: false]], 
+                            pluginFailureResultConstraint: 'FAILURE', 
+                            profileName: 'LogonBox Buckets', 
+                            userMetadata: []
+                        )
 					}
 				}
 			}
 		}
-		stage ('Deploy') {
-			agent {
-				label 'linux'
-			}
-			steps {
-			
-				script {
-					/* Create full version number from Maven POM version and the
-					   build number */
-					def pom = readMavenPom file: 'pom.xml'
-					pom_version_array = pom.version.split('\\.')
-					suffix_array = pom_version_array[2].split('-')
-					env.FULL_VERSION = pom_version_array[0] + '.' + pom_version_array[1] + "." + suffix_array[0] + "-${BUILD_NUMBER}"
-					echo 'Full Maven Version ' + env.FULL_VERSION
-				}
-				
-			}					
-		}		
 	}
 }
