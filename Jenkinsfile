@@ -65,7 +65,10 @@ pipeline {
         				tar file: 'target/logonbox-vpn-tools-linux-x64-' + env.FULL_VERSION + '.tar.gz',
         				    glob: 'lbv*',  exclude: '*.*', overwrite: true,
         				    compress: true, dir: 'tools/target'
-        				    
+                        
+                        tar file: 'target/logonbox-vpn-library-linux-x64-' + env.FULL_VERSION + '.tar.gz',
+                            glob: '*',  exclude: 'reports,libawt*,libjvm*,libjava*', overwrite: true,
+                            compress: true, dir: 'dll/target/lib'
                 
                         s3Upload(
                             consoleLogLevel: 'INFO', 
@@ -118,6 +121,9 @@ pipeline {
                             glob: 'lbv*',  exclude: '*.*', overwrite: true,
                             compress: true, dir: 'tools/target'
                             
+                        tar file: 'target/logonbox-vpn-library-macos-x64-' + env.FULL_VERSION + '.tar.gz',
+                            glob: '*',  exclude: 'reports,libawt*,libjvm*,libjava*', overwrite: true,
+                            compress: true, dir: 'dll/target/lib'
                 
                         s3Upload(
                             consoleLogLevel: 'INFO', 
@@ -173,6 +179,10 @@ pipeline {
                         zip zipFile: 'target/logonbox-vpn-tools-windows-x64-' + env.FULL_VERSION + '.zip',
                             glob: 'lbv*',  exclude: '*.*', overwrite: true,
                             dir: 'tools/target'
+                            
+                        zip zipFile: 'target/logonbox-vpn-library-windows-x64-' + env.FULL_VERSION + '.tar.gz',
+                            glob: '*',  exclude: 'reports,libawt*,libjvm*,libjava*', overwrite: true,
+                            dir: 'dll/target/lib'
                 
                         s3Upload(
                             consoleLogLevel: 'INFO', 
