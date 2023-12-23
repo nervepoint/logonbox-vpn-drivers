@@ -62,8 +62,8 @@ pipeline {
 					 		}
         				}
         				
-        				tar file: 'packages/logonbox-vpn-tools-linux-x64-' + env.FULL_VERSION + '.tar.gz',
-        				    glob: 'lbv*',  exclude: '*.txt', overwrite: true,
+        				tar file: 'target/logonbox-vpn-tools-linux-x64-' + env.FULL_VERSION + '.tar.gz',
+        				    glob: 'lbv*',  exclude: '*.*', overwrite: true,
         				    compress: true, dir: 'tools/target'
         				    
                 
@@ -75,7 +75,7 @@ pipeline {
                                 bucket: 'logonbox-packages/logonbox-vpn-drivers/' + env.FULL_VERSION, 
                                 noUploadOnFailure: true, 
                                 selectedRegion: 'eu-west-1', 
-                                sourceFile: 'packages/*', 
+                                sourceFile: 'target/*', 
                                 storageClass: 'STANDARD', 
                                 useServerSideEncryption: false]], 
                             pluginFailureResultConstraint: 'FAILURE', 
@@ -114,8 +114,8 @@ pipeline {
 					 		}
         				}
                         
-                        tar file: 'packages/logonbox-vpn-tools-macos-x64-' + env.FULL_VERSION + '.tar.gz',
-                            glob: 'lbv*',  exclude: '*.txt', overwrite: true,
+                        tar file: 'target/logonbox-vpn-tools-macos-x64-' + env.FULL_VERSION + '.tar.gz',
+                            glob: 'lbv*',  exclude: '*.*', overwrite: true,
                             compress: true, dir: 'tools/target'
                             
                 
@@ -127,7 +127,7 @@ pipeline {
                                 bucket: 'logonbox-packages/logonbox-vpn-drivers/' + env.FULL_VERSION, 
                                 noUploadOnFailure: true, 
                                 selectedRegion: 'eu-west-1', 
-                                sourceFile: 'packages/*', 
+                                sourceFile: 'target/*', 
                                 storageClass: 'STANDARD', 
                                 useServerSideEncryption: false]], 
                             pluginFailureResultConstraint: 'FAILURE', 
@@ -170,8 +170,8 @@ pipeline {
 					 		}
         				}
                         
-                        zip zipFile: 'packages/logonbox-vpn-tools-windows-x64-' + env.FULL_VERSION + '.zip',
-                            glob: 'lbv*',  exclude: '*.txt', overwrite: true,
+                        zip zipFile: 'target/logonbox-vpn-tools-windows-x64-' + env.FULL_VERSION + '.zip',
+                            glob: 'lbv*',  exclude: '*.*', overwrite: true,
                             dir: 'tools/target'
                 
                         s3Upload(
@@ -182,7 +182,7 @@ pipeline {
                                 bucket: 'logonbox-packages/logonbox-vpn-drivers/' + env.FULL_VERSION, 
                                 noUploadOnFailure: true, 
                                 selectedRegion: 'eu-west-1', 
-                                sourceFile: 'packages/*', 
+                                sourceFile: 'target/*', 
                                 storageClass: 'STANDARD', 
                                 useServerSideEncryption: false]], 
                             pluginFailureResultConstraint: 'FAILURE', 
