@@ -160,7 +160,7 @@ ACTION
                                 </goals>
                                 <configuration>
                                     <target>
-                                        <mkdir dir="${basedir}/target/lib"/>
+                                        <mkdir dir="target/lib"/>
                                     </target>
                                 </configuration>
                             </execution>
