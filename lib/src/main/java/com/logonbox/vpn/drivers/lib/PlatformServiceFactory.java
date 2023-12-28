@@ -25,7 +25,14 @@ import java.util.ServiceLoader;
 public interface PlatformServiceFactory {
     
     public static PlatformServiceFactory get() {
-        return ServiceLoader.load(PlatformServiceFactory.class).findFirst().filter(p -> p.isSupported()).orElseThrow(() -> new UnsupportedOperationException(
+        return ServiceLoader.load(PlatformServiceFactory.class,
+        		PlatformServiceFactory.class.getClassLoader()).findFirst().filter(p -> p.isSupported()).orElseThrow(() -> new UnsupportedOperationException(
+                String.format("%s not currently supported. There are no platform extensions installed, you may be missing libraries.", System.getProperty("os.name"))));
+    }
+    
+    public static PlatformServiceFactory get(ClassLoader clzloader) {
+        return ServiceLoader.load(PlatformServiceFactory.class,
+        		clzloader).findFirst().filter(p -> p.isSupported()).orElseThrow(() -> new UnsupportedOperationException(
                 String.format("%s not currently supported. There are no platform extensions installed, you may be missing libraries.", System.getProperty("os.name"))));
     }
     
