@@ -45,7 +45,7 @@
         <dependency>
             <groupId>com.sshtools</groupId>
             <artifactId>liftlib</artifactId>
-            <version>0.9.5</version>
+            <version>0.9.6</version>
         </dependency> 
         <dependency>
             <groupId>com.sshtools</groupId>

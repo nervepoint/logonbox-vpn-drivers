@@ -2,10 +2,10 @@ package com.logonbox.vpn.drivers.windows;
 
 import com.logonbox.vpn.drivers.lib.DNSProvider;
 import com.logonbox.vpn.drivers.lib.PlatformService;
-import com.logonbox.vpn.drivers.lib.SystemCommands.ProcessRedirect;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
 import com.logonbox.vpn.drivers.lib.util.Util;
 import com.sshtools.liftlib.ElevatedClosure;
+import com.sshtools.liftlib.commands.SystemCommands.ProcessRedirect;
 import com.sun.jna.platform.win32.Advapi32Util;
 import com.sun.jna.platform.win32.WinReg;
 

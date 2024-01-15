@@ -1,10 +1,10 @@
 package com.logonbox.vpn.drivers.lib;
 
-import java.io.IOException;
-import java.util.Optional;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.Optional;
 
 public final class InterfaceNameResolver {
     private final static Logger LOG = LoggerFactory.getLogger(InterfaceNameResolver.class);

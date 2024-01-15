@@ -20,6 +20,15 @@
  */
 package com.logonbox.vpn.drivers.macos;
 
+import com.logonbox.vpn.drivers.lib.AbstractUnixAddress;
+import com.logonbox.vpn.drivers.lib.util.IpUtil;
+import com.logonbox.vpn.drivers.lib.util.OsUtil;
+import com.logonbox.vpn.drivers.lib.util.Util;
+import com.sshtools.liftlib.commands.SystemCommands.ProcessRedirect;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -30,15 +39,6 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.logonbox.vpn.drivers.lib.AbstractUnixAddress;
-import com.logonbox.vpn.drivers.lib.SystemCommands.ProcessRedirect;
-import com.logonbox.vpn.drivers.lib.util.IpUtil;
-import com.logonbox.vpn.drivers.lib.util.OsUtil;
-import com.logonbox.vpn.drivers.lib.util.Util;
 
 public class UserspaceMacOsAddress extends AbstractUnixAddress<UserspaceMacOsPlatformService> {
 	enum IpAddressState {

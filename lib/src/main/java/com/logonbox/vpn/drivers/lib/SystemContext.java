@@ -20,6 +20,8 @@
  */
 package com.logonbox.vpn.drivers.lib;
 
+import com.sshtools.liftlib.commands.SystemCommands;
+
 import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 

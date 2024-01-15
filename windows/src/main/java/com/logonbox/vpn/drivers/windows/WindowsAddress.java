@@ -21,9 +21,9 @@
 package com.logonbox.vpn.drivers.windows;
 
 import com.logonbox.vpn.drivers.lib.AbstractVirtualInetAddress;
-import com.logonbox.vpn.drivers.lib.SystemCommands;
-import com.logonbox.vpn.drivers.lib.SystemCommands.ProcessRedirect;
 import com.sshtools.liftlib.ElevatedClosure;
+import com.sshtools.liftlib.commands.SystemCommands;
+import com.sshtools.liftlib.commands.SystemCommands.ProcessRedirect;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

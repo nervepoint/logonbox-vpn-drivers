@@ -4,8 +4,8 @@ import static com.logonbox.vpn.drivers.lib.util.OsUtil.debugCommandArgs;
 
 import com.logonbox.vpn.drivers.lib.DNSProvider;
 import com.logonbox.vpn.drivers.lib.PlatformService;
-import com.logonbox.vpn.drivers.lib.SystemCommands;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
+import com.sshtools.liftlib.commands.SystemCommands;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

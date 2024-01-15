@@ -2,8 +2,6 @@ package com.logonbox.vpn.drivers.lib;
 
 import com.sshtools.jini.INI.Section;
 
-import uk.co.bithatch.nativeimage.annotations.Serialization;
-
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -11,6 +9,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+
+import uk.co.bithatch.nativeimage.annotations.Serialization;
 
 @Serialization
 public interface VpnConfiguration extends VpnAdapterConfiguration {

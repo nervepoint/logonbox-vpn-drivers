@@ -1,5 +1,12 @@
 package com.logonbox.vpn.drivers.lib;
 
+import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
+import com.logonbox.vpn.drivers.lib.util.OsUtil;
+import com.logonbox.vpn.drivers.lib.util.Util;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
@@ -13,13 +20,6 @@ import java.util.Optional;
 import java.util.StringTokenizer;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
-import com.logonbox.vpn.drivers.lib.util.OsUtil;
-import com.logonbox.vpn.drivers.lib.util.Util;
 
 public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
 		extends AbstractDesktopPlatformService<I> {

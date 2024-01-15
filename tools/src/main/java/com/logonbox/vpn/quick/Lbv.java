@@ -1,9 +1,7 @@
 package com.logonbox.vpn.quick;
 
-import com.logonbox.vpn.drivers.lib.ElevatableSystemCommands;
 import com.logonbox.vpn.drivers.lib.NativeComponents;
 import com.logonbox.vpn.drivers.lib.PlatformService;
-import com.logonbox.vpn.drivers.lib.SystemCommands;
 import com.logonbox.vpn.drivers.lib.SystemConfiguration;
 import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.Vpn;
@@ -12,6 +10,8 @@ import com.logonbox.vpn.drivers.lib.VpnAdapterConfiguration;
 import com.logonbox.vpn.drivers.lib.VpnInterfaceInformation;
 import com.logonbox.vpn.drivers.lib.util.Keys;
 import com.logonbox.vpn.drivers.lib.util.Util;
+import com.sshtools.liftlib.commands.ElevatableSystemCommands;
+import com.sshtools.liftlib.commands.SystemCommands;
 
 import java.io.BufferedReader;
 import java.io.IOException;

@@ -1,5 +1,11 @@
 package com.logonbox.vpn.drivers.lib;
 
+import com.logonbox.vpn.drivers.lib.util.OsUtil;
+import com.sshtools.liftlib.OS;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URL;
@@ -12,12 +18,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.logonbox.vpn.drivers.lib.util.OsUtil;
-import com.sshtools.liftlib.OS;
 
 public class NativeComponents {
     /* TODO this needs to deal with updating the extracted binaries */

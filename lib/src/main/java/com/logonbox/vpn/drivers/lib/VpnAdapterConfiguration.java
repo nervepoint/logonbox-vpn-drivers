@@ -25,12 +25,10 @@ import com.logonbox.vpn.drivers.lib.util.Util;
 import com.sshtools.jini.INI;
 import com.sshtools.jini.INI.Section;
 import com.sshtools.jini.INIReader;
-import com.sshtools.jini.INIWriter;
 import com.sshtools.jini.INIReader.DuplicateAction;
 import com.sshtools.jini.INIReader.MultiValueMode;
+import com.sshtools.jini.INIWriter;
 import com.sshtools.jini.INIWriter.StringQuoteMode;
-
-import uk.co.bithatch.nativeimage.annotations.Serialization;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -51,6 +49,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+
+import uk.co.bithatch.nativeimage.annotations.Serialization;
 
 @Serialization
 public interface VpnAdapterConfiguration extends Serializable {

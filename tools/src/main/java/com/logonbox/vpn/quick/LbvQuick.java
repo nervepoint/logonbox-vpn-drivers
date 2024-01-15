@@ -1,5 +1,22 @@
 package com.logonbox.vpn.quick;
 
+import com.logonbox.vpn.drivers.lib.DNSProvider;
+import com.logonbox.vpn.drivers.lib.NativeComponents;
+import com.logonbox.vpn.drivers.lib.PlatformService;
+import com.logonbox.vpn.drivers.lib.Prefs;
+import com.logonbox.vpn.drivers.lib.Prefs.PrefType;
+import com.logonbox.vpn.drivers.lib.SystemConfiguration;
+import com.logonbox.vpn.drivers.lib.SystemContext;
+import com.logonbox.vpn.drivers.lib.Vpn;
+import com.logonbox.vpn.drivers.lib.Vpn.Builder;
+import com.logonbox.vpn.drivers.lib.VpnAdapter;
+import com.logonbox.vpn.drivers.lib.VpnAdapterConfiguration;
+import com.logonbox.vpn.drivers.lib.VpnConfiguration;
+import com.sshtools.liftlib.OS;
+import com.sshtools.liftlib.commands.ElevatableSystemCommands;
+import com.sshtools.liftlib.commands.SystemCommands;
+import com.sshtools.liftlib.commands.SystemCommands.ProcessRedirect;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -29,23 +46,6 @@ import java.util.StringTokenizer;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
-
-import com.logonbox.vpn.drivers.lib.DNSProvider;
-import com.logonbox.vpn.drivers.lib.ElevatableSystemCommands;
-import com.logonbox.vpn.drivers.lib.NativeComponents;
-import com.logonbox.vpn.drivers.lib.PlatformService;
-import com.logonbox.vpn.drivers.lib.Prefs;
-import com.logonbox.vpn.drivers.lib.Prefs.PrefType;
-import com.logonbox.vpn.drivers.lib.SystemCommands;
-import com.logonbox.vpn.drivers.lib.SystemCommands.ProcessRedirect;
-import com.logonbox.vpn.drivers.lib.SystemConfiguration;
-import com.logonbox.vpn.drivers.lib.SystemContext;
-import com.logonbox.vpn.drivers.lib.Vpn;
-import com.logonbox.vpn.drivers.lib.Vpn.Builder;
-import com.logonbox.vpn.drivers.lib.VpnAdapter;
-import com.logonbox.vpn.drivers.lib.VpnAdapterConfiguration;
-import com.logonbox.vpn.drivers.lib.VpnConfiguration;
-import com.sshtools.liftlib.OS;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;

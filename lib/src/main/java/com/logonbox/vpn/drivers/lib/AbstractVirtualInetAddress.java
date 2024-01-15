@@ -20,6 +20,8 @@
  */
 package com.logonbox.vpn.drivers.lib;
 
+import com.sshtools.liftlib.commands.SystemCommands;
+
 public abstract class AbstractVirtualInetAddress<P extends PlatformService<?>> implements VpnAddress {
 
 	public final static String TABLE_AUTO = "auto";

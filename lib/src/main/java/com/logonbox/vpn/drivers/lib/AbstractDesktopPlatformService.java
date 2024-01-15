@@ -20,6 +20,20 @@
  */
 package com.logonbox.vpn.drivers.lib;
 
+import com.github.jgonian.ipmath.AbstractIp;
+import com.github.jgonian.ipmath.Ipv4;
+import com.github.jgonian.ipmath.Ipv4Range;
+import com.github.jgonian.ipmath.Ipv6;
+import com.github.jgonian.ipmath.Ipv6Range;
+import com.logonbox.vpn.drivers.lib.DNSProvider.DNSEntry;
+import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
+import com.logonbox.vpn.drivers.lib.Prefs.PrefType;
+import com.logonbox.vpn.drivers.lib.util.IpUtil;
+import com.logonbox.vpn.drivers.lib.util.Util;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetAddress;
@@ -43,20 +57,6 @@ import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.github.jgonian.ipmath.AbstractIp;
-import com.github.jgonian.ipmath.Ipv4;
-import com.github.jgonian.ipmath.Ipv4Range;
-import com.github.jgonian.ipmath.Ipv6;
-import com.github.jgonian.ipmath.Ipv6Range;
-import com.logonbox.vpn.drivers.lib.DNSProvider.DNSEntry;
-import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
-import com.logonbox.vpn.drivers.lib.Prefs.PrefType;
-import com.logonbox.vpn.drivers.lib.util.IpUtil;
-import com.logonbox.vpn.drivers.lib.util.Util;
 
 public abstract class AbstractDesktopPlatformService<I extends VpnAddress> extends AbstractPlatformService<I> {
 
