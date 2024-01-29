@@ -29,7 +29,7 @@ public interface PlatformServiceFactory {
     }
     
 	public static PlatformServiceFactory get(ClassLoader clzloader) {
-		return ServiceLoader.load(PlatformServiceFactory.class, clzloader).findFirst().filter(p -> p.isSupported())
+		return ServiceLoader.load(PlatformServiceFactory.class, clzloader).stream().map(p->p.get()).filter(p -> p.isSupported()).findFirst()
 				.orElseThrow(() -> new UnsupportedOperationException(String.format(
 						"%s not currently supported. There are no platform extensions installed, you may be missing libraries. Discovered extensions are .. %s",
 						System.getProperty("os.name"),
