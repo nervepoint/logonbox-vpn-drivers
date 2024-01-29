@@ -1,5 +1,7 @@
 package com.logonbox.vpn.drivers.lib;
 
+import static com.logonbox.vpn.drivers.lib.util.Util.stringOr;
+
 import java.io.Serializable;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -102,7 +104,7 @@ public interface VpnPeer extends Serializable {
 		}
 
 		public Builder withEndpointAddress(String endpointAddress) {
-			return withEndpointAddress(Optional.of(endpointAddress));
+			return withEndpointAddress(stringOr(endpointAddress));
 		}
 
 		public Builder withEndpointAddress(Optional<String> endpointAddress) {
@@ -111,7 +113,7 @@ public interface VpnPeer extends Serializable {
 		}
 
 		public Builder withPresharedKey(String presharedKey) {
-			return withPresharedKey(Optional.of(presharedKey));
+			return withPresharedKey(stringOr(presharedKey));
 		}
 
 		public Builder withPresharedKey(Optional<String> presharedKey) {
@@ -120,7 +122,7 @@ public interface VpnPeer extends Serializable {
 		}
 
 		public Builder withPublicKey(String publicKey) {
-			return withPublicKey(Optional.of(publicKey));
+			return withPublicKey(stringOr(publicKey));
 		}
 
 		public Builder withPublicKey(Optional<String> publicKey) {
@@ -180,6 +182,31 @@ public interface VpnPeer extends Serializable {
 			@Override
 			public List<String> allowedIps() {
 				return Collections.unmodifiableList(allowedIps);
+			}
+
+			@Override
+			public int hashCode() {
+				final int prime = 31;
+				int result = 1;
+				result = prime * result + ((publicKey == null) ? 0 : publicKey.hashCode());
+				return result;
+			}
+
+			@Override
+			public boolean equals(Object obj) {
+				if (this == obj)
+					return true;
+				if (obj == null)
+					return false;
+				if (getClass() != obj.getClass())
+					return false;
+				DefaultVpnPeer other = (DefaultVpnPeer) obj;
+				if (publicKey == null) {
+					if (other.publicKey != null)
+						return false;
+				} else if (!publicKey.equals(other.publicKey))
+					return false;
+				return true;
 			}
 
 		}

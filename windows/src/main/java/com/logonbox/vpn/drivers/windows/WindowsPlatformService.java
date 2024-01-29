@@ -305,7 +305,7 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 	protected void onStart(StartRequest startRequest, VpnAdapter session) throws Exception {
 		var configuration  = startRequest.configuration();
 		var peer = startRequest.peer();
-        var ip = findAddress(startRequest, true);
+        var ip = findAddress(startRequest);
 
 		var cwd = context().nativeComponents().binDir();
 		var confDir = cwd.resolve("conf").resolve("connections");

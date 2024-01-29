@@ -35,7 +35,7 @@ public class KernelLinuxAddress extends AbstractLinuxAddress {
     
     @Override
     public boolean isUp() {
-        return true;
+        return !addresses.isEmpty();
     }
 
 }

@@ -143,7 +143,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
     protected final void onStart(StartRequest startRequest, VpnAdapter session) throws IOException {
 		var configuration  = startRequest.configuration();
 		var peer = startRequest.peer();
-        var ip = findAddress(startRequest, true);
+        var ip = findAddress(startRequest);
 
         /* Set the address reserved */
         if (configuration.addresses().size() > 0)

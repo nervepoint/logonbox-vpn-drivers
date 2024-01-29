@@ -70,7 +70,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 		super(interfacePrefix, context);
 	}
 	
-	protected final I findAddress(StartRequest startRequest, boolean failIfInUse)
+	protected final I findAddress(StartRequest startRequest)
 			throws IOException {
 
 		var addresses = addresses();
@@ -99,8 +99,13 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 				LOG.info("Created {}", ip.shortName());
 			} else {
 				var publicKey = getPublicKey(nativeName);
-				if (failIfInUse && publicKey.isPresent()) {
-					throw new IOException(MessageFormat.format("{0} is already in use", nativeName));
+				if (publicKey.isPresent()) {
+					if(publicKey.get().equals(configuration.publicKey())) {
+						ip = addr.get();
+					}
+					else {
+						throw new IOException(MessageFormat.format("{0} is already in use", nativeName));
+					}
 				}
 			}
 		}

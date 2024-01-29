@@ -1,22 +1,5 @@
 package com.logonbox.vpn.quick;
 
-import com.logonbox.vpn.drivers.lib.DNSProvider;
-import com.logonbox.vpn.drivers.lib.NativeComponents;
-import com.logonbox.vpn.drivers.lib.PlatformService;
-import com.logonbox.vpn.drivers.lib.Prefs;
-import com.logonbox.vpn.drivers.lib.Prefs.PrefType;
-import com.logonbox.vpn.drivers.lib.SystemConfiguration;
-import com.logonbox.vpn.drivers.lib.SystemContext;
-import com.logonbox.vpn.drivers.lib.Vpn;
-import com.logonbox.vpn.drivers.lib.Vpn.Builder;
-import com.logonbox.vpn.drivers.lib.VpnAdapter;
-import com.logonbox.vpn.drivers.lib.VpnAdapterConfiguration;
-import com.logonbox.vpn.drivers.lib.VpnConfiguration;
-import com.sshtools.liftlib.OS;
-import com.sshtools.liftlib.commands.ElevatableSystemCommands;
-import com.sshtools.liftlib.commands.SystemCommands;
-import com.sshtools.liftlib.commands.SystemCommands.ProcessRedirect;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -24,11 +7,14 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.Authenticator;
 import java.net.MalformedURLException;
+import java.net.PasswordAuthentication;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.cert.CertificateException;
 import java.text.DateFormat;
 import java.text.MessageFormat;
 import java.text.ParseException;
@@ -46,6 +32,31 @@ import java.util.StringTokenizer;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
+
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+import javax.security.cert.X509Certificate;
+
+import com.logonbox.vpn.drivers.lib.DNSProvider;
+import com.logonbox.vpn.drivers.lib.NativeComponents;
+import com.logonbox.vpn.drivers.lib.PlatformService;
+import com.logonbox.vpn.drivers.lib.Prefs;
+import com.logonbox.vpn.drivers.lib.Prefs.PrefType;
+import com.logonbox.vpn.drivers.lib.SystemConfiguration;
+import com.logonbox.vpn.drivers.lib.SystemContext;
+import com.logonbox.vpn.drivers.lib.Vpn;
+import com.logonbox.vpn.drivers.lib.Vpn.Builder;
+import com.logonbox.vpn.drivers.lib.VpnAdapter;
+import com.logonbox.vpn.drivers.lib.VpnAdapterConfiguration;
+import com.logonbox.vpn.drivers.lib.VpnConfiguration;
+import com.sshtools.liftlib.OS;
+import com.sshtools.liftlib.commands.ElevatableSystemCommands;
+import com.sshtools.liftlib.commands.SystemCommands;
+import com.sshtools.liftlib.commands.SystemCommands.ProcessRedirect;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -220,9 +231,54 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
     }
     
     abstract static class AbstractQuickCommand implements Callable<Integer> {
+    	
+    	
+		static void ignoreSslTrust() {
+			// Create a trust manager that does not validate certificate chains
+			var trustAllCerts = new TrustManager[] { new X509TrustManager() {
+
+				@Override
+				public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType)
+						throws CertificateException {
+				}
+
+				@Override
+				public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType)
+						throws CertificateException {
+				}
+
+				@Override
+				public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+					return null;
+				}
+			} };
+
+			// Install the all-trusting trust manager
+			try {
+				var sc = SSLContext.getInstance("SSL");
+				sc.init(null, trustAllCerts, new java.security.SecureRandom());
+				HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+
+				// Create all-trusting host name verifier
+				var allHostsValid = new HostnameVerifier() {
+					public boolean verify(String hostname, SSLSession session) {
+						return true;
+					}
+				};
+
+				// Install the all-trusting host verifier
+				HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid);
+			} catch (Exception e) {
+				throw new IllegalStateException(e);
+			}
+		}
 
         @ParentCommand
         protected LbvQuick parent;
+
+        @Option(names = { 
+                "--ignore-ssl-trust" }, description = "When this option is present, SSL certificate trust issues will be ignored. Only used when retrieving configuration from a URL ('up' command).")
+        private boolean ignoreSslTrust;
 
         @Parameters(arity = "1", paramLabel = "CONFIG_FILE | URL | INTERFACE", description = 
         		"CONFIG_FILE is a configuration file, whose filename is the interface name " 
@@ -238,6 +294,10 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
             Optional<Path> file = Optional.empty();
             
             parent.initCommand();
+            
+            if(ignoreSslTrust) {
+            	ignoreSslTrust();
+            }
 
             Optional<String> ifaceName = Optional.empty();
             var bldr = new Vpn.Builder().withSystemContext(parent);
@@ -255,6 +315,22 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
             else {
             	try {
             		var url = new URL(configFileOrInterface);
+            		Authenticator.setDefault(new Authenticator() {
+
+						@Override
+						protected PasswordAuthentication getPasswordAuthentication() {
+							var cnsl = System.console();
+							if(cnsl == null)
+								throw new IllegalStateException("Authentication required, but not interactive.");
+							var username = cnsl.readLine("Username: ");
+							if(username == null)
+								return null;
+							var password = cnsl.readPassword("Password: ");
+							if(password == null)
+								return null;
+							return new PasswordAuthentication(username, password);
+						}
+					});
             		try(var in = url.openStream()) {
             			bldr.withVpnConfiguration(new InputStreamReader(in));
             		}

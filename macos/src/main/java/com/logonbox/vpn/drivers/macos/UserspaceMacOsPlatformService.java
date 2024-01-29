@@ -144,7 +144,7 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 		var configuration  = startRequest.configuration();
 		var peer = startRequest.peer();
 		
-		var ip = findAddress(startRequest, true);
+		var ip = findAddress(startRequest);
 
 		var tempFile = Files.createTempFile("wg", "cfg");
 		try {

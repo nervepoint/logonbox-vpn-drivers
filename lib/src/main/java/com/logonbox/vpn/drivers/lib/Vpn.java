@@ -190,8 +190,8 @@ public final class Vpn implements Closeable {
     public void open() throws IOException {
     	/* Either start a new session, or find an existing one */
     	
-        if(adapter.isPresent())
-            throw new IllegalStateException(MessageFormat.format("`{0}` already exists", adapter().address().shortName()));
+        if(adapter.isPresent() && adapter.get().address().isUp())
+            throw new IllegalStateException(MessageFormat.format("`{0}` already exists and is up", adapter().address().shortName()));
         
         var req = new StartRequest.Builder(cfg).
         		withNativeInterfaceName(nativeInterfaceName).

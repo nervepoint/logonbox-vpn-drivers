@@ -335,6 +335,7 @@ public class Lbv extends AbstractCommand implements SystemContext {
 
             @Override
             public Integer call() throws Exception {
+                parent.parent.initCommand();
                 var ip = parent.parent.platform().adapter(parent.iface.get());
                 for (var peer : ip.information().peers()) {
                     out.format("%s\t%s%n", peer.publicKey(),

@@ -27,6 +27,7 @@ import java.text.StringCharacterIterator;
 import java.util.ArrayList; 
 import java.util.Base64;
 import java.util.List;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,6 +135,10 @@ public class Util {
 	    
 //		return ((a & 0xff000000) >>> 24) | ((a & 0x00ff0000) >>> 8) | ((a & 0x0000ff00) << 8)
 //				| ((a & 0x000000ff) << 24);
+	}
+	
+	public static Optional<String> stringOr(String str) {
+		return str == null || str.length() == 0 ? Optional.empty() : Optional.of(str);
 	}
 
     public static int parseFwMark(String tkn) {

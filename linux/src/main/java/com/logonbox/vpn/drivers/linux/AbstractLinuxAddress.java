@@ -49,8 +49,9 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
     public final static String TABLE_AUTO = "auto";
     public final static String TABLE_OFF = "off";
 
+    protected Set<String> addresses = new LinkedHashSet<>();
+
     private final static Logger LOG = LoggerFactory.getLogger(AbstractLinuxAddress.class);
-    private Set<String> addresses = new LinkedHashSet<>();
     private boolean haveSetFirewall;
 
     AbstractLinuxAddress(String name, String nativeName, AbstractLinuxPlatformService platform) {
