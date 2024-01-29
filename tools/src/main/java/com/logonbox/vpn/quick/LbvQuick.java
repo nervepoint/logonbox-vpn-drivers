@@ -8,6 +8,7 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.Authenticator;
+import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.PasswordAuthentication;
 import java.net.URL;
@@ -331,7 +332,9 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 							return new PasswordAuthentication(username, password);
 						}
 					});
-            		try(var in = url.openStream()) {
+            		var conx = (HttpURLConnection)url.openConnection();
+            		conx.setRequestProperty("Accept", "text/plain");
+            		try(var in = conx.getInputStream()) {
             			bldr.withVpnConfiguration(new InputStreamReader(in));
             		}
             	}
