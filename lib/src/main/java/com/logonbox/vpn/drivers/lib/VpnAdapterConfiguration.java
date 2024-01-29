@@ -117,13 +117,13 @@ public interface VpnAdapterConfiguration extends Serializable {
             return (B) this;
         }
 
-        public B removePeers(VpnPeer... peers) {
+        public B removePeers(String... peers) {
             return removePeers(Arrays.asList(peers));
         }
 
         @SuppressWarnings("unchecked")
-        public B removePeers(Collection<VpnPeer> peers) {
-            this.peers.removeAll(peers);
+        public B removePeers(Collection<String> peers) {
+            this.peers.removeAll(this.peers.stream().filter(p -> peers.contains(p.publicKey())).toList());
             return (B) this;
         }
 
