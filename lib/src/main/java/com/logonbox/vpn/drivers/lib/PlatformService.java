@@ -32,6 +32,18 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	/**
 	 * Create a default instance.
 	 * 
+	 * @param loader class loader for service locating
+	 * @param context system context
+	 * @return instance
+	 */
+	public static PlatformService<? extends VpnAddress> create(ClassLoader loader, SystemContext context) {
+		return PlatformServiceFactory.get(loader).createPlatformService(context);
+	}
+
+	/**
+	 * Create a default instance.
+	 * 
+	 * @param context system context
 	 * @return instance
 	 */
 	public static PlatformService<? extends VpnAddress> create(SystemContext context) {
