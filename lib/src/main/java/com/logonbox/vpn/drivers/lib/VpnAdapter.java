@@ -102,6 +102,14 @@ public final class VpnAdapter implements Closeable {
 	public void sync(VpnAdapterConfiguration cfg) throws IOException {
 		service.sync(this, cfg);
 	}
+	
+	public boolean isNat() throws IOException {
+		return service.isNat(this);
+	}
+	
+	public void setNat(boolean nat) throws IOException {
+		service.setNat(this, nat);
+	}
 
     public VpnInterfaceInformation information() {
         return service.information(this);

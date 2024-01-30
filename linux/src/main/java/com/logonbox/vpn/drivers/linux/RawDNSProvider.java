@@ -13,7 +13,6 @@ import java.util.stream.Collectors;
 
 import com.logonbox.vpn.drivers.lib.DNSProvider;
 import com.logonbox.vpn.drivers.lib.PlatformService;
-import com.logonbox.vpn.drivers.lib.util.IpUtil;
 import com.sshtools.liftlib.ElevatedClosure;
 
 import uk.co.bithatch.nativeimage.annotations.Serialization;
@@ -74,7 +73,7 @@ public class RawDNSProvider implements DNSProvider {
                     else {
                     	if(systemBldr == null) {
                     		systemBldr = new DNSEntry.Builder();
-                    		systemBldr.withInterface(IpUtil.getBestLocalNic().getName());
+                    		systemBldr.withInterface(platform.context().getBestLocalNic().getName());
                     		dns.add(0, systemBldr);
                     	}
                         if (l.get(0).equals("nameserver")) 

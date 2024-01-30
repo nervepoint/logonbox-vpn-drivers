@@ -24,13 +24,16 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.Serializable;
 import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.net.NetworkInterface;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -44,6 +47,9 @@ import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.VpnAdapter;
 import com.logonbox.vpn.drivers.lib.VpnConfiguration;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
+import com.sshtools.liftlib.ElevatedClosure;
+
+import uk.co.bithatch.nativeimage.annotations.Serialization;
 
 public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPlatformService<AbstractLinuxAddress> {
 
@@ -61,11 +67,6 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
     }
 
 	@Override
-	public boolean isValidNativeInterfaceName(String ifaceName) {
-		return ifaceName.length() < 17 && !ifaceName.matches(".*\\s+.*") && !ifaceName.contains(" ");
-	}
-
-    @Override
     public final List<AbstractLinuxAddress> addresses() {
         List<AbstractLinuxAddress> l = new ArrayList<>();
         AbstractLinuxAddress lastLink = null;
@@ -107,10 +108,71 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
     }
 
     @Override
+	public boolean isIpForwardingEnabledOnSystem() {
+    	var ipv4 = Paths.get("/proc/sys/ipv4/ip_forward");
+    	var ipv6 = Paths.get("/proc/sys/net/ipv6/conf/all/forwarding");
+    	return (((Files.exists(ipv4) && isEnabled(ipv4)) || !Files.exists(ipv4)) &&
+    			((Files.exists(ipv4) && isEnabled(ipv6)) || !Files.exists(ipv6)));
+	}
+
+	@Override
+	public boolean isValidNativeInterfaceName(String ifaceName) {
+		return ifaceName.length() < 17 && !ifaceName.matches(".*\\s+.*") && !ifaceName.contains(" ");
+	}
+
+	@Override
     public final void runHook(VpnConfiguration configuration, VpnAdapter session, String... hookScript) throws IOException {
         runHookViaPipeToShell(configuration, session, OsUtil.getPathOfCommandInPathOrFail("bash").toString(), "-c",
                 String.join(" ; ", hookScript).trim());
     }
+
+	@Override
+	public void setNat(VpnAdapter vpnAdapter, boolean nat) throws IOException {
+		var is = isNat(vpnAdapter);
+		if(is != nat) {
+			if(nat) {
+				LOG.info("Turning on NAT masquerade for {}", vpnAdapter.address().nativeName());
+				context.commands().privileged().run("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", vpnAdapter.address().nativeName(), "-j",
+						"MASQUERADE");
+			}
+			else {
+				LOG.info("Turning off NAT masquerade for {}", vpnAdapter.address().nativeName());
+				context.commands().privileged().run("iptables", "-t", "nat", "-D", "POSTROUTING", "-o", vpnAdapter.address().nativeName(), "-j",
+						"MASQUERADE");
+			}
+		}
+	}
+
+	@Override
+	public boolean isNat(VpnAdapter vpnAdapter) throws IOException {
+		return getNatInterfaces().contains(vpnAdapter.address().nativeName());
+	}
+
+	@Override
+	public void setIpForwardingEnabledOnSystem(boolean ipForwarding) {
+    	var ipv4 = Paths.get("/proc/sys/ipv4/ip_forward");
+    	var ipv6 = Paths.get("/proc/sys/net/ipv6/conf/all/forwarding");
+    	var ipv4Exists = Files.exists(ipv4);
+		var ipv6Exists = Files.exists(ipv6);
+		if(ipv4Exists || ipv6Exists) {
+			try {
+	    		if(ipv4Exists) {
+	    			context.commands().privileged().task(new SetIpForwarding(ipv4.toString(), ipForwarding));
+	    		}
+	    		if(ipv6Exists) {
+	    			context.commands().privileged().task(new SetIpForwarding(ipv6.toString(), ipForwarding));
+	    		}
+			}
+			catch(Exception e) {
+				throw new IllegalStateException("Failed to change IP forwarding.", e);
+			}
+    	}
+    	else {
+    		super.setIpForwardingEnabledOnSystem(ipForwarding);
+    	}
+	}
+
+	protected abstract AbstractLinuxAddress createAddress(String name, String nativeName);
 
     @Override
     protected final AbstractLinuxAddress createVirtualInetAddress(NetworkInterface nif) throws IOException {
@@ -120,8 +182,6 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
         }
         return ip;
     }
-
-    protected abstract AbstractLinuxAddress createAddress(String name, String nativeName);
 
     @Override
     protected final String getDefaultGateway() throws IOException {
@@ -232,4 +292,52 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
         }
         return "";
     }
+
+    private boolean isEnabled(Path path) {
+		try(var rdr = Files.newBufferedReader(path)) {
+    		return rdr.readLine().equals("1");
+    	}
+    	catch(IOException ioe) {
+    		throw new UncheckedIOException(ioe);
+    	}
+	}
+
+    @SuppressWarnings("serial")
+	@Serialization
+    public final static class SetIpForwarding implements ElevatedClosure<Serializable, Serializable> {
+    	
+    	private String path;
+		private boolean enable;
+
+		public SetIpForwarding() {} 
+    	
+		SetIpForwarding(String path, boolean enable) {
+    		this.path = path;
+    		this.enable = enable;
+    	}
+
+		@Override
+		public Serializable call(ElevatedClosure<Serializable, Serializable> proxy) throws Exception {
+			try(var rdr = Files.newBufferedWriter(Paths.get(path))) {
+	    		rdr.write(enable ? "1" : "0");
+	    	}
+	    	catch(IOException ioe) {
+	    		throw new UncheckedIOException(ioe);
+	    	}
+			return null;
+		}
+    	
+    }
+
+	private List<String> getNatInterfaces() throws IOException {
+		var s = new ArrayList<String>();
+		for (var l : context.commands().privileged().output("iptables", "-t", "nat", "-L", "POSTROUTING", "-v")) {
+			var els = l.split("\\s+");
+			if(els.length > 6 && els[2].equals("MASQUERADE")) {
+				s.add(els[6]);
+			}
+		}
+		Collections.sort(s);
+		return s;
+	}
 }

@@ -309,6 +309,46 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	 */
 	Optional<String> nativeNameToInterfaceName(String name);
 
-	boolean isValidNativeInterfaceName(String string);
+	/**
+	 * Check if the given native interface name is valid for this platform.
+	 * 
+	 * @param name interface name
+	 * @return valid name for this platform
+	 */
+	boolean isValidNativeInterfaceName(String name);
+	
+	/**
+	 * Get if IP forwarding is globally enabled. This currently only has an effect
+	 * on Linux. All other platforms will just return <code>true</code>
+	 * 
+	 * @return ip forwarding is enabled on system
+	 */
+	boolean isIpForwardingEnabledOnSystem();
+	
+	/**
+	 * Set if IP forwarding is globally enabled. This currently only has an effect
+	 * on Linux. All other platforms will throw an {@link UnsupportedOperationException}.
+	 * 
+	 * @param ipForwarding enable ip forwarding globally
+	 */
+	void setIpForwardingEnabledOnSystem(boolean ipForwarding);
+
+	/**
+	 * Set whether the supplied interface should do NAT translation.
+	 * 
+	 * @param adapter       adapter
+	 * @param nat 			do NAT translation
+	 * @throws IOException on error
+	 */
+	void setNat(VpnAdapter vpnAdapter, boolean nat) throws IOException;
+
+	/**
+	 * Get whether the supplied interface is doing NAT translation.
+	 * 
+	 * @param adapter       adapter
+	 * @return doing NAT translation
+	 * @throws IOException on error
+	 */
+	boolean isNat(VpnAdapter vpnAdapter) throws IOException;
 
 }

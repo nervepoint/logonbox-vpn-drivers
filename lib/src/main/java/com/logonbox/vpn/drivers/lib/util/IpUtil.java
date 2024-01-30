@@ -20,46 +20,14 @@
  */
 package com.logonbox.vpn.drivers.lib.util;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.github.jgonian.ipmath.AbstractIp;
 import com.github.jgonian.ipmath.Ipv4;
 import com.github.jgonian.ipmath.Ipv6;
 
-import java.net.NetworkInterface;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.List;
-
 public class IpUtil {
-
-	public static NetworkInterface getBestLocalNic() {
-		var nics = getBestLocalNics();
-		if(nics.isEmpty())
-			throw new IllegalStateException("Could not find local network interface.");
-		return nics.get(0);
-	}
-
-	public static List<NetworkInterface> getBestLocalNics() {
-		List<NetworkInterface> addrList = new ArrayList<>();
-		try {
-			for (Enumeration<NetworkInterface> nifEn = NetworkInterface.getNetworkInterfaces(); nifEn
-					.hasMoreElements();) {
-				var nif = nifEn.nextElement();
-				/* TODO: Wireguard interfaces won't necessarily start with wg* */
-				if (!nif.getName().startsWith("wg") && !nif.isLoopback() && nif.isUp()) {
-					for (var addr : nif.getInterfaceAddresses()) {
-						var ipAddr = addr.getAddress();
-						if (!ipAddr.isAnyLocalAddress() && !ipAddr.isLinkLocalAddress()
-								&& !ipAddr.isLoopbackAddress()) {
-							addrList.add(nif);
-							break;
-						}
-					}
-				}
-			}
-		} catch (Exception e) {
-		}
-		return addrList;
-	}
 	
 	public static AbstractIp<?, ?> parse(String ip) {
 		try {

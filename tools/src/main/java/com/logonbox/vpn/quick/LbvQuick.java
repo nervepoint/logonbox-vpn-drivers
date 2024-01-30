@@ -40,7 +40,6 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
-import javax.security.cert.X509Certificate;
 
 import com.logonbox.vpn.drivers.lib.DNSProvider;
 import com.logonbox.vpn.drivers.lib.NativeComponents;
@@ -302,6 +301,7 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
 
             Optional<String> ifaceName = Optional.empty();
             var bldr = new Vpn.Builder().withSystemContext(parent);
+            var alert = false;
             
             
 			if(configFileOrInterface.equals("[")) {

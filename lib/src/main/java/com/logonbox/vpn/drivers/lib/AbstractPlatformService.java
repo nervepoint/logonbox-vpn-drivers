@@ -61,6 +61,26 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
 	}
 
 	@Override
+	public void setNat(VpnAdapter vpnAdapter, boolean nat) throws IOException {
+		throw new UnsupportedOperationException("NAT is not supported on this platform.");
+	}
+
+	@Override
+	public boolean isNat(VpnAdapter vpnAdapter) throws IOException {
+		return false;
+	}
+
+	@Override
+	public boolean isIpForwardingEnabledOnSystem() {
+		return true;
+	}
+
+	@Override
+	public void setIpForwardingEnabledOnSystem(boolean ipForwarding) {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
     public void openToEveryone(Path path) throws IOException {
         LOG.info("Setting permissions on {} to {}", path,
                 Arrays.asList(PosixFilePermission.values()));

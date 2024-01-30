@@ -18,7 +18,6 @@ import java.util.regex.Pattern;
 
 import com.logonbox.vpn.drivers.lib.DNSProvider;
 import com.logonbox.vpn.drivers.lib.PlatformService;
-import com.logonbox.vpn.drivers.lib.util.IpUtil;
 
 public class ResolvConfDNSProvider implements DNSProvider {
 
@@ -99,7 +98,7 @@ public class ResolvConfDNSProvider implements DNSProvider {
             if(ifname.equals("systemd-resolved")) {
             	var sysd = new SystemDDNSProvider();
             	sysd.init(platform);
-            	return sysd.entry(IpUtil.getBestLocalNic().getName());
+            	return sysd.entry(platform.context().getBestLocalNic().getName());
             }
 			bldr.withInterface(ifname);
             while( ( line = rdr.readLine() ) != null) {
