@@ -208,7 +208,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
     @Override
     public final Optional<DNSProvider> dns() {
         if(dnsProvider == null) {
-            var srvs = ServiceLoader.load(DNSProvider.Factory.class).stream().collect(Collectors.toList());
+            var srvs = ServiceLoader.load(DNSProvider.Factory.class, getClass().getClassLoader()).stream().collect(Collectors.toList());
             if(srvs.size() == 0) {
                 LOG.warn("No DNS provider factories found for this platform, DNS settings will be ignored.");
                 dnsProvider = Optional.empty();
