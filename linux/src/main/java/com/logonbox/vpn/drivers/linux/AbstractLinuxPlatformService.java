@@ -35,6 +35,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
@@ -141,6 +142,16 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 						"MASQUERADE");
 			}
 		}
+	}
+
+	@Override
+	public Optional<String> nativeNameToInterfaceName(String name) {
+		return Optional.empty();
+	}
+
+	@Override
+	public Optional<String> interfaceNameToNativeName(String name) {
+		return Optional.empty();
 	}
 
 	@Override

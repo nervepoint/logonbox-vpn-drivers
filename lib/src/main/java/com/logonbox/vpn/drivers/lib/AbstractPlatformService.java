@@ -223,9 +223,9 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
 		return System.getProperty("logonbox.vpn.interfacePrefix", interfacePrefix);
 	}
 
-	protected boolean exists(String name, Iterable<I> links) {
+	protected boolean exists(String nativeName, Iterable<I> links) {
 		try {
-			return find(name, links).isPresent();
+			return find(nativeName, links).isPresent();
 		} catch (IllegalArgumentException iae) {
 			return false;
 		}
@@ -251,12 +251,12 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
 	}
 
 	@Override
-	public final I address(String name) {
-		return find(name, addresses()).orElseThrow(() -> new IllegalArgumentException(String.format("No address %s", name)));
+	public final I address(String nativeName) {
+		return find(nativeName, addresses()).orElseThrow(() -> new IllegalArgumentException(String.format("No address %s", nativeName)));
 	}
 
     @Override
-    public final VpnAdapter adapter(String name) {
-        return findAdapter(name, adapters()).orElseThrow(() -> new IllegalArgumentException(String.format("No adapter %s", name)));
+    public final VpnAdapter adapter(String nativeName) {
+        return findAdapter(nativeName, adapters()).orElseThrow(() -> new IllegalArgumentException(String.format("No adapter %s", nativeName)));
     }
 }

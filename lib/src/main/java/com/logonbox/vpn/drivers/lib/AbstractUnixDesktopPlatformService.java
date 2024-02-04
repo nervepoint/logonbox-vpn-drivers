@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.StringTokenizer;
@@ -32,13 +33,26 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
 	@Override
 	public List<VpnAdapter> adapters() {
 		try {
-			var l = new ArrayList<VpnAdapter>();
+			var m = new HashMap<String, VpnAdapter>();
 			for (var line : context.commands().output(context.nativeComponents().tool(Tool.WG), "show", "interfaces")) {
 				for (var ifaceName : line.split("\\s+")) {
-					l.add(configureExistingSession(address(ifaceName)));
+					var addr = address(ifaceName);
+					var iface = configureExistingSession(addr);
+					if(m.containsKey(addr.name())) {
+						if(addr.name().equals(addr.nativeName())) {
+							LOG.warn("Replacing interface {} [{}], as an interface with the same name already exists.", addr.name(), addr.nativeName());
+							m.put(addr.name(), iface);
+						}
+						else {
+							LOG.warn("Skipping interface {} [{}], an interface with the same name already exists.", addr.name(), addr.nativeName());
+						}
+					}
+					else {
+						m.put(addr.name(), iface);
+					}
 				}
 			}
-			return l;
+			return m.values().stream().toList();
 		} catch (IOException ioe) {
 			throw new UncheckedIOException(ioe);
 		}
