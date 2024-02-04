@@ -163,7 +163,7 @@ public interface VpnAdapterConfiguration extends Serializable {
         }
         
         public B withPrivateKey(String privateKey) {
-            return withPrivateKey(Optional.of(privateKey));
+            return withPrivateKey(Optional.ofNullable(privateKey));
         }
 
         @SuppressWarnings("unchecked")
