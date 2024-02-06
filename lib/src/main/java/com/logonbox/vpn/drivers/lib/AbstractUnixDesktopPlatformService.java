@@ -310,8 +310,8 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
 		Collections.sort(session.allows(), (a, b) -> {
 			var sa = a.split("/");
 			var sb = b.split("/");
-			Integer ia = Integer.parseInt(sa[1]);
-			Integer ib = Integer.parseInt(sb[1]);
+			Integer ia = sa.length == 1 ? 0 : Integer.parseInt(sa[1]);
+			Integer ib = sb.length == 1 ? 0 : Integer.parseInt(sb[1]);
 			var r = ia.compareTo(ib);
 			if (r == 0) {
 				return a.compareTo(b);
