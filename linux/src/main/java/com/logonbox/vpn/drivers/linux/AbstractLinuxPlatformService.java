@@ -118,7 +118,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 
 	@Override
 	public boolean isValidNativeInterfaceName(String ifaceName) {
-		return ifaceName.length() < 17 && !ifaceName.matches(".*\\s+.*") && !ifaceName.contains(" ");
+		return ifaceName.length() < 16 && !ifaceName.matches(".*\\s+.*") && !ifaceName.contains(" ") && !ifaceName.contains("/");
 	}
 
 	@Override

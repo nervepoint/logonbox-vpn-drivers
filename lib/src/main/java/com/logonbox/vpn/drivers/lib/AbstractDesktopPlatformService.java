@@ -478,8 +478,8 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 		var transformBldr = new VpnConfiguration.Builder();
 		
         var gw = defaultGateway();
-        
-		transformBldr.withPrivateKey(configuration.privateKey());
+        transformBldr.fromConfiguration(configuration);
+        transformBldr.withPeers();
 		transformInterface(configuration, transformBldr);
 		for(var peer : configuration.peers()) {
 			var transformPeerBldr = new VpnPeer.Builder();
