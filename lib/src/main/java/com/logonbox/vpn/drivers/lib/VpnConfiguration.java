@@ -30,14 +30,14 @@ public interface VpnConfiguration extends VpnAdapterConfiguration {
         @Override
         protected void readInterfaceSection(Section iface) {
             super.readInterfaceSection(iface);
-            withAddresses(iface.getAllOr("Address", new String[0]));
-            withDns(iface.getAllOr("DNS", new String[0]));
+            withAddresses(iface.getAllElse("Address"));
+            withDns(iface.getAllElse("DNS"));
             withMtu(iface.getIntOr("MTU"));
-            withPreUp(iface.getAllOr("PreUp", new String[0]));
-            withPreDown(iface.getAllOr("PreDown", new String[0]));
-            withPostUp(iface.getAllOr("PostUp", new String[0]));
-            withPostDown(iface.getAllOr("PostDown", new String[0]));
-            withSaveConfig(iface.getBooleanOr("SaveConfig", false));
+            withPreUp(iface.getAllElse("PreUp"));
+            withPreDown(iface.getAllElse("PreDown"));
+            withPostUp(iface.getAllElse("PostUp"));
+            withPostDown(iface.getAllElse("PostDown"));
+            withSaveConfig(iface.getBoolean("SaveConfig", false));
             withTable(iface.getOr("Table"));
         }
 

@@ -190,7 +190,7 @@ public interface VpnAdapterConfiguration extends Serializable {
         protected void readPeerSection(Section peer, com.logonbox.vpn.drivers.lib.VpnPeer.Builder peerBldr) {
             peerBldr.withPublicKey(peer.get("PublicKey")).
                 withEndpoint(peer.getOr("Endpoint")).
-                withAllowedIps(peer.getAllOr("AllowedIPs", new String[0])).
+                withAllowedIps(peer.getAllElse("AllowedIPs")).
                 withPersistentKeepalive(peer.getIntOr("PersistentKeepalive")).
                 withPresharedKey(peer.getOr("PresharedKey"));
         }
