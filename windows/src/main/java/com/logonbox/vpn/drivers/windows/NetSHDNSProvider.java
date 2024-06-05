@@ -211,8 +211,15 @@ public class NetSHDNSProvider implements DNSProvider {
 
         @Override
         public Serializable call(ElevatedClosure<Serializable, Serializable> proxy) throws Exception {
-            var currentDomains = Advapi32Util.registryGetStringValue(WinReg.HKEY_LOCAL_MACHINE,
+            String currentDomains;
+            try {
+                currentDomains = Advapi32Util.registryGetStringValue(WinReg.HKEY_LOCAL_MACHINE,
                     "System\\CurrentControlSet\\Services\\TCPIP\\Parameters", "SearchList");
+            }
+            catch(Exception e) {
+                LOG.debug("Failed to get current domain search list.", e);
+                currentDomains = null;
+            }
             var currentDomainList = new LinkedHashSet<String>(
                     Util.isBlank(currentDomains) ? Collections.emptySet() : Arrays.asList(currentDomains));
             for (var dnsName : domains) {
