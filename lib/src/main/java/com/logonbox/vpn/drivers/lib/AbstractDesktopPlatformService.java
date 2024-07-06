@@ -83,7 +83,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 		I ip = null;
 		
 		/* If a particular native interface has been resolved, then see if it is
-		 * available. If it is, we can re-use if
+		 * available. If it is, we can re-use if the public key is the same
 		 */
 		
 

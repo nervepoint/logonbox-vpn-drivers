@@ -106,6 +106,13 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
 		return Instant.ofEpochSecond(0);
 	}
 
+    @Override
+    protected final void transformInterface(VpnConfiguration configuration, VpnConfiguration.Builder writer) {
+        /* DNS, Addresses handled separately */
+        writer.withAddresses();
+        writer.withDns();
+    }
+
 	@Override
 	protected Optional<String> getPublicKey(String interfaceName) throws IOException {
 		try {
@@ -127,7 +134,6 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
 				throw ioe;
 		}
 	}
-
 
 	@SuppressWarnings("serial")
 	@Override
