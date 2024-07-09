@@ -110,7 +110,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 
     @Override
 	public boolean isIpForwardingEnabledOnSystem() {
-    	var ipv4 = Paths.get("/proc/sys/ipv4/ip_forward");
+    	var ipv4 = Paths.get("/proc/sys/net/ipv4/ip_forward");
     	var ipv6 = Paths.get("/proc/sys/net/ipv6/conf/all/forwarding");
     	return (((Files.exists(ipv4) && isEnabled(ipv4)) || !Files.exists(ipv4)) &&
     			((Files.exists(ipv4) && isEnabled(ipv6)) || !Files.exists(ipv6)));
@@ -161,7 +161,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 
 	@Override
 	public void setIpForwardingEnabledOnSystem(boolean ipForwarding) {
-    	var ipv4 = Paths.get("/proc/sys/ipv4/ip_forward");
+    	var ipv4 = Paths.get("/proc/sys/net/ipv4/ip_forward");
     	var ipv6 = Paths.get("/proc/sys/net/ipv6/conf/all/forwarding");
     	var ipv4Exists = Files.exists(ipv4);
 		var ipv6Exists = Files.exists(ipv6);
