@@ -52,11 +52,9 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
     protected Set<String> addresses = new LinkedHashSet<>();
 
     private final static Logger LOG = LoggerFactory.getLogger(AbstractLinuxAddress.class);
-    private boolean haveSetFirewall;
 
     AbstractLinuxAddress(String name, String nativeName, AbstractLinuxPlatformService platform) {
         super(name, nativeName, platform);
-        haveSetFirewall = calcFirewallSet();
     }
 
     public void addAddress(String address) throws IOException {
@@ -76,31 +74,39 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
 
     @Override
     public void delete() throws IOException {
-        if (haveSetFirewall) {
-            removeFirewall();
-        }
-        var table = table();
-        var fwmark = getFWMark("table");
-        if ((Util.isBlank(table) || table.equals(TABLE_AUTO))
-                && fwmark > 0 /* && [[ $(wg show "$INTERFACE" allowed-ips) =~ /0(\ |$'\n'|$) ]] */) {
-            while (commandOutputMatches(".*lookup " + fwmark + ".*", "ip", "-4", "rule", "show")) {
-                commands.privileged().logged().result("ip", "-4", "rule", "delete", "table", String.valueOf(fwmark));
-            }
-            while (commandOutputMatches(".*from all lookup main suppress_prefixlength 0.*", "ip", "-4", "rule",
-                    "show")) {
-                commands.privileged().logged().result("ip", "-4", "rule", "delete", "table", "main",
-                        "suppress_prefixlength", "0");
-            }
-            while (commandOutputMatches(".*lookup " + fwmark + ".*", "ip", "-6", "rule", "show")) {
-                commands.privileged().logged().result("ip", "-6", "rule", "delete", "table", String.valueOf(fwmark));
-            }
-            while (commandOutputMatches(".*from all lookup main suppress_prefixlength 0.*", "ip", "-6", "rule",
-                    "show")) {
-                commands.privileged().logged().result("ip", "-6", "rule", "delete", "table", "main",
-                        "suppress_prefixlength", "0");
+        try {
+            if (haveSetFirewall()) {
+                removeFirewall();
             }
         }
-        onDelete();
+        finally {
+            try {
+                var table = table();
+                var fwmark = getFWMark("table");
+                if ((Util.isBlank(table) || table.equals(TABLE_AUTO))
+                        && fwmark > 0 /* && [[ $(wg show "$INTERFACE" allowed-ips) =~ /0(\ |$'\n'|$) ]] */) {
+                    while (commandOutputMatches(".*lookup " + fwmark + ".*", "ip", "-4", "rule", "show")) {
+                        commands.privileged().logged().result("ip", "-4", "rule", "delete", "table", String.valueOf(fwmark));
+                    }
+                    while (commandOutputMatches(".*from all lookup main suppress_prefixlength 0.*", "ip", "-4", "rule",
+                            "show")) {
+                        commands.privileged().logged().result("ip", "-4", "rule", "delete", "table", "main",
+                                "suppress_prefixlength", "0");
+                    }
+                    while (commandOutputMatches(".*lookup " + fwmark + ".*", "ip", "-6", "rule", "show")) {
+                        commands.privileged().logged().result("ip", "-6", "rule", "delete", "table", String.valueOf(fwmark));
+                    }
+                    while (commandOutputMatches(".*from all lookup main suppress_prefixlength 0.*", "ip", "-6", "rule",
+                            "show")) {
+                        commands.privileged().logged().result("ip", "-6", "rule", "delete", "table", "main",
+                                "suppress_prefixlength", "0");
+                    }
+                }
+            }
+            finally {
+                onDelete();
+            }
+        }
     }
 
     protected abstract void onDelete() throws IOException;
@@ -118,7 +124,7 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
     @Override
     public void down() throws IOException {
 
-        if (haveSetFirewall) {
+        if (haveSetFirewall()) {
             removeFirewall();
         }
 
@@ -282,14 +288,14 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
         }
     }
     
-    private boolean calcFirewallSet() {
+    private boolean haveSetFirewall() {
         var nftable = TABLE_PREFIX + nativeName();
         if (OsUtil.doesCommandExist(NFT_COMMAND)) {
             if(LOG.isDebugEnabled()) {
                 LOG.debug("Checking if firewall already setup for {} using nft", shortName());
             }
             for(var line : commands.privileged().silentOutput("nft", "list", "ruleset")) {
-                if(line.startsWith("table ip " + nftable + "{")) {
+                if(line.startsWith("table ip " + nftable +" {")) {
                     LOG.info("Firewall is configured using nft");
                    return true;
                 }
@@ -375,7 +381,7 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
         }
 
         if (OsUtil.doesCommandExist(NFT_COMMAND)) {
-            LOG.info("Updating firewall: {}", nftcmd.toString());
+            LOG.info("Updating firewall (NFT): {}", nftcmd.toString());
             var temp = Files.createTempFile("nftvpn", ".fwl");
             try {
                 try(var out = Files.newBufferedWriter(temp)) {
@@ -387,10 +393,9 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
                 Files.delete(temp);
             }
         } else {
-            LOG.info("Updating firewall: {}", restore);
+            LOG.info("Updating firewall (IpTables): {}", restore);
             commands.privileged().logged().pipeTo(restore, iptables + "-restore", "-n");
         }
-        haveSetFirewall = true;
     }
 
     private void addRoute(String route) throws IOException {
@@ -442,39 +447,35 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
     }
 
     private void removeFirewall() throws IOException {
-        try {
-            if (OsUtil.doesCommandExist(NFT_COMMAND)) {
-                var nftcmd = new StringBuilder();
-                for (var table : commands.privileged().output("nft", "list", "tables")) {
-                    if (table.contains(TABLE_PREFIX)) {
-                        nftcmd.append(String.format("%s\n", table));
-                    }
-                }
-                if (nftcmd.length() > 0) {
-                    commands.privileged().logged().pipeTo(nftcmd.toString(), "nft", "-f");
+        if (OsUtil.doesCommandExist(NFT_COMMAND)) {
+            var nftcmd = new StringBuilder();
+            for (var table : commands.privileged().output("nft", "list", "tables")) {
+                if (table.contains(TABLE_PREFIX)) {
+                    nftcmd.append(String.format("delete %s\n", table));
                 }
             }
-            if (OsUtil.doesCommandExist("iptables")) {
-                for (var iptables : new String[] { "iptables", "ip6tables" }) {
-                    var restore = new StringBuilder();
-                    var found = false;
-                    for (var line : commands.privileged().output(iptables + "-save")) {
-                        if (line.startsWith("*") || line.equals("COMMIT")
-                                || line.matches("-A .*-m comment --comment \"LogonBoxVPN rule for " + nativeName() + ".*"))
-                            continue;
-                        if (line.startsWith("-A"))
-                            found = true;
-                        restore.append(String.format("%s\n", line.replace("#-A", "-D"))); // TODO is this really #-A?
-                    }
-                    if (found) {
-                        LOG.info("Updating firewall: {}", restore.toString());
-                        commands.privileged().logged().pipeTo(restore.toString(), iptables + "-restore", "-n");
-                    }
-                }
+            if (nftcmd.length() > 0) {
+                LOG.info("Removing firewall (NFT): {}", nftcmd.toString());
+                commands.privileged().logged().pipeTo(nftcmd.toString(), "nft", "-f", "-");
             }
         }
-        finally {
-            haveSetFirewall = false;
+        else if (OsUtil.doesCommandExist("iptables")) {
+            for (var iptables : new String[] { "iptables", "ip6tables" }) {
+                var restore = new StringBuilder();
+                var found = false;
+                for (var line : commands.privileged().output(iptables + "-save")) {
+                    if (line.startsWith("*") || line.equals("COMMIT")
+                            || line.matches("-A .*-m comment --comment \"LogonBoxVPN rule for " + nativeName() + ".*"))
+                        continue;
+                    if (line.startsWith("-A"))
+                        found = true;
+                    restore.append(String.format("%s\n", line.replace("#-A", "-D"))); // TODO is this really #-A?
+                }
+                if (found) {
+                    LOG.info("Removing firewall (IpTables): {}", restore.toString());
+                    commands.privileged().logged().pipeTo(restore.toString(), iptables + "-restore", "-n");
+                }
+            }
         }
 
     }
