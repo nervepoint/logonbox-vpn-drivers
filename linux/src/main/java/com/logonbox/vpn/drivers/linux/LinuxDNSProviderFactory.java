@@ -1,6 +1,7 @@
 package com.logonbox.vpn.drivers.linux;
 
 import com.logonbox.vpn.drivers.lib.DNSProvider;
+import com.sshtools.liftlib.OS;
 
 import java.io.File;
 import java.io.IOException;
@@ -15,7 +16,12 @@ public class LinuxDNSProviderFactory implements DNSProvider.Factory {
     @SuppressWarnings("unchecked")
     @Override
     public <P extends DNSProvider> Class<P>[] available() {
-        return new Class[] { ResolvConfDNSProvider.class, NetworkManagerDNSProvider.class, SystemDDNSProvider.class, RawDNSProvider.class };
+    	if(OS.isLinux()) {
+    		return new Class[] { ResolvConfDNSProvider.class, NetworkManagerDNSProvider.class, SystemDDNSProvider.class, RawDNSProvider.class };
+    	}
+    	else {
+    		return new Class[0];
+    	}
     }
 
     @Override

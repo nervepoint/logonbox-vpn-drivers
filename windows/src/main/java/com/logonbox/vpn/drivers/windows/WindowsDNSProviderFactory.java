@@ -1,6 +1,7 @@
 package com.logonbox.vpn.drivers.windows;
 
 import com.logonbox.vpn.drivers.lib.DNSProvider;
+import com.sshtools.liftlib.OS;
 
 import java.util.Optional;
 
@@ -12,10 +13,15 @@ public class WindowsDNSProviderFactory implements DNSProvider.Factory {
     @SuppressWarnings("unchecked")
     @Override
     public <P extends DNSProvider> Class<P>[] available() {
-        return new Class[] {
-        	NullDNSProvider.class,
-            NetSHDNSProvider.class
-        };
+    	if(OS.isWindows()) {
+	        return new Class[] {
+	        	NullDNSProvider.class,
+	            NetSHDNSProvider.class
+	        };
+    	}
+    	else {
+    		return new Class[0];
+    	}
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.logonbox.vpn.drivers.macos;
 
 import com.logonbox.vpn.drivers.lib.DNSProvider;
+import com.sshtools.liftlib.OS;
 
 import java.util.Optional;
 
@@ -13,8 +14,13 @@ public class MacOsDNSProviderFactory implements DNSProvider.Factory {
     @SuppressWarnings("unchecked")
     @Override
     public <P extends DNSProvider> Class<P>[] available() {
-        return new Class[] { SCUtilSplitDNSProvider.class, SCUtilCompatibleDNSProvider.class,
-                NetworksetupDNSProvider.class };
+    	if(OS.isMacOs()) {
+	        return new Class[] { SCUtilSplitDNSProvider.class, SCUtilCompatibleDNSProvider.class,
+	                NetworksetupDNSProvider.class };
+    	}
+    	else {
+    		return new Class[0];
+    	}
     }
 
     @Override
