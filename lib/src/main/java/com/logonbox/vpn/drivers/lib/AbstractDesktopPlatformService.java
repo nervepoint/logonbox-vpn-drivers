@@ -20,20 +20,6 @@
  */
 package com.logonbox.vpn.drivers.lib;
 
-import com.github.jgonian.ipmath.AbstractIp;
-import com.github.jgonian.ipmath.Ipv4;
-import com.github.jgonian.ipmath.Ipv4Range;
-import com.github.jgonian.ipmath.Ipv6;
-import com.github.jgonian.ipmath.Ipv6Range;
-import com.logonbox.vpn.drivers.lib.DNSProvider.DNSEntry;
-import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
-import com.logonbox.vpn.drivers.lib.Prefs.PrefType;
-import com.logonbox.vpn.drivers.lib.util.IpUtil;
-import com.logonbox.vpn.drivers.lib.util.Util;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetAddress;
@@ -57,6 +43,20 @@ import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.github.jgonian.ipmath.AbstractIp;
+import com.github.jgonian.ipmath.Ipv4;
+import com.github.jgonian.ipmath.Ipv4Range;
+import com.github.jgonian.ipmath.Ipv6;
+import com.github.jgonian.ipmath.Ipv6Range;
+import com.logonbox.vpn.drivers.lib.DNSProvider.DNSEntry;
+import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
+import com.logonbox.vpn.drivers.lib.Prefs.PrefType;
+import com.logonbox.vpn.drivers.lib.util.IpUtil;
+import com.logonbox.vpn.drivers.lib.util.Util;
 
 public abstract class AbstractDesktopPlatformService<I extends VpnAddress> extends AbstractPlatformService<I> {
 
@@ -208,36 +208,42 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
     @Override
     public final Optional<DNSProvider> dns() {
         if(dnsProvider == null) {
-            var srvs = ServiceLoader.load(DNSProvider.Factory.class, getClass().getClassLoader()).stream().collect(Collectors.toList());
-            if(srvs.size() == 0) {
-                LOG.warn("No DNS provider factories found for this platform, DNS settings will be ignored.");
-                dnsProvider = Optional.empty();
-            }
-            else {
-                if(srvs.size() > 1) {
-                    LOG.warn("Found multiple DNS provider factories, only the first will be used. This may be incorrect.");
-                }
-                try {
-                	if(context.configuration().dnsIntegrationMethod().isPresent()) {
-	                	for(var provFactory : srvs) {
-	                		var provs = provFactory.get().available();
-	                		for(var prov : provs) {
-	                			if(prov.getName().equals(context.configuration().dnsIntegrationMethod().get())) {
-	                				dnsProvider = Optional.of(provFactory.get().create(Optional.of(prov)));
-	                                dnsProvider.get().init(this);
-	                                return dnsProvider;
-	                			}
-	                		}
-	                	}
-                	}
-                    dnsProvider = Optional.of(srvs.get(0).get().create(Optional.empty()));
-                    dnsProvider.get().init(this);
-                }
-                catch(UnsupportedOperationException uoe) {
-                    LOG.warn("A DNS provider factory was found, but it could not detect any supported DNS providers.");
-                    dnsProvider = Optional.empty();
-                }
-            }
+
+        	var dnsOr = context.configuration().dnsIntegrationMethod();
+        	var allSrvs = ServiceLoader.load(DNSProvider.Factory.class, getClass().getClassLoader());
+        	
+			for(var provFactory : allSrvs.stream().collect(Collectors.toList())) {
+				var provs = provFactory.get().available();
+        		for(var prov : provs) {
+        			try {
+						if(dnsOr.isEmpty() || prov.getName().equals(dnsOr.get())) {
+	        				dnsProvider = Optional.of(provFactory.get().create(Optional.of(prov)));
+	                        dnsProvider.get().init(this);
+	                        return dnsProvider;
+	        			}
+        			}
+        			catch(UnsupportedOperationException uoe) {
+        				// 
+        			}
+        		}
+        	}
+            
+			
+			for(var provFactory : allSrvs.stream().collect(Collectors.toList())) {
+				var provs = provFactory.get().available();
+        		for(var prov : provs) {
+        			try {
+        				dnsProvider = Optional.of(provFactory.get().create(Optional.of(prov)));
+                        dnsProvider.get().init(this);
+                        return dnsProvider;
+        			}
+        			catch(UnsupportedOperationException uoe) {
+        				// 
+        			}
+        		}
+        	}
+			
+			dnsProvider = Optional.empty();
         }
         return dnsProvider;
     }
