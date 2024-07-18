@@ -96,7 +96,7 @@ public interface VpnConfiguration extends VpnAdapterConfiguration {
         }
 
         public Builder withMtu(int listenPort) {
-            return withListenPort(Optional.of(listenPort));
+            return withMtu(listenPort == 0 ? Optional.empty() : Optional.of(listenPort));
         }
 
         public Builder withMtu(Optional<Integer> mtu) {
