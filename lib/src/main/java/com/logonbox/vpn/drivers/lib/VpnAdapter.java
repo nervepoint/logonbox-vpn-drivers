@@ -20,9 +20,6 @@
  */
 package com.logonbox.vpn.drivers.lib;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -30,6 +27,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class VpnAdapter implements Closeable {
     final static Logger LOG = LoggerFactory.getLogger(VpnAdapter.class);
@@ -103,12 +103,12 @@ public final class VpnAdapter implements Closeable {
 		service.sync(this, cfg);
 	}
 	
-	public boolean isNat() throws IOException {
-		return service.isNat(this);
+	public NATMode[] nat(String range) throws IOException {
+		return service.getNat(this.address().nativeName(), range);
 	}
 	
-	public void setNat(boolean nat) throws IOException {
-		service.setNat(this, nat);
+	public void nat(String range, NATMode[] nat) throws IOException {
+		service.setNat(this.address().nativeName(), range, nat);
 	}
 
     public VpnInterfaceInformation information() {

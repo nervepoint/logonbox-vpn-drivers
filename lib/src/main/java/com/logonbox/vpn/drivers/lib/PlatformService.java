@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface PlatformService<ADDR extends VpnAddress> {
-
+	
 	/**
 	 * Create a default instance.
 	 * 
@@ -336,19 +336,21 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	/**
 	 * Set whether the supplied interface should do NAT translation.
 	 * 
-	 * @param adapter       adapter
+	 * @param iface native interface name
+	 * @param range network range
 	 * @param nat 			do NAT translation
 	 * @throws IOException on error
 	 */
-	void setNat(VpnAdapter vpnAdapter, boolean nat) throws IOException;
+	void setNat(String iface, String range, NATMode... nat) throws IOException; 
 
 	/**
-	 * Get whether the supplied interface is doing NAT translation.
+	 * Get whether the supplied interface is doing NAT/SNAT translation.
 	 * 
-	 * @param adapter       adapter
+	 * @param iface native interface name
+	 * @param range network range
 	 * @return doing NAT translation
 	 * @throws IOException on error
 	 */
-	boolean isNat(VpnAdapter vpnAdapter) throws IOException;
+	NATMode[] getNat(String iface, String range) throws IOException;
 
 }

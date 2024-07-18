@@ -24,8 +24,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.github.jgonian.ipmath.AbstractIp;
+import com.github.jgonian.ipmath.AbstractIpRange;
 import com.github.jgonian.ipmath.Ipv4;
+import com.github.jgonian.ipmath.Ipv4Range;
 import com.github.jgonian.ipmath.Ipv6;
+import com.github.jgonian.ipmath.Ipv6Range;
 
 public class IpUtil {
 	
@@ -35,6 +38,14 @@ public class IpUtil {
 		}
 		catch(IllegalArgumentException iae) {
 			return Ipv6.of(ip);
+		}
+	}
+
+	public static AbstractIpRange<?,?> rangeFrom(String range) {
+		try {
+			return Ipv4Range.parse(range);
+		} catch(IllegalArgumentException e) {
+			return Ipv6Range.parse(range);
 		}
 	}
 

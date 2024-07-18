@@ -27,13 +27,16 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.io.UncheckedIOException;
 import java.io.Writer;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
+import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -41,12 +44,17 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.github.jgonian.ipmath.Ipv4Range;
 import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
+import com.logonbox.vpn.drivers.lib.NATMode;
+import com.logonbox.vpn.drivers.lib.NATMode.MASQUERADE;
+import com.logonbox.vpn.drivers.lib.NATMode.SNAT;
 import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
 import com.logonbox.vpn.drivers.lib.StartRequest;
 import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.VpnAdapter;
 import com.logonbox.vpn.drivers.lib.VpnConfiguration;
+import com.logonbox.vpn.drivers.lib.util.IpUtil;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
 import com.sshtools.liftlib.ElevatedClosure;
 
@@ -54,7 +62,10 @@ import uk.co.bithatch.nativeimage.annotations.Serialization;
 
 public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPlatformService<AbstractLinuxAddress> {
 
-    enum IpAddressState {
+    private static final String SNAT = "SNAT";
+	private static final String MASQUERADE = "MASQUERADE";
+
+	enum IpAddressState {
         HEADER, IP, MAC
     }
 
@@ -128,18 +139,58 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
     }
 
 	@Override
-	public void setNat(VpnAdapter vpnAdapter, boolean nat) throws IOException {
-		var is = isNat(vpnAdapter);
-		if(is != nat) {
-			if(nat) {
-				LOG.info("Turning on NAT masquerade for {}", vpnAdapter.address().nativeName());
-				context.commands().privileged().run("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", vpnAdapter.address().nativeName(), "-j",
-						"MASQUERADE");
+	public void setNat(String iface, String range, NATMode... nat) throws IOException {
+		var is = getNat(iface, range);
+		var ipRange = IpUtil.rangeFrom(range);
+		if(!Arrays.equals(is, nat)) {
+
+			LOG.info("Removing existing NAT/SNAT rules for {}", iface);
+			var priv = context.commands().privileged();
+			for(var i : is) {
+				if(i instanceof SNAT snat) {
+					priv.run("iptables", "-t", "nat", "-D", "POSTROUTING", "-o", snat.to().getName(),
+							"-s", snat.sourceRangeOrCidr(),
+							"-j", SNAT, "--to-source", snat.toAddress(ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class));
+				}
+				else if(i instanceof MASQUERADE masq) {
+					if(masq.in().isEmpty())
+						priv.run("iptables", "-t", "nat", "-D", "POSTROUTING", "-j", MASQUERADE, "-o", masq.iface());
+					else {
+						for(var in : masq.in()) {
+							priv.run("iptables", "-t", "nat", "-D", "POSTROUTING", "-j", MASQUERADE, "-i", in, "-o", masq.iface());
+						}
+					}
+				}
+				else
+					throw new UnsupportedOperationException(i.getClass().getName());
+			}
+			
+			if(nat.length == 0) {
+				LOG.info("Reverting to full routed mode.");
 			}
 			else {
-				LOG.info("Turning off NAT masquerade for {}", vpnAdapter.address().nativeName());
-				context.commands().privileged().run("iptables", "-t", "nat", "-D", "POSTROUTING", "-o", vpnAdapter.address().nativeName(), "-j",
-						"MASQUERADE");
+				for(var n : nat) {
+					if(n instanceof SNAT snat) {
+						var toAddress = snat.toAddress(ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class);
+						var toIface = snat.to().getName();
+						LOG.info("Turning on SNAT for {} to {} @ {}", snat.sourceRangeOrCidr(), toAddress, toIface);
+						priv.run("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", toIface,
+								"-s", snat.sourceRangeOrCidr(),
+								"-j", SNAT, "--to-source", toAddress);
+					}
+					else if(n instanceof MASQUERADE masq) {
+						LOG.info("Turning on MASQUERADE for {}", masq.iface());
+						if(masq.in().isEmpty())
+							priv.run("iptables", "-t", "nat", "-A", "POSTROUTING", "-j", MASQUERADE, "-o", masq.iface());
+						else {
+							for(var in : masq.in()) {
+								priv.run("iptables", "-t", "nat", "-A", "POSTROUTING", "-j", MASQUERADE, "-i", in, "-o", masq.iface());
+							}
+						}
+					}
+					else
+						throw new UnsupportedOperationException(n.getClass().getName());
+				}
 			}
 		}
 	}
@@ -155,8 +206,54 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 	}
 
 	@Override
-	public boolean isNat(VpnAdapter vpnAdapter) throws IOException {
-		return getNatInterfaces().contains(vpnAdapter.address().nativeName());
+	public NATMode[] getNat(String ifaceName, String range) throws IOException {
+		
+//		var addr = vpnAdapter.address();
+//		var ifaceName = addr.nativeName();
+		
+//		var nativeIface = addr.getByName(ifaceName);
+//		var firstAddr = nativeIface.getInterfaceAddresses().iterator().next();
+//		var ip = IpUtil.parse(firstAddr.getAddress().toString() + "/" + firstAddr.getNetworkPrefixLength());
+//		var rng = ip.asRange();
+//		var cidr = rng.toStringInCidrNotation();
+//		String cidr ="";
+		
+		NATMode.MASQUERADE masq = null;
+		NATMode.SNAT snat = null;
+		
+		for (var l : context.commands().privileged().output("iptables", "-t", "nat", "-L", "POSTROUTING", "-v")) {
+			var els = l.trim().split("\\s+");
+			if(els.length > 6 && els[2].equals(MASQUERADE) && els[6].equals(ifaceName)) {
+				var in = els[5];
+				if(masq == null || in.equals("any")) {
+					masq = new NATMode.MASQUERADE(ifaceName);
+				}
+				else if(masq != null) {
+					masq = masq.addIn(in);
+				}
+			}
+			else if(els.length > 7 && ( els[7].equals("anywhere") || els[7].equals(range) ) && els[2].equals(SNAT)) {
+				try {
+					var to = els[9].substring(3);
+					if(snat == null) {
+						snat = new NATMode.SNAT(range, getInterfaceForAddress(to));
+					}
+				}
+				catch(Exception e) {
+					LOG.warn("Failed to interface address for SNAT match.", e);
+				}
+			}
+		}
+		
+		var a = new ArrayList<NATMode>();
+		if(masq != null) {
+			a.add(masq);
+		}
+		if(snat != null) {
+			a.add(snat);
+		}
+		
+		return a.toArray(new NATMode[0]);
 	}
 
 	@Override
@@ -285,6 +382,23 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
         context(). commands().privileged().logged().run(commands.toArray(new String[0]));
     }
 
+    private boolean isEnabled(Path path) {
+		try(var rdr = Files.newBufferedReader(path)) {
+    		return rdr.readLine().equals("1");
+    	}
+    	catch(IOException ioe) {
+    		throw new UncheckedIOException(ioe);
+    	}
+	}
+
+	private NetworkInterface getInterfaceForAddress(String address) {
+		try {
+			return NetworkInterface.getByInetAddress(InetAddress.getByName(address));
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
+
     String resolvconfIfacePrefix() {
         var f = new File("/etc/resolvconf/interface-order");
         if (f.exists()) {
@@ -303,15 +417,6 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
         }
         return "";
     }
-
-    private boolean isEnabled(Path path) {
-		try(var rdr = Files.newBufferedReader(path)) {
-    		return rdr.readLine().equals("1");
-    	}
-    	catch(IOException ioe) {
-    		throw new UncheckedIOException(ioe);
-    	}
-	}
 
     @SuppressWarnings("serial")
 	@Serialization
@@ -339,16 +444,4 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 		}
     	
     }
-
-	private List<String> getNatInterfaces() throws IOException {
-		var s = new ArrayList<String>();
-		for (var l : context.commands().privileged().output("iptables", "-t", "nat", "-L", "POSTROUTING", "-v")) {
-			var els = l.split("\\s+");
-			if(els.length > 6 && els[2].equals("MASQUERADE")) {
-				s.add(els[6]);
-			}
-		}
-		Collections.sort(s);
-		return s;
-	}
 }
