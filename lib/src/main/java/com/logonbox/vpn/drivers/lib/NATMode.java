@@ -73,37 +73,30 @@ public class NATMode {
 	}
 
 	public final static class MASQUERADE extends NATMode {
-		private final String iface;
-		private Set<String> in;
+		private Set<NetworkInterface> in;
 
-		public MASQUERADE(String ifaceOut, String... in) {
-			this(ifaceOut, Set.of(in));
+		public MASQUERADE(NetworkInterface... in) {
+			this(Set.of(in));
 		}
 
-		public MASQUERADE(String ifaceOut, Set<String> in) {
-			this.iface = ifaceOut;
+		public MASQUERADE(Set<NetworkInterface> in) {
 			this.in = in;
 		}
 
-		public String iface() {
-			return iface;
-		}
-
-		public Set<String> in() {
+		public Set<NetworkInterface> in() {
 			return in;
 		}
 
-		public MASQUERADE addIn(String in) {
-			var s = new LinkedHashSet<String>(this.in);
+		public MASQUERADE addIn(NetworkInterface in) {
+			var s = new LinkedHashSet<NetworkInterface>(this.in);
 			s.add(in);
-			return new MASQUERADE(iface, s);
+			return new MASQUERADE(s);
 		}
 
 		@Override
 		public int hashCode() {
 			final int prime = 31;
 			int result = 1;
-			result = prime * result + ((iface == null) ? 0 : iface.hashCode());
 			result = prime * result + ((in == null) ? 0 : in.hashCode());
 			return result;
 		}
@@ -117,11 +110,6 @@ public class NATMode {
 			if (getClass() != obj.getClass())
 				return false;
 			MASQUERADE other = (MASQUERADE) obj;
-			if (iface == null) {
-				if (other.iface != null)
-					return false;
-			} else if (!iface.equals(other.iface))
-				return false;
 			if (in == null) {
 				if (other.in != null)
 					return false;
@@ -132,8 +120,9 @@ public class NATMode {
 
 		@Override
 		public String toString() {
-			return "MASQUERADE [iface=" + iface + ", in=" + in + "]";
+			return "MASQUERADE [in=" + in + "]";
 		}
+
 	}
 
 }

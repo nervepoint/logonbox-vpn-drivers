@@ -154,10 +154,10 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 				}
 				else if(i instanceof MASQUERADE masq) {
 					if(masq.in().isEmpty())
-						priv.run("iptables", "-t", "nat", "-D", "POSTROUTING", "-j", MASQUERADE, "-o", masq.iface());
+						priv.run("iptables", "-t", "nat", "-D", "POSTROUTING", "-j", MASQUERADE, "-o", context.getBestLocalNic().getName());
 					else {
 						for(var in : masq.in()) {
-							priv.run("iptables", "-t", "nat", "-D", "POSTROUTING", "-j", MASQUERADE, "-i", in, "-o", masq.iface());
+							priv.run("iptables", "-t", "nat", "-D", "POSTROUTING", "-j", MASQUERADE, "-o", in.getName());
 						}
 					}
 				}
@@ -179,12 +179,13 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 								"-j", SNAT, "--to-source", toAddress);
 					}
 					else if(n instanceof MASQUERADE masq) {
-						LOG.info("Turning on MASQUERADE for {}", masq.iface());
-						if(masq.in().isEmpty())
-							priv.run("iptables", "-t", "nat", "-A", "POSTROUTING", "-j", MASQUERADE, "-o", masq.iface());
+						if(masq.in().isEmpty()) {
+							LOG.info("Turning on MASQUERADE for {}", context.getBestLocalNic().getName());
+							priv.run("iptables", "-t", "nat", "-A", "POSTROUTING", "-j", MASQUERADE, "-o", context.getBestLocalNic().getName());
+						}
 						else {
 							for(var in : masq.in()) {
-								priv.run("iptables", "-t", "nat", "-A", "POSTROUTING", "-j", MASQUERADE, "-i", in, "-o", masq.iface());
+								priv.run("iptables", "-t", "nat", "-A", "POSTROUTING", "-j", MASQUERADE, "-o", in.getName());
 							}
 						}
 					}
@@ -226,10 +227,11 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 			if(els.length > 6 && els[2].equals(MASQUERADE) && els[6].equals(ifaceName)) {
 				var in = els[5];
 				if(masq == null || in.equals("any")) {
-					masq = new NATMode.MASQUERADE(ifaceName);
+					masq = new NATMode.MASQUERADE();
+					masq.addIn(NetworkInterface.getByName(in));
 				}
 				else if(masq != null) {
-					masq = masq.addIn(in);
+					masq = masq.addIn(NetworkInterface.getByName(in));
 				}
 			}
 			else if(els.length > 7 && ( els[7].equals("anywhere") || els[7].equals(range) ) && els[2].equals(SNAT)) {
@@ -341,6 +343,9 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
         LOG.info("Bringing up {}", ip.shortName());
         ip.up();
         session.attachToInterface(ip);
+        
+
+        LOG.info("DNS Provider: {}", dns().map(dns -> dns.getClass().getName()).orElse("None"));
 
         /*
          * Wait for the first handshake. As soon as we have it, we are 'connected'. If
