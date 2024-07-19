@@ -48,11 +48,9 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
 	
 	protected AbstractPlatformService(String interfacePrefix, SystemContext context) {
 		this.interfacePrefix = interfacePrefix;
-        LOG.info("Starting platform services {}", getClass().getName());
         this.context = context;
         beforeStart(context);
         onInit(context);
-        LOG.info("DNS Provider: {}", dns().map(dns -> dns.getClass().getName()).orElse("None"));
 	}
 	
 	protected void beforeStart(SystemContext ctx) {

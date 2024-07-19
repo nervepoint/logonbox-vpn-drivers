@@ -25,10 +25,9 @@ public class ResolvConfDNSProvider implements DNSProvider {
 
     @Override
     public List<DNSEntry> entries() throws IOException {
-        var dir = LinuxDNSProviderFactory.runPath().resolve("resolvconf").resolve("interface");
+        var dir = LinuxDNSProviderFactory.runPath().resolve("resolvconf").resolve("interfaces");
         if(Files.exists(dir)) {
             var l = new ArrayList<DNSEntry>();
-            //try(var str = Files.newDirectoryStream(dir, f -> f.getFileName().toString().startsWith(resolvconfIfacePrefix() + "."))) {
             try(var str = Files.newDirectoryStream(dir)) {
                 for(var f : str) {
                 	dnsEntry(f).ifPresent(d -> l.add(d));

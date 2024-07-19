@@ -53,7 +53,8 @@ public interface SystemConfiguration {
 
 		@Override
 		public Optional<String> dnsIntegrationMethod() {
-		    return Optional.empty();
+			var str = System.getProperty("logonbox.vpn.dns", "");
+		    return str.equals("") ? Optional.empty() : Optional.of(str);
 		}
 	}
 
