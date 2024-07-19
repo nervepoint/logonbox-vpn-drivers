@@ -1,6 +1,7 @@
 package com.logonbox.vpn.drivers.macos;
 
 import com.logonbox.vpn.drivers.lib.DNSProvider;
+import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.sshtools.liftlib.OS;
 
 import java.util.Optional;
@@ -24,7 +25,7 @@ public class MacOsDNSProviderFactory implements DNSProvider.Factory {
     }
 
     @Override
-    public DNSProvider create(Optional<Class<? extends DNSProvider>> clazz) {
+    public DNSProvider create(Optional<Class<? extends DNSProvider>> clazz, SystemContext context) {
         if (clazz.isPresent()) {
             /* Don't use reflection her for native images' sake */
             var clazzVal = clazz.get();
@@ -37,7 +38,7 @@ public class MacOsDNSProviderFactory implements DNSProvider.Factory {
             } else
                 throw new IllegalArgumentException(clazzVal.toString());
         } else {
-        	return create(Optional.of(NetworksetupDNSProvider.class));
+        	return create(Optional.of(NetworksetupDNSProvider.class), context);
         }
     }
 

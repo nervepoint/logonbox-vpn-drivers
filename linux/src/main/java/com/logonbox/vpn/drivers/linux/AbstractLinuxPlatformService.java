@@ -343,9 +343,6 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
         LOG.info("Bringing up {}", ip.shortName());
         ip.up();
         session.attachToInterface(ip);
-        
-
-        LOG.info("DNS Provider: {}", dns().map(dns -> dns.getClass().getName()).orElse("None"));
 
         /*
          * Wait for the first handshake. As soon as we have it, we are 'connected'. If

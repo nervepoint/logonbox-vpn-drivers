@@ -52,6 +52,7 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
         this.context = context;
         beforeStart(context);
         onInit(context);
+        LOG.info("DNS Provider: {}", dns().map(dns -> dns.getClass().getName()).orElse("None"));
 	}
 	
 	protected void beforeStart(SystemContext ctx) {

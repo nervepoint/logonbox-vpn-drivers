@@ -21,7 +21,7 @@ public interface DNSProvider {
     public interface Factory {
         <P extends DNSProvider> Class<P>[] available();
 
-        DNSProvider create(Optional<Class<? extends DNSProvider>> clazz);
+        DNSProvider create(Optional<Class<? extends DNSProvider>> clazz, SystemContext context);
     }
 
     @SuppressWarnings("serial")

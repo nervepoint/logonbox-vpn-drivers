@@ -1,3 +1,4 @@
+
 package com.logonbox.vpn.drivers.linux;
 
 import java.io.BufferedReader;
@@ -9,7 +10,6 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -25,7 +25,7 @@ public class ResolvConfDNSProvider implements DNSProvider {
 
     @Override
     public List<DNSEntry> entries() throws IOException {
-        var dir = Paths.get("/var/run/resolvconf/interface");
+        var dir = LinuxDNSProviderFactory.runPath().resolve("resolvconf").resolve("interface");
         if(Files.exists(dir)) {
             var l = new ArrayList<DNSEntry>();
             //try(var str = Files.newDirectoryStream(dir, f -> f.getFileName().toString().startsWith(resolvconfIfacePrefix() + "."))) {

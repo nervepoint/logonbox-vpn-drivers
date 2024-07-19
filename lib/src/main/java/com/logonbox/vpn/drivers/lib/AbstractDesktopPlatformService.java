@@ -208,7 +208,6 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
     @Override
     public final Optional<DNSProvider> dns() {
         if(dnsProvider == null) {
-
         	var dnsOr = context.configuration().dnsIntegrationMethod();
         	var allSrvs = ServiceLoader.load(DNSProvider.Factory.class, getClass().getClassLoader());
         	
@@ -217,7 +216,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
         		for(var prov : provs) {
         			try {
 						if(dnsOr.isEmpty() || prov.getName().equals(dnsOr.get())) {
-	        				dnsProvider = Optional.of(provFactory.get().create(Optional.of(prov)));
+	        				dnsProvider = Optional.of(provFactory.get().create(Optional.of(prov), context));
 	                        dnsProvider.get().init(this);
 	                        return dnsProvider;
 	        			}
@@ -233,7 +232,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 				var provs = provFactory.get().available();
         		for(var prov : provs) {
         			try {
-        				dnsProvider = Optional.of(provFactory.get().create(Optional.of(prov)));
+        				dnsProvider = Optional.of(provFactory.get().create(Optional.of(prov), context));
                         dnsProvider.get().init(this);
                         return dnsProvider;
         			}

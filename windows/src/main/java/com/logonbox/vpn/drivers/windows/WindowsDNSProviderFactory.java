@@ -1,6 +1,7 @@
 package com.logonbox.vpn.drivers.windows;
 
 import com.logonbox.vpn.drivers.lib.DNSProvider;
+import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.sshtools.liftlib.OS;
 
 import java.util.Optional;
@@ -25,7 +26,7 @@ public class WindowsDNSProviderFactory implements DNSProvider.Factory {
     }
 
     @Override
-    public DNSProvider create(Optional<Class<? extends DNSProvider>> clazz) {
+    public DNSProvider create(Optional<Class<? extends DNSProvider>> clazz, SystemContext context) {
         if(clazz.isPresent()) {
             /* Don't use reflection here for native images' sake */
             var clazzVal = clazz.get();
@@ -39,7 +40,7 @@ public class WindowsDNSProviderFactory implements DNSProvider.Factory {
                 throw new IllegalArgumentException(clazzVal.toString());
         }
         else {
-            return create(Optional.of(NullDNSProvider.class));
+            return create(Optional.of(NullDNSProvider.class), context);
         }
     }
     

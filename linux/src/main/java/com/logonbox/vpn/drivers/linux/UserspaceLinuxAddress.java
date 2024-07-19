@@ -42,7 +42,7 @@ public class UserspaceLinuxAddress extends AbstractLinuxAddress {
     }
 
     protected File getSocketFile() {
-        return new File("/var/run/wireguard/" + nativeName() + ".sock");
+        return new File(LinuxDNSProviderFactory.runPath().toString() + "/wireguard/" + nativeName() + ".sock");
     }
 
 }
