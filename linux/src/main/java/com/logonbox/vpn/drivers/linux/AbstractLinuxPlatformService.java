@@ -148,9 +148,17 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 			var priv = context.commands().privileged();
 			for(var i : is) {
 				if(i instanceof SNAT snat) {
-					priv.run("iptables", "-t", "nat", "-D", "POSTROUTING", "-o", snat.to().getName(),
-							"-s", snat.sourceRangeOrCidr(),
-							"-j", SNAT, "--to-source", snat.toAddress(ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class));
+					if(snat.sourceRangeOrCidr().contains("-")) {
+						priv.run("iptables", "-t", "nat", "-D", "POSTROUTING", "-o", snat.to().getName(),
+								"-m", "iprange",
+								"--src-range", snat.sourceRangeOrCidr(),
+								"-j", SNAT, "--to-source", snat.toAddress(ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class));
+					}
+					else {
+						priv.run("iptables", "-t", "nat", "-D", "POSTROUTING", "-o", snat.to().getName(),
+								"-s", snat.sourceRangeOrCidr(),
+								"-j", SNAT, "--to-source", snat.toAddress(ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class));
+					}
 				}
 				else if(i instanceof MASQUERADE masq) {
 					if(masq.in().isEmpty())
@@ -174,9 +182,17 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 						var toAddress = snat.toAddress(ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class);
 						var toIface = snat.to().getName();
 						LOG.info("Turning on SNAT for {} to {} @ {}", snat.sourceRangeOrCidr(), toAddress, toIface);
-						priv.run("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", toIface,
-								"-s", snat.sourceRangeOrCidr(),
-								"-j", SNAT, "--to-source", toAddress);
+						if(snat.sourceRangeOrCidr().contains("-")) {
+							priv.run("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", toIface,
+									"-m", "iprange",
+									"--src-range", snat.sourceRangeOrCidr(),
+									"-j", SNAT, "--to-source", toAddress);
+						}
+						else {
+							priv.run("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", toIface,
+									"-s", snat.sourceRangeOrCidr(),
+									"-j", SNAT, "--to-source", toAddress);
+						}
 					}
 					else if(n instanceof MASQUERADE masq) {
 						if(masq.in().isEmpty()) {
@@ -209,24 +225,15 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 	@Override
 	public NATMode[] getNat(String ifaceName, String range) throws IOException {
 		
-//		var addr = vpnAdapter.address();
-//		var ifaceName = addr.nativeName();
-		
-//		var nativeIface = addr.getByName(ifaceName);
-//		var firstAddr = nativeIface.getInterfaceAddresses().iterator().next();
-//		var ip = IpUtil.parse(firstAddr.getAddress().toString() + "/" + firstAddr.getNetworkPrefixLength());
-//		var rng = ip.asRange();
-//		var cidr = rng.toStringInCidrNotation();
-//		String cidr ="";
 		
 		NATMode.MASQUERADE masq = null;
 		NATMode.SNAT snat = null;
 		
-		for (var l : context.commands().privileged().output("iptables", "-t", "nat", "-L", "POSTROUTING", "-v")) {
+		for (var l : context.commands().privileged().output("iptables", "-t", "nat", "-L", "POSTROUTING", "-v", "-n")) {
 			var els = l.trim().split("\\s+");
 			if(els.length > 6 && els[2].equals(MASQUERADE) && els[6].equals(ifaceName)) {
 				var in = els[5];
-				if(masq == null || in.equals("any")) {
+				if(masq == null || in.equals("0.0.0.0/0")) {
 					masq = new NATMode.MASQUERADE();
 					masq.addIn(NetworkInterface.getByName(in));
 				}
@@ -234,11 +241,26 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 					masq = masq.addIn(NetworkInterface.getByName(in));
 				}
 			}
-			else if(els.length > 7 && ( els[7].equals("anywhere") || els[7].equals(range) ) && els[2].equals(SNAT)) {
+			else if(els.length > 13 && els[12].equals(range) && els[2].equals(SNAT)) {
 				try {
-					var to = els[9].substring(3);
-					if(snat == null) {
-						snat = new NATMode.SNAT(range, getInterfaceForAddress(to));
+					if(els[13].startsWith("to:")) {
+						var to = els[13].substring(3);
+						if(snat == null) {
+							snat = new NATMode.SNAT(range, getInterfaceForAddress(to));
+						}
+					}
+				}
+				catch(Exception e) {
+					LOG.warn("Failed to interface address for SNAT match.", e);
+				}
+			}
+			else if(els.length > 9 && els[7].equals(range)  && els[2].equals(SNAT)) {
+				try {
+					if(els[9].startsWith("to:")) {
+						var to = els[9].substring(3);
+						if(snat == null) {
+							snat = new NATMode.SNAT(range, getInterfaceForAddress(to));
+						}
 					}
 				}
 				catch(Exception e) {
