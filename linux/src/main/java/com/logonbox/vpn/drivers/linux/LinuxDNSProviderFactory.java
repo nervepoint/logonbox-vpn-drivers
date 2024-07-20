@@ -21,7 +21,7 @@ public class LinuxDNSProviderFactory implements DNSProvider.Factory {
     @Override
     public <P extends DNSProvider> Class<P>[] available() {
     	if(OS.isLinux()) {
-    		return new Class[] { ResolvConfDNSProvider.class, NetworkManagerDNSProvider.class, SystemDDNSProvider.class, RawDNSProvider.class };
+    		return new Class[] { OpenresolvDNSProvider.class, ResolvConfDNSProvider.class, NetworkManagerDNSProvider.class, SystemDDNSProvider.class, RawDNSProvider.class };
     	}
     	else {
     		return new Class[0];
