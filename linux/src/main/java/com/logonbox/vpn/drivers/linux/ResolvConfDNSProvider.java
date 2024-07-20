@@ -25,7 +25,7 @@ public class ResolvConfDNSProvider implements DNSProvider {
 
     @Override
     public List<DNSEntry> entries() throws IOException {
-        var dir = LinuxDNSProviderFactory.runPath().resolve("resolvconf").resolve("interfaces");
+        var dir = interfacesPath();
         if(Files.exists(dir)) {
             var l = new ArrayList<DNSEntry>();
             try(var str = Files.newDirectoryStream(dir)) {
@@ -69,6 +69,9 @@ public class ResolvConfDNSProvider implements DNSProvider {
         this.platform = platform;
     }
 
+	protected Path interfacesPath() {
+		return LinuxDNSProviderFactory.runPath().resolve("resolvconf").resolve("interface");
+	}
 
     private String resolvconfIfacePrefix() {
         var f = new File("/etc/resolvconf/interface-order");

@@ -33,7 +33,10 @@ public class LinuxDNSProviderFactory implements DNSProvider.Factory {
         if (clazz.isPresent()) {
             /* Don't use reflection her for native images' sake */
             var clazzVal = clazz.get();
-            if (clazzVal.equals(ResolvConfDNSProvider.class)) {
+            if (clazzVal.equals(OpenresolvDNSProvider.class)) {
+                return new OpenresolvDNSProvider();
+            }
+            else if (clazzVal.equals(ResolvConfDNSProvider.class)) {
                 return new ResolvConfDNSProvider();
             } else if (clazzVal.equals(NetworkManagerDNSProvider.class)) {
                 return new NetworkManagerDNSProvider();
@@ -56,7 +59,7 @@ public class LinuxDNSProviderFactory implements DNSProvider.Factory {
             	try {
 	        		for (var l : context.commands().privileged().output("resolvconf", "--version")) {
 	        			if(l.startsWith("openresolv")) {
-	                        return ResolvConfDNSProvider.class;
+	                        return OpenresolvDNSProvider.class;
 	        			}
 	        		}
             	}
