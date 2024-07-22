@@ -149,15 +149,24 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 			for(var i : is) {
 				if(i instanceof SNAT snat) {
 					if(snat.sourceRangeOrCidr().contains("-")) {
-						priv.run("iptables", "-t", "nat", "-D", "POSTROUTING", "-o", snat.to().getName(),
-								"-m", "iprange",
-								"--src-range", snat.sourceRangeOrCidr(),
-								"-j", SNAT, "--to-source", snat.toAddress(ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class));
+						for(var to : snat.to()) {
+							var snataddr = NATMode.SNAT.toAddress(to, ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class);
+							LOG.info("Removing SNAT rules for {} to {} on {}", snat.sourceRangeOrCidr(), to.getName(), snataddr);
+							priv.run("iptables", "-t", "nat", "-D", "POSTROUTING", "-o", to.getName(),
+									"-m", "iprange",
+									"--src-range", snat.sourceRangeOrCidr(),
+									"-j", SNAT, "--to-source", snataddr);
+						}
+						
 					}
 					else {
-						priv.run("iptables", "-t", "nat", "-D", "POSTROUTING", "-o", snat.to().getName(),
-								"-s", snat.sourceRangeOrCidr(),
-								"-j", SNAT, "--to-source", snat.toAddress(ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class));
+						for(var to : snat.to()) {
+							var snataddr = NATMode.SNAT.toAddress(to, ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class);
+							LOG.info("Removing SNAT rules for {} to {} on {}", snat.sourceRangeOrCidr(), to.getName(), snataddr);
+							priv.run("iptables", "-t", "nat", "-D", "POSTROUTING", "-o", to.getName(),
+									"-s", snat.sourceRangeOrCidr(),
+									"-j", SNAT, "--to-source", snataddr);
+						}
 					}
 				}
 				else if(i instanceof MASQUERADE masq) {
@@ -179,19 +188,28 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 			else {
 				for(var n : nat) {
 					if(n instanceof SNAT snat) {
-						var toAddress = snat.toAddress(ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class);
-						var toIface = snat.to().getName();
-						LOG.info("Turning on SNAT for {} to {} @ {}", snat.sourceRangeOrCidr(), toAddress, toIface);
 						if(snat.sourceRangeOrCidr().contains("-")) {
-							priv.run("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", toIface,
-									"-m", "iprange",
-									"--src-range", snat.sourceRangeOrCidr(),
-									"-j", SNAT, "--to-source", toAddress);
+							for(var to : snat.to()) {
+								var snataddr = NATMode.SNAT.toAddress(to, ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class);
+
+								LOG.info("Adding SNAT rules for {} to {} on {}", snat.sourceRangeOrCidr(), to.getName(), snataddr);
+								
+								priv.run("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", to.getName(),
+										"-m", "iprange",
+										"--src-range", snat.sourceRangeOrCidr(),
+										"-j", SNAT, "--to-source", snataddr);
+							}
 						}
 						else {
-							priv.run("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", toIface,
-									"-s", snat.sourceRangeOrCidr(),
-									"-j", SNAT, "--to-source", toAddress);
+							for(var to : snat.to()) {
+								var snataddr = NATMode.SNAT.toAddress(to, ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class);
+
+								LOG.info("Adding SNAT rules for {} to {} on {}", snat.sourceRangeOrCidr(), to.getName(), snataddr);
+								
+								priv.run("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", to.getName(),
+										"-s", snat.sourceRangeOrCidr(),
+										"-j", SNAT, "--to-source", snataddr);
+							}
 						}
 					}
 					else if(n instanceof MASQUERADE masq) {
@@ -246,8 +264,9 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 					if(els[13].startsWith("to:")) {
 						var to = els[13].substring(3);
 						if(snat == null) {
-							snat = new NATMode.SNAT(range, getInterfaceForAddress(to));
+							snat = new NATMode.SNAT(range);
 						}
+						snat.addTo(getInterfaceForAddress(to));
 					}
 				}
 				catch(Exception e) {
@@ -259,8 +278,9 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 					if(els[9].startsWith("to:")) {
 						var to = els[9].substring(3);
 						if(snat == null) {
-							snat = new NATMode.SNAT(range, getInterfaceForAddress(to));
+							snat = new NATMode.SNAT(range);
 						}
+						snat.addTo(getInterfaceForAddress(to));
 					}
 				}
 				catch(Exception e) {

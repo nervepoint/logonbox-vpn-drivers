@@ -2,6 +2,7 @@ package com.logonbox.vpn.drivers.lib;
 
 import java.net.InetAddress;
 import java.net.NetworkInterface;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -9,18 +10,28 @@ public class NATMode {
 
 	public final static class SNAT extends NATMode {
 		private final String sourceRangeOrCidr;
-		private final NetworkInterface to;
+		private final Set<NetworkInterface> to;
 
-		public SNAT(String sourceRangeOrCidr, NetworkInterface to) {
+		public SNAT(String sourceRangeOrCidr) {
+			this(sourceRangeOrCidr, Collections.emptySet());
+		}
+		
+		public SNAT(String sourceRangeOrCidr, Set<NetworkInterface> to) {
 			this.sourceRangeOrCidr = sourceRangeOrCidr;
 			this.to = to;
+		}
+		
+		public SNAT addTo(NetworkInterface to) {
+			var l = new LinkedHashSet<>(this.to);
+			l.add(to);
+			return new SNAT(sourceRangeOrCidr, l);
 		}
 
 		public String sourceRangeOrCidr() {
 			return sourceRangeOrCidr;
 		}
 
-		public NetworkInterface to() {
+		public Set<NetworkInterface> to() {
 			return to;
 		}
 
@@ -60,7 +71,7 @@ public class NATMode {
 			return "SNAT [sourceRangeOrCidr=" + sourceRangeOrCidr + ", to=" + to + "]";
 		}
 
-		public String toAddress(Class<? extends InetAddress> clazz) {
+		public static String toAddress(NetworkInterface to, Class<? extends InetAddress> clazz) {
 			for(var en = to.getInetAddresses(); en.hasMoreElements(); ) {
 				var a = en.nextElement();
 				if(a.getClass().equals(clazz)) {
