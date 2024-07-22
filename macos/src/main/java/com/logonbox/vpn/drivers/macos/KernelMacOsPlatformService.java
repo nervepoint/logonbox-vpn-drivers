@@ -23,6 +23,7 @@ package com.logonbox.vpn.drivers.macos;
 import java.io.IOException;
 import java.net.NetworkInterface;
 import java.util.List;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,16 +44,8 @@ public class KernelMacOsPlatformService extends AbstractUnixDesktopPlatformServi
 	}
 
 	@Override
-	protected String getDefaultGateway() throws IOException {
-		for(String line : context().commands().privileged().output("route", "-n", "get", "default")) {
-			line = line.trim();
-			if(line.startsWith("gateway:")) {
-				String[] args = line.split(":");
-				if(args.length > 1)
-					return args[1].trim();
-			}
-		}
-		throw new IOException("Could not get default gateway.");
+	public Optional<Gateway> defaultGateway()  {
+		return UserspaceMacOsPlatformService.getDefaultGateway(context());
 	}
 
 	@Override

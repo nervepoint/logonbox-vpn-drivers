@@ -44,7 +44,7 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
 	private final String interfacePrefix;
 
     protected SystemContext context;
-	private Optional<VpnPeer> defaultGateway = Optional.empty();
+	private Optional<VpnPeer> defaultGatewayPeer = Optional.empty();
 	
 	protected AbstractPlatformService(String interfacePrefix, SystemContext context) {
 		this.interfacePrefix = interfacePrefix;
@@ -139,23 +139,31 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
     }
 	
 	@Override
-    public Optional<VpnPeer> defaultGateway() {
-        return defaultGateway;
+    public final Optional<VpnPeer> defaultGatewayPeer() {
+        return defaultGatewayPeer;
     }
 	
     @Override
-    public final void defaultGateway(VpnPeer peer) throws IOException {
-        resetDefaulGateway();
-        defaultGateway = Optional.of(peer);
-        onSetDefaultGateway(peer);
+    public final void defaultGatewayPeer(VpnPeer peer) throws IOException {
+    	var gw = defaultGateway().orElseThrow(() -> new IllegalStateException("No default gateway interface is currently set, so cannot set {0} to be it's new address."));
+        resetDefaultGatewayPeer();
+        defaultGatewayPeer = Optional.of(peer);
+        var peerAddr = peer.endpointAddress().orElseThrow(() -> new IllegalArgumentException("Peer has no address."));
+		onSetDefaultGateway(new Gateway(gw.nativeIface(), peerAddr));
     }
     
     @Override
-    public final void resetDefaulGateway() throws IOException {
-        if(defaultGateway.isPresent())  {
-            var gw =defaultGateway.get();
-            defaultGateway = Optional.empty();
-            onResetDefaultGateway(gw); 
+    public final void resetDefaultGatewayPeer() throws IOException {
+        if(defaultGatewayPeer.isPresent())  {
+            var gwOr = defaultGateway();
+            var addr = defaultGatewayPeer.get().endpointAddress().orElseThrow(() -> new IllegalArgumentException("Peer has no address."));
+            defaultGatewayPeer = Optional.empty();
+            if(gwOr.isPresent()) {
+            	var gw = gwOr.get();
+            	if(gw.address().equals(addr)) {
+            		onResetDefaultGateway(gw);
+            	}
+            } 
         };
     }
 
@@ -207,9 +215,17 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
         
     }
 
-    protected abstract void onResetDefaultGateway(VpnPeer session) throws IOException;
+    @Override
+	public final void defaultGateway(Optional<Gateway> addr) {
+    	if(addr.isEmpty()) {
+    		defaultGateway().ifPresent(this::onResetDefaultGateway);
+    		addr.ifPresent(this::onSetDefaultGateway);
+    	}
+	}
 
-    protected abstract void onSetDefaultGateway(VpnPeer connection) throws IOException;
+	protected abstract void onResetDefaultGateway(Gateway gateway);
+
+    protected abstract void onSetDefaultGateway(Gateway gateway);
 
 	protected VpnAdapter configureExistingSession(I ip) {
 		return new VpnAdapter(this, Optional.of(ip));

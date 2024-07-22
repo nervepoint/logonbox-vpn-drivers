@@ -77,19 +77,23 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
 	}
 
 	@Override
-	protected void onSetDefaultGateway(VpnPeer peer) throws IOException {
-		var gw = getDefaultGateway();
-		var addr = peer.endpointAddress().orElseThrow(() -> new IllegalArgumentException("Peer has no address."));
-		LOG.info("Routing traffic all through peer {}", addr);
-		context.commands().privileged().logged().run("route", "add", addr, "gw", gw);
+	protected void onSetDefaultGateway(Gateway gateway) {
+		LOG.info("Routing traffic all through {} on {}", gateway.address(), gateway.nativeIface());
+		try {
+			context.commands().privileged().logged().run("ip", "route", "add", "default", "via", gateway.address(), "dev", gateway.nativeIface());
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
 	}
 
 	@Override
-	protected void onResetDefaultGateway(VpnPeer peer) throws IOException {
-		var gw = getDefaultGateway();
-		var addr = peer.endpointAddress().orElseThrow(() -> new IllegalArgumentException("Peer has no address."));
-		LOG.info("Removing routing of all traffic  through peer {}", addr);
-		context.commands().privileged().logged().run("route", "del", addr, "gw", gw);
+	protected void onResetDefaultGateway(Gateway gateway) {
+		LOG.info("Stopping routing traffic all through {} on {}", gateway.address(), gateway.nativeIface());
+		try {
+			context.commands().privileged().logged().run("ip", "route", "del", "default", "via", gateway.address(), "dev", gateway.nativeIface());
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
 	}
 
 	@Override

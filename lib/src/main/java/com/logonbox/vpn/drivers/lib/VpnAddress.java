@@ -20,15 +20,22 @@
  */
 package com.logonbox.vpn.drivers.lib;
 
-import com.sshtools.liftlib.OS;
-
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.util.Enumeration;
+import java.util.Optional;
+
+import com.sshtools.liftlib.OS;
 
 public interface VpnAddress {
 
 	boolean isUp();
+	
+	boolean isDefaultGateway();
+	
+	void setDefaultGateway(String address);
 
 	/**
 	 * Entirely disconnect and delete the interface.
@@ -39,7 +46,30 @@ public interface VpnAddress {
 
 	String getMac();
 	
-	default NetworkInterface getByName(String name) throws IOException {
+	default boolean isLoopback() {
+		return networkInterface().map(nif -> { 
+			try {
+				if(nif.isLoopback())
+					return true;
+				
+				var loopback = true;
+				for (var addr : nif.getInterfaceAddresses()) {
+					var ipAddr = addr.getAddress();
+					if (!ipAddr.isAnyLocalAddress() && !ipAddr.isLinkLocalAddress()
+							&& !ipAddr.isLoopbackAddress()) {
+						loopback = false;
+					}
+				}
+				
+				return loopback;
+				
+			} catch (SocketException e) {
+				return false;
+			} 
+		}).orElse(false);
+	}
+	
+	default Optional<NetworkInterface> networkInterface() {
 		/* NOTE: This is pretty much useless  to lookup the network by the 
 		 * name we know it as on Windows, as for some bizarre reason,
 		 * net8 for example (as would show ip "ipconfig /all") comes back 
@@ -48,12 +78,17 @@ public interface VpnAddress {
 		if(OS.isWindows())
 			throw new UnsupportedOperationException("Do not use this on Windows.");
 		
-		for(Enumeration<NetworkInterface> nifEnum = NetworkInterface.getNetworkInterfaces(); nifEnum.hasMoreElements(); ) {
-			NetworkInterface nif = nifEnum.nextElement();
-			if(nif.getName().equals(name))
-				return nif;
+		try {
+			for(Enumeration<NetworkInterface> nifEnum = NetworkInterface.getNetworkInterfaces(); nifEnum.hasMoreElements(); ) {
+				NetworkInterface nif = nifEnum.nextElement();
+				if(nif.getName().equals(nativeName()))
+					return Optional.of(nif);
+			}
+			return Optional.empty();
 		}
-		return null;
+		catch(IOException ioe) {
+			throw new UncheckedIOException(ioe);
+		}
 	}
 
 	int getMtu();

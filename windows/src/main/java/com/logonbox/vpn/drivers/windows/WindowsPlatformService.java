@@ -254,41 +254,60 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 	}
 
 	@Override
-	protected void onSetDefaultGateway(VpnPeer peer) throws IOException {
-		var gw = getDefaultGateway();
-		var addr = peer.endpointAddress().orElseThrow(() -> new IllegalArgumentException("Peer has no address."));
-		LOG.info("Routing traffic all through peer {}", addr);
-		context().commands().privileged().logged().run("route", "add", addr, gw);
+	protected void onSetDefaultGateway(Gateway gateway) {
+		LOG.info("Routing traffic all through {} on {}", gateway.address(), gateway.nativeIface());
+		try {
+			context().commands().privileged().logged().run("route", "add", gateway.address(), gateway.nativeIface());
+		}
+		catch(IOException ioe) {
+			throw new UncheckedIOException(ioe);
+		}
 	}
 
 	@Override
-	protected void onResetDefaultGateway(VpnPeer peer) throws IOException {
-		var gw = getDefaultGateway();
-		var addr = peer.endpointAddress().orElseThrow(() -> new IllegalArgumentException("Peer has no address."));
-		LOG.info("Removing routing of all traffic  through peer {}", addr);
-		context().commands().privileged().logged().run("route", "delete", addr, gw);
+	protected void onResetDefaultGateway(Gateway gateway) {
+		LOG.info("Stopping routing traffic all through {} on {}", gateway.address(), gateway.nativeIface());
+		try {
+			context().commands().privileged().logged().run("route", "delete", gateway.address(), gateway.nativeIface());
+		}
+		catch(IOException ioe) {
+			throw new UncheckedIOException(ioe);
+		}
 	}
 
 	@Override
-	protected String getDefaultGateway() throws IOException {
-		String gw = null;
-		for (var line : context().commands().privileged().output("ipconfig")) {
-			if (gw == null) {
-				line = line.trim();
-				if (line.startsWith("Default Gateway ")) {
-					int idx = line.indexOf(":");
-					if (idx != -1) {
-						line = line.substring(idx + 1).trim();
-						if (!line.equals("0.0.0.0"))
-							gw = line;
+	public Optional<Gateway> defaultGateway() {
+		Gateway gw = null;
+		try {
+			String netname = null;
+			var ips = ips(false);
+			for (var line : context().commands().privileged().output("ipconfig")) {
+				if (gw == null) {
+					if(line.startsWith(" ")) {
+						netname = line.trim();
+						netname = netname.substring(netname.length() - 1);
+					}
+					line = line.trim();
+					if (line.startsWith("Default Gateway ")) {
+						int idx = line.indexOf(":");
+						if (idx != -1) {
+							var addr = line.substring(idx + 1).trim();
+							if (!addr.equals("0.0.0.0") && netname != null) {
+								var fnetname = netname;
+								var iface = ips.stream().filter(ip -> ip.displayName().equals(fnetname)).findFirst();
+								if(iface.isPresent()) {
+									gw = new Gateway(iface.get().nativeName(), addr);
+								}
+							}
+						}
 					}
 				}
 			}
+			return Optional.ofNullable(gw);
 		}
-		if (gw == null)
-			throw new IOException("Could not get default gateway.");
-		else
-			return gw;
+		catch(IOException ioe) {
+			throw new UncheckedIOException(ioe);
+		}
 	}
 
 	@Override

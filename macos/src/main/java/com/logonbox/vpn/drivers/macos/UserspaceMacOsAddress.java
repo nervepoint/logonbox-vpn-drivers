@@ -22,8 +22,10 @@ package com.logonbox.vpn.drivers.macos;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -117,21 +119,21 @@ public class UserspaceMacOsAddress extends AbstractUnixAddress<UserspaceMacOsPla
 	@Override
 	public String displayName() {
 		try {
-			NetworkInterface iface = getByName(nativeName());
-			return iface == null ? "Unknown" : iface.getDisplayName();
-		} catch (IOException ioe) {
+			return networkInterface().map(NetworkInterface::getDisplayName).orElse("Unknown");
+		} catch (UncheckedIOException ioe) {
 			return "Unknown";
 		}
 	}
 
 	@Override
 	public String getMac() {
-		try {
-			NetworkInterface iface = getByName(nativeName());
-			return iface == null ? null : IpUtil.toIEEE802(iface.getHardwareAddress());
-		} catch (IOException ioe) {
-			return null;
-		}
+        return networkInterface().map(nif -> {
+			try {
+				return IpUtil.toIEEE802(nif.getHardwareAddress());
+			} catch (SocketException e) {
+				return null;
+			}
+		}).orElse(null);
 	}
 
 	public boolean hasAddress(String address) {

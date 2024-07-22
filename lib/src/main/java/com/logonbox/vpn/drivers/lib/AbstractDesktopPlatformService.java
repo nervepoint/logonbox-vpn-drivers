@@ -210,36 +210,43 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
         if(dnsProvider == null) {
         	var dnsOr = context.configuration().dnsIntegrationMethod();
         	var allSrvs = ServiceLoader.load(DNSProvider.Factory.class, getClass().getClassLoader());
+        	var preferredFailed = false;
         	
-			for(var provFactory : allSrvs.stream().collect(Collectors.toList())) {
-				var provs = provFactory.get().available();
-        		for(var prov : provs) {
-        			try {
-						if(dnsOr.isEmpty() || prov.getName().equals(dnsOr.get())) {
-	        				dnsProvider = Optional.of(provFactory.get().create(Optional.of(prov), context));
-	                        dnsProvider.get().init(this);
-	                        return dnsProvider;
-	        			}
-        			}
-        			catch(UnsupportedOperationException uoe) {
-        				// 
-        			}
-        		}
+        	if(dnsOr.isPresent()) {
+        		var dns = dnsOr.get();
+        		for(var provFactory : allSrvs.stream().collect(Collectors.toList())) {
+    				var provs = provFactory.get().available();
+            		for(var provClazz : provs) {
+            			try {
+    						if(preferredFailed || provClazz.getName().equals(dns)) {							
+    	        				var provInstance = provFactory.get().create(Optional.of(provClazz), context);
+    	        				dnsProvider = Optional.of(provInstance);
+    	                        dnsProvider.get().init(this);
+    	                        return dnsProvider;
+    						}
+            			}
+            			catch(UnsupportedOperationException uoe) {
+            				break;
+            			}
+            		}
+            	}	
+        		throw new IllegalStateException("Request " + dns + ", but it was not available.");
         	}
+			
             
 			
+			/* Fallback to the first that works */
 			for(var provFactory : allSrvs.stream().collect(Collectors.toList())) {
-				var provs = provFactory.get().available();
-        		for(var prov : provs) {
-        			try {
-        				dnsProvider = Optional.of(provFactory.get().create(Optional.of(prov), context));
-                        dnsProvider.get().init(this);
-                        return dnsProvider;
-        			}
-        			catch(UnsupportedOperationException uoe) {
-        				// 
-        			}
-        		}
+				if(provFactory.get().available().length > 0) {
+	    			try {
+	    				dnsProvider = Optional.of(provFactory.get().create(Optional.empty(), context));
+	                    dnsProvider.get().init(this);
+	                    return dnsProvider;
+	    			}
+	    			catch(UnsupportedOperationException uoe) {
+	    				// 
+	    			}
+				}
         	}
 			
 			dnsProvider = Optional.empty();
@@ -289,10 +296,14 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 			throw new IOException("Failed to start.", e);
 		}
     
-        var gw = defaultGateway();
+        var gw = defaultGatewayPeer();
         if(gw.isPresent() && config.peers().contains(gw.get())) {
 			try {
-				onSetDefaultGateway(gw.get());
+				var addr = gw.get().endpointAddress().orElseThrow(() -> new IllegalStateException("No endpoint for peer."));
+				var iface = defaultGateway().
+						map(Gateway::nativeIface).
+						orElseThrow(() -> new IllegalStateException("No current default gateway."));
+				onSetDefaultGateway(new Gateway(iface, addr));
 			}
 			catch(Exception e) { 
 				LOG.error("Failed to setup routing.", e);
@@ -312,9 +323,9 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 	protected final void onStop(VpnConfiguration configuration, VpnAdapter session) {
 		try {
 			try {
-				if(defaultGateway().isPresent() && configuration.peers().contains(defaultGateway().get())) {
+				if(defaultGatewayPeer().isPresent() && configuration.peers().contains(defaultGatewayPeer().get())) {
 					try {
-					    resetDefaulGateway();
+					    resetDefaultGatewayPeer();
 					}
 					catch(Exception e) { 
 						LOG.error("Failed to tear down routing.", e);
@@ -380,7 +391,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 
 	protected void dns(VpnConfiguration configuration, I ip) throws IOException {
 		if(configuration.dns().isEmpty()) {
-		    var gw = defaultGateway();
+		    var gw = defaultGatewayPeer();
 			if(gw.isPresent() && configuration.peers().contains(gw.get()))
 				LOG.warn("No DNS servers configured for this connection and all traffic is being routed through the VPN. DNS is unlikely to work.");
 			else  
@@ -394,8 +405,6 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 		    dnsOr.get().set(new DNSEntry.Builder().fromConfiguration(configuration).withInterface(ip.nativeName()).build());
 		
 	}
-
-	protected abstract String getDefaultGateway() throws IOException;
 
 	protected boolean isMatchesPrefix(NetworkInterface nif) {
 		return nif.getName().startsWith(getInterfacePrefix());
@@ -482,7 +491,7 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 	protected final VpnConfiguration transform(VpnConfiguration configuration) {
 		var transformBldr = new VpnConfiguration.Builder();
 		
-        var gw = defaultGateway();
+        var gw = defaultGatewayPeer();
         transformBldr.fromConfiguration(configuration);
         transformBldr.withPeers();
 		transformInterface(configuration, transformBldr);

@@ -316,19 +316,23 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
     }
 
     @Override
-    protected final String getDefaultGateway() throws IOException {
-        String gw = null;
-        for (String line : context().commands().privileged().output("ip", "route")) {
-            if (gw == null && line.startsWith("default via")) {
-                String[] args = line.split("\\s+");
-                if (args.length > 2)
-                    gw = args[2];
-            }
+    public final Optional<Gateway> defaultGateway() {
+        Gateway gw = null;
+        try {
+	        for (String line : context().commands().privileged().output("ip", "route")) {
+	            if (gw == null && line.startsWith("default via")) {
+	                String[] args = line.split("\\s+");
+	                if (args.length > 4) {
+	                    gw = new Gateway(args[4], args[2]);
+	                    break;
+	                }
+	            }
+	        }
+          return Optional.ofNullable(gw);
         }
-        if (gw == null)
-            throw new IOException("Could not get default gateway.");
-        else
-            return gw;
+        catch(IOException ioe) {
+        	throw new UncheckedIOException(ioe);
+        }
     }
 
     @Override

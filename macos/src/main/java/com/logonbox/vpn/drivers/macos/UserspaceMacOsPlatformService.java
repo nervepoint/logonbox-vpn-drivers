@@ -21,13 +21,16 @@
 package com.logonbox.vpn.drivers.macos;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.text.MessageFormat;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,18 +75,35 @@ public class UserspaceMacOsPlatformService extends AbstractUnixDesktopPlatformSe
 	}
 
 	@Override
-	protected String getDefaultGateway() throws IOException {
-		String gw = null;
-		for (var line : context().commands().output("route", "get", "default")) {
-			line = line.trim();
-			if (gw == null && line.startsWith("gateway:")) {
-				gw = InetAddress.getByName(line.substring(9)).getHostAddress();
+	public Optional<Gateway> defaultGateway() {
+		return getDefaultGateway(context);
+	}
+
+	static Optional<Gateway> getDefaultGateway(SystemContext context) {
+		String addr = null;
+		String iface = null;
+		try {
+			for (var line :context.commands().output("route", "get", "default")) {
+				line = line.trim();
+				if (line.startsWith("interface:")) {
+					iface = line.substring(11);
+				}
+				else if (line.startsWith("gateway:")) {
+					try {
+						addr = line.substring(9);
+						addr = InetAddress.getByName(addr).getHostAddress();
+					} catch (UnknownHostException e) {
+					}
+				}
 			}
+			if(addr == null || iface == null)
+				return Optional.empty();
+			else
+				return Optional.of(new Gateway(iface, addr));
 		}
-		if (gw == null)
-			throw new IOException("Could not get default gateway.");
-		else
-			return gw;
+		catch(IOException ioe) {
+			throw new UncheckedIOException(ioe);
+		}
 	}
 
 	@Override

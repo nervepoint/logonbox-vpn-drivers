@@ -20,6 +20,9 @@
  */
 package com.logonbox.vpn.drivers.lib;
 
+import java.util.Optional;
+
+import com.logonbox.vpn.drivers.lib.PlatformService.Gateway;
 import com.sshtools.liftlib.commands.SystemCommands;
 
 public abstract class AbstractVirtualInetAddress<P extends PlatformService<?>> implements VpnAddress {
@@ -41,6 +44,16 @@ public abstract class AbstractVirtualInetAddress<P extends PlatformService<?>> i
 		this.nativeName = nativeName;
 		this.platform = platform;
 	    commands = platform.context().commands();
+	}
+
+    @Override
+	public boolean isDefaultGateway() {
+    	return platform.defaultGateway().map(dg -> dg.nativeIface().equals(nativeName())).orElse(false);
+	}
+
+	@Override
+	public void setDefaultGateway(String address) {
+		platform.defaultGateway(Optional.of(new Gateway(nativeName(), address)));
 	}
 
 	@Override

@@ -30,6 +30,20 @@ import java.util.Optional;
 public interface PlatformService<ADDR extends VpnAddress> {
 	
 	/**
+	 * Represents a gateway address and the native interface name it can be found on 
+	 */
+	public record Gateway(
+		/**
+		 * The native interface name 
+		 */
+		String nativeIface, 
+		/**
+		 * The Ipv4 or Ipv6 address of the gateway 
+		 */
+		String address) {
+	}
+	
+	/**
 	 * Create a default instance.
 	 * 
 	 * @param loader class loader for service locating
@@ -145,8 +159,9 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	 * is not currently a peer on this VPN.
 	 * 
 	 * @return default gateway peer
+	 * @see #defaultGateway()
 	 */
-	Optional<VpnPeer> defaultGateway();
+	Optional<VpnPeer> defaultGatewayPeer();
 
 	/**
 	 * Set the peer to be used as the default gateway. This is a syterm wide
@@ -154,15 +169,16 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	 * 
 	 * @param peer peer to use as default gateway
 	 * @throws IOException on error
+	 * @see #defaultGateway()
 	 */
-	void defaultGateway(VpnPeer peer) throws IOException;
+	void defaultGatewayPeer(VpnPeer peer) throws IOException;
 
 	/**
 	 * Stop using any currently selected peer as the default gateway.
 	 * 
 	 * @throws IOException on error
 	 */
-	void resetDefaulGateway() throws IOException;
+	void resetDefaultGatewayPeer() throws IOException;
 
 	/**
 	 * Get an {@link VpnAddress} given its short name.
@@ -352,5 +368,20 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	 * @throws IOException on error
 	 */
 	NATMode[] getNat(String iface, String range) throws IOException;
+
+	/**
+	 * Get the actual default gateway interface if one is set and detectable.
+	 * 
+	 * @return gateway interface
+	 */
+	Optional<Gateway> defaultGateway();
+
+	/**
+	 * Set the actual default gateway. An empty interface will remove any current default
+	 * interface.
+	 * 
+	 * @return iface gateway interface
+	 */
+	void defaultGateway(Optional<Gateway> iface);
 
 }

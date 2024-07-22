@@ -20,16 +20,9 @@
  */
 package com.logonbox.vpn.drivers.linux;
 
-import com.logonbox.vpn.drivers.lib.AbstractUnixAddress;
-import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
-import com.logonbox.vpn.drivers.lib.util.IpUtil;
-import com.logonbox.vpn.drivers.lib.util.OsUtil;
-import com.logonbox.vpn.drivers.lib.util.Util;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
+import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,6 +32,15 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.regex.Pattern;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.logonbox.vpn.drivers.lib.AbstractUnixAddress;
+import com.logonbox.vpn.drivers.lib.NativeComponents.Tool;
+import com.logonbox.vpn.drivers.lib.util.IpUtil;
+import com.logonbox.vpn.drivers.lib.util.OsUtil;
+import com.logonbox.vpn.drivers.lib.util.Util;
 
 public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractLinuxPlatformService> {
 
@@ -72,7 +74,7 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
         addresses.add(address);
     }
 
-    @Override
+	@Override
     public void delete() throws IOException {
         try {
             if (haveSetFirewall()) {
@@ -113,12 +115,7 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
 
     @Override
     public String displayName() {
-        try {
-            var iface = getByName(nativeName());
-            return iface == null ? "Unknown" : iface.getDisplayName();
-        } catch (IOException ioe) {
-            return "Unknown";
-        }
+        return networkInterface().map(NetworkInterface::getDisplayName).orElse("Unknown");
     }
 
     @Override
@@ -137,12 +134,13 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
 
     @Override
     public String getMac() {
-        try {
-            var iface = getByName(nativeName());
-            return iface == null ? null : IpUtil.toIEEE802(iface.getHardwareAddress());
-        } catch (IOException ioe) {
-            return null;
-        }
+        return networkInterface().map(nif -> {
+			try {
+				return IpUtil.toIEEE802(nif.getHardwareAddress());
+			} catch (SocketException e) {
+				return null;
+			}
+		}).orElse(null);
     }
 
     public boolean hasAddress(String address) {
