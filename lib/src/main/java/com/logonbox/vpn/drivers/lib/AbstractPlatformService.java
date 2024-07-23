@@ -217,10 +217,8 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
 
     @Override
 	public final void defaultGateway(Optional<Gateway> addr) {
-    	if(addr.isEmpty()) {
-    		defaultGateway().ifPresent(this::onResetDefaultGateway);
-    		addr.ifPresent(this::onSetDefaultGateway);
-    	}
+		defaultGateway().ifPresent(this::onResetDefaultGateway);
+		addr.ifPresent(this::onSetDefaultGateway);
 	}
 
 	protected abstract void onResetDefaultGateway(Gateway gateway);
