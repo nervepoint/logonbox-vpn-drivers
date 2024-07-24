@@ -280,7 +280,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 						if(snat == null) {
 							snat = new NATMode.SNAT(range);
 						}
-						snat.addTo(getInterfaceForAddress(to));
+						snat = snat.addTo(getInterfaceForAddress(to));
 					}
 				}
 				catch(Exception e) {
