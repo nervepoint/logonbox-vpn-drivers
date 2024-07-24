@@ -104,6 +104,10 @@ public interface VpnConfiguration extends VpnAdapterConfiguration {
             return this;
         }
 
+		public Builder withoutMtu() {
+			return withMtu(Optional.empty());
+		}
+
         public Builder withPreUp(String... preUp) {
             return withPreUp(Arrays.asList(preUp));
         }

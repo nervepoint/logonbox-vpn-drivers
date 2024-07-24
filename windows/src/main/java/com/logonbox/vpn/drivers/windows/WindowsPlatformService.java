@@ -448,6 +448,8 @@ public class WindowsPlatformService extends AbstractDesktopPlatformService<Windo
 		if(dnsProvider.isEmpty() || dnsProvider.get() instanceof NullDNSProvider) {
 			writer.withDns(configuration.dns());
 		}
+		
+		writer.withoutMtu();
 	}
 
 	@Override

@@ -115,6 +115,7 @@ public abstract class AbstractUnixDesktopPlatformService<I extends VpnAddress>
         /* DNS, Addresses handled separately */
         writer.withAddresses();
         writer.withDns();
+        writer.withoutMtu();
     }
 
 	@Override
