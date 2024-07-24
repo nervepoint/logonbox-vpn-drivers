@@ -97,6 +97,9 @@ public class ResolvConfDNSProvider implements DNSProvider {
             String line;
             var bldr = new DNSEntry.Builder();
             var ifname = resolvConf.getFileName().toString();
+            if(ifname.endsWith(".inet")) {
+            	ifname = ifname.substring(0, ifname.length() - 4); 
+            }
             if(ifname.equals("systemd-resolved")) {
             	var sysd = new SystemDDNSProvider();
             	sysd.init(platform);
