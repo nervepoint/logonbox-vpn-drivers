@@ -334,6 +334,8 @@ public interface VpnAdapterConfiguration extends Serializable {
     	return new INIWriter.Builder().
                 withEmptyValues(false).
                 withCommentCharacter('#').
+                withValueSeparatorWhitespace(false).
+                withIndent(0).
                 withStringQuoteMode(StringQuoteMode.NEVER).
                 withMultiValueMode(MultiValueMode.SEPARATED).build();
     }
