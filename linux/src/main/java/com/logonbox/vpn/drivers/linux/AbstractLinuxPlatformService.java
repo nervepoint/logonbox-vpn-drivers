@@ -244,21 +244,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 				}
 				masq.addOut(NetworkInterface.getByName(out));
 			}
-			else if(els.length > 13 && els[12].equals(range) && els[2].equals(SNAT)) {
-				try {
-					if(els[13].startsWith("to:")) {
-						var to = els[13].substring(3);
-						if(snat == null) {
-							snat = new NATMode.SNAT(range);
-						}
-						snat.addTo(getInterfaceForAddress(to));
-					}
-				}
-				catch(Exception e) {
-					LOG.warn("Failed to interface address for SNAT match.", e);
-				}
-			}
-			else if(els.length > 9 && els[7].equals(range)  && els[2].equals(SNAT)) {
+			else if(els.length > 8 && els[5].equals(ifaceName)  && els[2].equals(SNAT)) {
 				try {
 					if(els[9].startsWith("to:")) {
 						var to = els[9].substring(3);
