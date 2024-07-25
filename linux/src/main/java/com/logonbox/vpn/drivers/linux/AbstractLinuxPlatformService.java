@@ -63,6 +63,7 @@ import uk.co.bithatch.nativeimage.annotations.Serialization;
 public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPlatformService<AbstractLinuxAddress> {
 
     private static final String POSTROUTING_VPN = "POSTROUTING_VPN";
+    private static final String POSTROUTING = "POSTROUTING";
 	private static final String SNAT = "SNAT";
 	private static final String MASQUERADE = "MASQUERADE";
 
@@ -166,8 +167,6 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 					
 				}
 				else if(i instanceof MASQUERADE masq) {
-					/* Hack used to get an input POSTROUTING rule for MASQ - 
-					  https://superuser.com/questions/1706874/iptables-selective-masquerade */
 					if(masq.out().isEmpty())
 						priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN, "-i", iface, "-j", MASQUERADE, "-o", context.getBestLocalNic().getName());
 					else {
@@ -178,7 +177,13 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 				}
 				else
 					throw new UnsupportedOperationException(i.getClass().getName());
+				
 			}
+
+			try {
+				priv.run("iptables", "-t", "nat", "-D", POSTROUTING, "-o", iface, "-j", POSTROUTING_VPN);
+			}
+			catch(Exception e) {}
 			
 			if(nat.length == 0) {
 				LOG.info("Reverting to full routed mode.");
@@ -214,6 +219,11 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 					else
 						throw new UnsupportedOperationException(n.getClass().getName());
 				}
+				
+				try {
+					priv.run("iptables", "-t", "nat", "-A", POSTROUTING, "-o", iface, "-j", POSTROUTING_VPN);
+				}
+				catch(Exception e) {}
 			}
 		}
 	}
