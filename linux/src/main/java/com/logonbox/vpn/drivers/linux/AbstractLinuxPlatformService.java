@@ -62,7 +62,8 @@ import uk.co.bithatch.nativeimage.annotations.Serialization;
 
 public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPlatformService<AbstractLinuxAddress> {
 
-    private static final String SNAT = "SNAT";
+    private static final String POSTROUTING_VPN = "POSTROUTING_VPN";
+	private static final String SNAT = "SNAT";
 	private static final String MASQUERADE = "MASQUERADE";
 
 	enum IpAddressState {
@@ -140,6 +141,11 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 
 	@Override
 	public void setNat(String iface, String range, NATMode... nat) throws IOException {
+		
+		/* "Hack" used to get an input POSTROUTING rule for MASQ - 
+		  https://superuser.com/questions/1706874/iptables-selective-masquerade.
+		  Note, kernels prior to 5.5.x don't. But all our VMs have this.   */
+		
 		var is = getNat(iface, range);
 		var ipRange = IpUtil.rangeFrom(range);
 		if(!Arrays.equals(is, nat)) {
@@ -148,33 +154,25 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 			var priv = context.commands().privileged();
 			for(var i : is) {
 				if(i instanceof SNAT snat) {
-					if(snat.sourceRangeOrCidr().contains("-")) {
-						for(var to : snat.to()) {
-							var snataddr = NATMode.SNAT.toAddress(to, ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class);
-							LOG.info("Removing SNAT rules for {} to {} on {}", snat.sourceRangeOrCidr(), to.getName(), snataddr);
-							priv.run("iptables", "-t", "nat", "-D", "POSTROUTING", "-o", to.getName(),
-									"-m", "iprange",
-									"--src-range", snat.sourceRangeOrCidr(),
-									"-j", SNAT, "--to-source", snataddr);
-						}
-						
+					
+					for(var to : snat.to()) {
+						var snataddr = NATMode.SNAT.toAddress(to, ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class);
+						LOG.info("Removing SNAT rules for {} to {} on {}", snat.sourceRangeOrCidr(), to.getName(), snataddr);
+						priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN,  
+								"-i", iface,
+								"-o", to.getName(),
+								"-j", SNAT, "--to-source", snataddr);
 					}
-					else {
-						for(var to : snat.to()) {
-							var snataddr = NATMode.SNAT.toAddress(to, ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class);
-							LOG.info("Removing SNAT rules for {} to {} on {}", snat.sourceRangeOrCidr(), to.getName(), snataddr);
-							priv.run("iptables", "-t", "nat", "-D", "POSTROUTING", "-o", to.getName(),
-									"-s", snat.sourceRangeOrCidr(),
-									"-j", SNAT, "--to-source", snataddr);
-						}
-					}
+					
 				}
 				else if(i instanceof MASQUERADE masq) {
+					/* Hack used to get an input POSTROUTING rule for MASQ - 
+					  https://superuser.com/questions/1706874/iptables-selective-masquerade */
 					if(masq.in().isEmpty())
-						priv.run("iptables", "-t", "nat", "-D", "POSTROUTING", "-j", MASQUERADE, "-o", context.getBestLocalNic().getName());
+						priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN, "-i", iface, "-j", MASQUERADE, "-o", context.getBestLocalNic().getName());
 					else {
 						for(var in : masq.in()) {
-							priv.run("iptables", "-t", "nat", "-D", "POSTROUTING", "-j", MASQUERADE, "-o", in.getName());
+							priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN, "-i", iface, "-j", MASQUERADE, "-o", in.getName());
 						}
 					}
 				}
@@ -188,38 +186,28 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 			else {
 				for(var n : nat) {
 					if(n instanceof SNAT snat) {
-						if(snat.sourceRangeOrCidr().contains("-")) {
-							for(var to : snat.to()) {
-								var snataddr = NATMode.SNAT.toAddress(to, ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class);
+						
+						for(var to : snat.to()) {
+							var snataddr = NATMode.SNAT.toAddress(to, ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class);
 
-								LOG.info("Adding SNAT rules for {} to {} on {}", snat.sourceRangeOrCidr(), to.getName(), snataddr);
-								
-								priv.run("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", to.getName(),
-										"-m", "iprange",
-										"--src-range", snat.sourceRangeOrCidr(),
-										"-j", SNAT, "--to-source", snataddr);
-							}
+							LOG.info("Adding SNAT rules for {} to {} on {}", snat.sourceRangeOrCidr(), to.getName(), snataddr);
+							
+							priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN,
+									"-i", iface, 
+									"-o", to.getName(),
+									"-j", SNAT, 
+									"--to-source", snataddr);
 						}
-						else {
-							for(var to : snat.to()) {
-								var snataddr = NATMode.SNAT.toAddress(to, ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class);
-
-								LOG.info("Adding SNAT rules for {} to {} on {}", snat.sourceRangeOrCidr(), to.getName(), snataddr);
-								
-								priv.run("iptables", "-t", "nat", "-A", "POSTROUTING", "-o", to.getName(),
-										"-s", snat.sourceRangeOrCidr(),
-										"-j", SNAT, "--to-source", snataddr);
-							}
-						}
+						
 					}
 					else if(n instanceof MASQUERADE masq) {
 						if(masq.in().isEmpty()) {
 							LOG.info("Turning on MASQUERADE for {}", context.getBestLocalNic().getName());
-							priv.run("iptables", "-t", "nat", "-A", "POSTROUTING", "-j", MASQUERADE, "-o", context.getBestLocalNic().getName());
+							priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN, "-j", MASQUERADE, "-i", iface, "-o", context.getBestLocalNic().getName());
 						}
 						else {
 							for(var in : masq.in()) {
-								priv.run("iptables", "-t", "nat", "-A", "POSTROUTING", "-j", MASQUERADE, "-o", in.getName());
+								priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN, "-i", iface, "-j", MASQUERADE, "-o", in.getName());
 							}
 						}
 					}
@@ -247,16 +235,16 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 		NATMode.MASQUERADE masq = null;
 		NATMode.SNAT snat = null;
 		
-		for (var l : context.commands().privileged().output("iptables", "-t", "nat", "-L", "POSTROUTING", "-v", "-n")) {
+		for (var l : context.commands().privileged().output("iptables", "-t", "nat", "-L", POSTROUTING_VPN, "-v", "-n")) {
 			var els = l.trim().split("\\s+");
-			if(els.length > 6 && els[2].equals(MASQUERADE) && els[6].equals(ifaceName)) {
-				var in = els[5];
-				if(masq == null || in.equals("0.0.0.0/0")) {
+			if(els.length > 6 && els[2].equals(MASQUERADE) && els[5].equals(ifaceName)) {
+				var out = els[6];
+				if(masq == null || out.equals("0.0.0.0/0")) {
 					masq = new NATMode.MASQUERADE();
-					masq.addIn(NetworkInterface.getByName(in));
+					masq.addIn(NetworkInterface.getByName(out));
 				}
 				else if(masq != null) {
-					masq = masq.addIn(NetworkInterface.getByName(in));
+					masq = masq.addIn(NetworkInterface.getByName(out));
 				}
 			}
 			else if(els.length > 13 && els[12].equals(range) && els[2].equals(SNAT)) {
@@ -355,6 +343,18 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 
     @Override
     protected final void onStart(StartRequest startRequest, VpnAdapter session) throws IOException {
+
+    	LOG.info("Creating new table for VPN NAT rules");
+    	try {
+    		context.commands().privileged().run("iptables", "-t", "nat", "-N", POSTROUTING_VPN);
+    	}
+    	catch(Exception e) {
+    		if(LOG.isDebugEnabled())
+        		LOG.info("Didn't create create new {} table for VPN NAT rules, probably already exists.", POSTROUTING_VPN, e);
+    		else
+    			LOG.info("Didn't create create new {} table for VPN NAT rules, probably already exists. {}", POSTROUTING_VPN, e.getMessage());
+    	}
+		
 		var configuration  = startRequest.configuration();
 		var peer = startRequest.peer();
         var ip = findAddress(startRequest);
