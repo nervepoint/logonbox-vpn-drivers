@@ -86,21 +86,21 @@ public class NATMode {
 	public final static class MASQUERADE extends NATMode {
 		private Set<NetworkInterface> in;
 
-		public MASQUERADE(NetworkInterface... in) {
-			this(Set.of(in));
+		public MASQUERADE(NetworkInterface... out) {
+			this(Set.of(out));
 		}
 
-		public MASQUERADE(Set<NetworkInterface> in) {
-			this.in = in;
+		public MASQUERADE(Set<NetworkInterface> out) {
+			this.in = out;
 		}
 
-		public Set<NetworkInterface> in() {
+		public Set<NetworkInterface> out() {
 			return in;
 		}
 
-		public MASQUERADE addIn(NetworkInterface in) {
+		public MASQUERADE addOut(NetworkInterface out) {
 			var s = new LinkedHashSet<NetworkInterface>(this.in);
-			s.add(in);
+			s.add(out);
 			return new MASQUERADE(s);
 		}
 

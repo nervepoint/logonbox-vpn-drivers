@@ -168,10 +168,10 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 				else if(i instanceof MASQUERADE masq) {
 					/* Hack used to get an input POSTROUTING rule for MASQ - 
 					  https://superuser.com/questions/1706874/iptables-selective-masquerade */
-					if(masq.in().isEmpty())
+					if(masq.out().isEmpty())
 						priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN, "-i", iface, "-j", MASQUERADE, "-o", context.getBestLocalNic().getName());
 					else {
-						for(var in : masq.in()) {
+						for(var in : masq.out()) {
 							priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN, "-i", iface, "-j", MASQUERADE, "-o", in.getName());
 						}
 					}
@@ -201,12 +201,12 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 						
 					}
 					else if(n instanceof MASQUERADE masq) {
-						if(masq.in().isEmpty()) {
+						if(masq.out().isEmpty()) {
 							LOG.info("Turning on MASQUERADE for {}", context.getBestLocalNic().getName());
 							priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN, "-j", MASQUERADE, "-i", iface, "-o", context.getBestLocalNic().getName());
 						}
 						else {
-							for(var in : masq.in()) {
+							for(var in : masq.out()) {
 								priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN, "-i", iface, "-j", MASQUERADE, "-o", in.getName());
 							}
 						}
@@ -239,13 +239,10 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 			var els = l.trim().split("\\s+");
 			if(els.length > 6 && els[2].equals(MASQUERADE) && els[5].equals(ifaceName)) {
 				var out = els[6];
-				if(masq == null || out.equals("0.0.0.0/0")) {
+				if(masq == null) {
 					masq = new NATMode.MASQUERADE();
-					masq.addIn(NetworkInterface.getByName(out));
 				}
-				else if(masq != null) {
-					masq = masq.addIn(NetworkInterface.getByName(out));
-				}
+				masq.addOut(NetworkInterface.getByName(out));
 			}
 			else if(els.length > 13 && els[12].equals(range) && els[2].equals(SNAT)) {
 				try {
