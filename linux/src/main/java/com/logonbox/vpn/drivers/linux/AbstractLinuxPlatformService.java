@@ -37,6 +37,7 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -153,77 +154,96 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 
 			LOG.info("Removing existing NAT/SNAT rules for {}", iface);
 			var priv = context.commands().privileged();
-			for(var i : is) {
-				if(i instanceof SNAT snat) {
-					
-					for(var to : snat.to()) {
-						var snataddr = NATMode.SNAT.toAddress(to, ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class);
-						LOG.info("Removing SNAT rules for {} to {} on {}", snat.sourceRangeOrCidr(), to.getName(), snataddr);
-						priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN,  
-								"-i", iface,
-								"-o", to.getName(),
-								"-j", SNAT, "--to-source", snataddr);
-					}
-					
-				}
-				else if(i instanceof MASQUERADE masq) {
-					if(masq.out().isEmpty())
-						priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN, "-i", iface, "-j", MASQUERADE, "-o", context.getBestLocalNic().getName());
-					else {
-						for(var in : masq.out()) {
-							priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN, "-i", iface, "-j", MASQUERADE, "-o", in.getName());
-						}
-					}
-				}
-				else
-					throw new UnsupportedOperationException(i.getClass().getName());
-				
-			}
-
 			try {
-				priv.run("iptables", "-t", "nat", "-D", POSTROUTING, "-o", iface, "-j", POSTROUTING_VPN);
-			}
-			catch(Exception e) {}
-			
-			if(nat.length == 0) {
-				LOG.info("Reverting to full routed mode.");
-			}
-			else {
-				for(var n : nat) {
-					if(n instanceof SNAT snat) {
+				for(var i : is) {
+					if(i instanceof SNAT snat) {
 						
 						for(var to : snat.to()) {
 							var snataddr = NATMode.SNAT.toAddress(to, ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class);
-
-							LOG.info("Adding SNAT rules for {} to {} on {}", snat.sourceRangeOrCidr(), to.getName(), snataddr);
-							
-							priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN,
-									"-i", iface, 
+							LOG.info("Removing SNAT rules for {} to {} on {}", snat.sourceRangeOrCidr(), to.getName(), snataddr);
+							priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN,  
+									"-i", iface,
 									"-o", to.getName(),
-									"-j", SNAT, 
-									"--to-source", snataddr);
+									"-j", SNAT, "--to-source", snataddr);
 						}
 						
 					}
-					else if(n instanceof MASQUERADE masq) {
-						if(masq.out().isEmpty()) {
-							LOG.info("Turning on MASQUERADE for {}", context.getBestLocalNic().getName());
-							priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN, "-j", MASQUERADE, "-i", iface, "-o", context.getBestLocalNic().getName());
-						}
+					else if(i instanceof MASQUERADE masq) {
+						if(masq.out().isEmpty())
+							priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN, "-i", iface, "-j", MASQUERADE, "-o", context.getBestLocalNic().getName());
 						else {
 							for(var in : masq.out()) {
-								priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN, "-i", iface, "-j", MASQUERADE, "-o", in.getName());
+								priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN, "-i", iface, "-j", MASQUERADE, "-o", in.getName());
 							}
 						}
 					}
 					else
-						throw new UnsupportedOperationException(n.getClass().getName());
+						throw new UnsupportedOperationException(i.getClass().getName());
+					
 				}
 				
-				try {
-					priv.run("iptables", "-t", "nat", "-A", POSTROUTING, "-o", iface, "-j", POSTROUTING_VPN);
+				if(nat.length == 0) {
+					LOG.info("Reverting to full routed mode.");
 				}
-				catch(Exception e) {}
+				else {
+					for(var n : nat) {
+						if(n instanceof SNAT snat) {
+							
+							for(var to : snat.to()) {
+								var snataddr = NATMode.SNAT.toAddress(to, ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class);
+	
+								LOG.info("Adding SNAT rules for {} to {} on {}", snat.sourceRangeOrCidr(), to.getName(), snataddr);
+								
+								priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN,
+										"-i", iface, 
+										"-o", to.getName(),
+										"-j", SNAT, 
+										"--to-source", snataddr);
+							}
+							
+						}
+						else if(n instanceof MASQUERADE masq) {
+							if(masq.out().isEmpty()) {
+								LOG.info("Turning on MASQUERADE for {}", context.getBestLocalNic().getName());
+								priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN, "-j", MASQUERADE, "-i", iface, "-o", context.getBestLocalNic().getName());
+							}
+							else {
+								for(var in : masq.out()) {
+									priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN, "-i", iface, "-j", MASQUERADE, "-o", in.getName());
+								}
+							}
+						}
+						else
+							throw new UnsupportedOperationException(n.getClass().getName());
+					}
+				}
+			}
+			finally {
+				var needEths = new LinkedHashSet<String>();
+				for (var l : priv.output("iptables", "-t", "nat", "-L", POSTROUTING_VPN, "-v", "-n").stream().skip(2).toList()) {
+					var els = l.trim().split("\\s+");
+					needEths.add(els[6]);
+				}
+
+				var haveEths = new LinkedHashSet<String>();
+				for (var l : priv.output("iptables", "-t", "nat", "-L", POSTROUTING, "-v", "-n").stream().skip(2).toList()) {
+					var els = l.trim().split("\\s+");
+					haveEths.add(els[6]);
+				}
+				
+				var toAdd = new LinkedHashSet<>(needEths);
+				toAdd.removeAll(haveEths);
+				for(var add : toAdd) {
+					LOG.info("Adding POSTROUTING -> POSTROUTING_VPN for {}", add);
+					priv.run("iptables", "-t", "nat", "-A", POSTROUTING, "-o", add, "-j", POSTROUTING_VPN);
+				}
+				
+				var toRemove = new LinkedHashSet<>(haveEths);
+				toRemove.removeAll(needEths);
+				for(var remove : toRemove) {
+					LOG.info("Removing POSTROUTING -> POSTROUTING_VPN for {}", remove);
+					priv.run("iptables", "-t", "nat", "-D", POSTROUTING, "-o", remove, "-j", POSTROUTING_VPN);
+				}
 			}
 		}
 	}
