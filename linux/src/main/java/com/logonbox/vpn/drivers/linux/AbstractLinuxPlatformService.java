@@ -151,14 +151,14 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 		 * Note, kernels prior to 5.5.x don't. But all our VMs have this.
 		 */
 		
-		var is = getNat(iface).orElse(null);
-		if(!Objects.equals(is, nat.orElse(null))) {
+		var is = getNat(iface);
+		if(!Objects.equals(is.orElse(null), nat.orElse(null))) {
 
-			LOG.info("Removing existing NAT/SNAT rules for {}", iface);
+			LOG.info("Removing existing MASQUERADE/SNAT rules for {}", iface);
 			var priv = context.commands().privileged();
 			try {
-				if(nat.isPresent()) {
-					var i = nat.get();
+				if(is.isPresent()) {
+					var i = is.get();
 					if(i instanceof SNAT snat) {
 						
 						for(var to : snat.to()) {
