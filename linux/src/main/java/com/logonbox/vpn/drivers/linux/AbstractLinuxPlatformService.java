@@ -255,7 +255,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 					haveSpecialTable = true;
 					break;
 				}
-				for (@SuppressWarnings("unused") var l : priv.output("iptables", "-t", "nat", "-L", POSTROUTING, "-v", "-n").stream().skip(2).toList()) {
+				for (@SuppressWarnings("unused") var l : priv.output("iptables", "-t", "nat", "-L", POSTROUTING_VPN, "-v", "-n").stream().skip(2).toList()) {
 					needSpecialTable = true;
 					break;
 				}
