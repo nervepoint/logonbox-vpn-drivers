@@ -1,10 +1,11 @@
 package com.logonbox.vpn.drivers.lib;
 
-import java.net.InetAddress;
+import java.net.Inet4Address;
 import java.net.NetworkInterface;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 public class NATMode {
@@ -60,19 +61,13 @@ public class NATMode {
 			return "SNAT [to=" + to + "]";
 		}
 
-		public static Collection<String> toAddresses(NetworkInterface to) {
-			return to.getInterfaceAddresses().stream().map(ni -> ni.getAddress().getHostAddress()).toList();
+		public static Collection<String> toIpv4Addresses(NetworkInterface to) {
+			List<String> ipv4addrs = to.getInterfaceAddresses().stream().filter(a -> a.getAddress() instanceof Inet4Address).map(ni -> ni.getAddress().getHostAddress()).toList();
+			if(ipv4addrs.isEmpty())
+				throw new IllegalStateException("NAT is currently on supported for IPv4 networks.");
+			return ipv4addrs;
 		}
 
-		public static String toAddress(NetworkInterface to, Class<? extends InetAddress> clazz) {
-			for(var en = to.getInetAddresses(); en.hasMoreElements(); ) {
-				var a = en.nextElement();
-				if(a.getClass().equals(clazz)) {
-					return a.getHostAddress();
-				}
-			}
-			throw new IllegalArgumentException("Address is not " + clazz.getName());
-		}
 	}
 
 	public final static class MASQUERADE extends NATMode {

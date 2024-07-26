@@ -149,6 +149,8 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 		 * https://superuser.com/questions/1706874/iptables-selective-masquerade.
 		 * 
 		 * Note, kernels prior to 5.5.x don't. But all our VMs have this.
+		 * 
+		 * TODO this is all IPv4 only anyway!
 		 */
 		
 		var is = getNat(iface);
@@ -162,7 +164,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 					if(i instanceof SNAT snat) {
 						
 						for(var to : snat.to()) {
-							for(var addr : NATMode.SNAT.toAddresses(to)) {
+							for(var addr : NATMode.SNAT.toIpv4Addresses(to)) {
 								LOG.info("Removing SNAT rules for {} to {} using {}", iface, to.getName(), addr);
 								priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN,  
 										"-o", iface,
@@ -172,7 +174,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 						}
 
 						var to = context.getBestLocalNic();
-						for(var addr : NATMode.SNAT.toAddresses(to)) {
+						for(var addr : NATMode.SNAT.toIpv4Addresses(to)) {
 							LOG.info("Removing SNAT rules for {} to {} using {}", iface, to.getName(), addr);
 							priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN,  
 									"-i", iface,
@@ -208,7 +210,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 					if(n instanceof SNAT snat) {
 						
 						for(var to : snat.to()) {
-							for(var addr : NATMode.SNAT.toAddresses(to)) {
+							for(var addr : NATMode.SNAT.toIpv4Addresses(to)) {
 								LOG.info("Adding SNAT rules for {} to {} using {}", iface, to.getName(), addr);
 								priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN,  
 										"-o", iface,
@@ -218,7 +220,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 						}
 
 						var to = context.getBestLocalNic();
-						for(var addr : NATMode.SNAT.toAddresses(to)) {
+						for(var addr : NATMode.SNAT.toIpv4Addresses(to)) {
 							LOG.info("Adding SNAT rules for {} to {} using {}", iface, to.getName(), addr);
 							priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN,  
 									"-i", iface,
