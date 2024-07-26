@@ -2,6 +2,7 @@ package com.logonbox.vpn.drivers.lib;
 
 import java.net.InetAddress;
 import java.net.NetworkInterface;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -9,26 +10,20 @@ import java.util.Set;
 public class NATMode {
 
 	public final static class SNAT extends NATMode {
-		private final String sourceRangeOrCidr;
 		private final Set<NetworkInterface> to;
 
-		public SNAT(String sourceRangeOrCidr) {
-			this(sourceRangeOrCidr, Collections.emptySet());
+		public SNAT() {
+			this(Collections.emptySet());
 		}
 		
-		public SNAT(String sourceRangeOrCidr, Set<NetworkInterface> to) {
-			this.sourceRangeOrCidr = sourceRangeOrCidr;
+		public SNAT(Set<NetworkInterface> to) {
 			this.to = to;
 		}
 		
 		public SNAT addTo(NetworkInterface to) {
 			var l = new LinkedHashSet<>(this.to);
 			l.add(to);
-			return new SNAT(sourceRangeOrCidr, l);
-		}
-
-		public String sourceRangeOrCidr() {
-			return sourceRangeOrCidr;
+			return new SNAT(l);
 		}
 
 		public Set<NetworkInterface> to() {
@@ -39,7 +34,6 @@ public class NATMode {
 		public int hashCode() {
 			final int prime = 31;
 			int result = 1;
-			result = prime * result + ((sourceRangeOrCidr == null) ? 0 : sourceRangeOrCidr.hashCode());
 			result = prime * result + ((to == null) ? 0 : to.hashCode());
 			return result;
 		}
@@ -53,11 +47,6 @@ public class NATMode {
 			if (getClass() != obj.getClass())
 				return false;
 			SNAT other = (SNAT) obj;
-			if (sourceRangeOrCidr == null) {
-				if (other.sourceRangeOrCidr != null)
-					return false;
-			} else if (!sourceRangeOrCidr.equals(other.sourceRangeOrCidr))
-				return false;
 			if (to == null) {
 				if (other.to != null)
 					return false;
@@ -68,7 +57,11 @@ public class NATMode {
 
 		@Override
 		public String toString() {
-			return "SNAT [sourceRangeOrCidr=" + sourceRangeOrCidr + ", to=" + to + "]";
+			return "SNAT [to=" + to + "]";
+		}
+
+		public static Collection<String> toAddresses(NetworkInterface to) {
+			return to.getInterfaceAddresses().stream().map(ni -> ni.getAddress().getHostAddress()).toList();
 		}
 
 		public static String toAddress(NetworkInterface to, Class<? extends InetAddress> clazz) {
@@ -80,7 +73,6 @@ public class NATMode {
 			}
 			throw new IllegalArgumentException("Address is not " + clazz.getName());
 		}
-
 	}
 
 	public final static class MASQUERADE extends NATMode {

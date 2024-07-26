@@ -27,25 +27,23 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.io.UncheckedIOException;
 import java.io.Writer;
-import java.net.Inet4Address;
-import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.github.jgonian.ipmath.Ipv4Range;
 import com.logonbox.vpn.drivers.lib.AbstractUnixDesktopPlatformService;
 import com.logonbox.vpn.drivers.lib.NATMode;
 import com.logonbox.vpn.drivers.lib.NATMode.MASQUERADE;
@@ -55,7 +53,6 @@ import com.logonbox.vpn.drivers.lib.StartRequest;
 import com.logonbox.vpn.drivers.lib.SystemContext;
 import com.logonbox.vpn.drivers.lib.VpnAdapter;
 import com.logonbox.vpn.drivers.lib.VpnConfiguration;
-import com.logonbox.vpn.drivers.lib.util.IpUtil;
 import com.logonbox.vpn.drivers.lib.util.OsUtil;
 import com.sshtools.liftlib.ElevatedClosure;
 
@@ -142,107 +139,133 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
     }
 
 	@Override
-	public void setNat(String iface, String range, NATMode... nat) throws IOException {
+	public void setNat(String iface, Optional<NATMode> nat) throws IOException {
 		
-		/* "Hack" used to get an input POSTROUTING rule for MASQ - 
-		  https://superuser.com/questions/1706874/iptables-selective-masquerade.
-		  Note, kernels prior to 5.5.x don't. But all our VMs have this.   */
+		/*
+		 * A little more complicated that ideal algorithm used to set input interface
+		 * POSTROUTING rules for MASQ -
+		 * 
+		 * Some ideas from here,
+		 * https://superuser.com/questions/1706874/iptables-selective-masquerade.
+		 * 
+		 * Note, kernels prior to 5.5.x don't. But all our VMs have this.
+		 */
 		
-		var is = getNat(iface, range);
-		var ipRange = IpUtil.rangeFrom(range);
-		if(!Arrays.equals(is, nat)) {
+		var is = getNat(iface).orElse(null);
+		if(!Objects.equals(is, nat.orElse(null))) {
 
 			LOG.info("Removing existing NAT/SNAT rules for {}", iface);
 			var priv = context.commands().privileged();
 			try {
-				for(var i : is) {
+				if(nat.isPresent()) {
+					var i = nat.get();
 					if(i instanceof SNAT snat) {
 						
 						for(var to : snat.to()) {
-							var snataddr = NATMode.SNAT.toAddress(to, ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class);
-							LOG.info("Removing SNAT rules for {} to {} on {}", snat.sourceRangeOrCidr(), to.getName(), snataddr);
+							for(var addr : NATMode.SNAT.toAddresses(to)) {
+								LOG.info("Removing SNAT rules for {} to {} using {}", iface, to.getName(), addr);
+								priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN,  
+										"-o", iface,
+										"-i", to.getName(),
+										"-j", SNAT, "--to-source", addr);
+							}
+						}
+
+						var to = context.getBestLocalNic();
+						for(var addr : NATMode.SNAT.toAddresses(to)) {
+							LOG.info("Removing SNAT rules for {} to {} using {}", iface, to.getName(), addr);
 							priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN,  
 									"-i", iface,
-									"-o", to.getName(),
-									"-j", SNAT, "--to-source", snataddr);
+									"-j", SNAT, "--to-source", addr);
 						}
 						
 					}
 					else if(i instanceof MASQUERADE masq) {
-						if(masq.out().isEmpty())
-							priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN, "-i", iface, "-j", MASQUERADE, "-o", context.getBestLocalNic().getName());
+						if(masq.out().isEmpty()) {
+							var to = context.getBestLocalNic();
+							LOG.info("Removing MASQ rules for {} to {}", iface, to.getName());
+							priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN, "-i", to.getName(), "-j", MASQUERADE, "-o", iface);
+							priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN, "-i", iface, "-j", MASQUERADE);
+						}
 						else {
 							for(var in : masq.out()) {
-								priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN, "-i", iface, "-j", MASQUERADE, "-o", in.getName());
+								LOG.info("Removing MASQ rules for {} to {}", in.getName(), iface);
+								priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN, "-i", in.getName(), "-j", MASQUERADE, "-o", iface);
 							}
+							LOG.info("Removing MASQ rules for {}", iface);
+							priv.run("iptables", "-t", "nat", "-D", POSTROUTING_VPN, "-i", iface, "-j", MASQUERADE, "*");
 						}
 					}
 					else
 						throw new UnsupportedOperationException(i.getClass().getName());
-					
 				}
 				
-				if(nat.length == 0) {
+				if(nat.isEmpty()) {
 					LOG.info("Reverting to full routed mode.");
 				}
 				else {
-					for(var n : nat) {
-						if(n instanceof SNAT snat) {
-							
-							for(var to : snat.to()) {
-								var snataddr = NATMode.SNAT.toAddress(to, ipRange instanceof Ipv4Range ? Inet4Address.class : Inet6Address.class);
-	
-								LOG.info("Adding SNAT rules for {} to {} on {}", snat.sourceRangeOrCidr(), to.getName(), snataddr);
-								
-								priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN,
-										"-i", iface, 
-										"-o", to.getName(),
-										"-j", SNAT, 
-										"--to-source", snataddr);
-							}
-							
-						}
-						else if(n instanceof MASQUERADE masq) {
-							if(masq.out().isEmpty()) {
-								LOG.info("Turning on MASQUERADE for {}", context.getBestLocalNic().getName());
-								priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN, "-j", MASQUERADE, "-i", iface, "-o", context.getBestLocalNic().getName());
-							}
-							else {
-								for(var in : masq.out()) {
-									priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN, "-i", iface, "-j", MASQUERADE, "-o", in.getName());
-								}
+					var n = nat.get();
+					if(n instanceof SNAT snat) {
+						
+						for(var to : snat.to()) {
+							for(var addr : NATMode.SNAT.toAddresses(to)) {
+								LOG.info("Adding SNAT rules for {} to {} using {}", iface, to.getName(), addr);
+								priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN,  
+										"-o", iface,
+										"-i", to.getName(),
+										"-j", SNAT, "--to-source", addr);
 							}
 						}
-						else
-							throw new UnsupportedOperationException(n.getClass().getName());
+
+						var to = context.getBestLocalNic();
+						for(var addr : NATMode.SNAT.toAddresses(to)) {
+							LOG.info("Adding SNAT rules for {} to {} using {}", iface, to.getName(), addr);
+							priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN,  
+									"-i", iface,
+									"-j", SNAT, "--to-source", addr);
+						}
+						
 					}
+					else if(n instanceof MASQUERADE masq) {
+						if(masq.out().isEmpty()) {
+							var to = context.getBestLocalNic();
+							LOG.info("Adding MASQUERADE rules for {} to {}", iface, to.getName());
+							priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN, "-j", MASQUERADE, "-i", iface);
+							priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN, "-j", MASQUERADE, "-i", to.getName(), "-o", iface);
+						}
+						else {
+							for(var in : masq.out()) {
+								LOG.info("Adding MASQUERADE rules for {} to {}", in.getName(), iface);
+								priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN, "-i", in.getName(), "-j", MASQUERADE, "-o", iface);
+							}
+							LOG.info("Adding MASQUERADE rules for {}", iface);
+							priv.run("iptables", "-t", "nat", "-A", POSTROUTING_VPN, "-i", iface, "-j", MASQUERADE);
+						}
+					}
+					else
+						throw new UnsupportedOperationException(n.getClass().getName());
 				}
 			}
 			finally {
-				var needEths = new LinkedHashSet<String>();
-				for (var l : priv.output("iptables", "-t", "nat", "-L", POSTROUTING_VPN, "-v", "-n").stream().skip(2).toList()) {
-					var els = l.trim().split("\\s+");
-					needEths.add(els[6]);
+				var haveSpecialTable = false;
+				var needSpecialTable = false;
+				for (@SuppressWarnings("unused") var l : priv.output("iptables", "-t", "nat", "-L", POSTROUTING, "-v", "-n").stream().skip(2).toList()) {
+					haveSpecialTable = true;
+					break;
 				}
-
-				var haveEths = new LinkedHashSet<String>();
-				for (var l : priv.output("iptables", "-t", "nat", "-L", POSTROUTING, "-v", "-n").stream().skip(2).toList()) {
-					var els = l.trim().split("\\s+");
-					haveEths.add(els[6]);
+				for (@SuppressWarnings("unused") var l : priv.output("iptables", "-t", "nat", "-L", POSTROUTING, "-v", "-n").stream().skip(2).toList()) {
+					needSpecialTable = true;
+					break;
 				}
-				
-				var toAdd = new LinkedHashSet<>(needEths);
-				toAdd.removeAll(haveEths);
-				for(var add : toAdd) {
-					LOG.info("Adding POSTROUTING -> POSTROUTING_VPN for {}", add);
-					priv.run("iptables", "-t", "nat", "-A", POSTROUTING, "-o", add, "-j", POSTROUTING_VPN);
-				}
-				
-				var toRemove = new LinkedHashSet<>(haveEths);
-				toRemove.removeAll(needEths);
-				for(var remove : toRemove) {
-					LOG.info("Removing POSTROUTING -> POSTROUTING_VPN for {}", remove);
-					priv.run("iptables", "-t", "nat", "-D", POSTROUTING, "-o", remove, "-j", POSTROUTING_VPN);
+				if(haveSpecialTable != needSpecialTable) {
+					if(needSpecialTable) {
+						LOG.info("Adding POSTROUTING -> POSTROUTING_VPN rule");
+						priv.run("iptables", "-t", "nat", "-A", POSTROUTING,  "-j", POSTROUTING_VPN);
+					}
+					else {
+						LOG.info("Removing POSTROUTING -> POSTROUTING_VPN rule");
+						priv.run("iptables", "-t", "nat", "-D", POSTROUTING,  "-j", POSTROUTING_VPN);
+					}
 				}
 			}
 		}
@@ -259,46 +282,54 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 	}
 
 	@Override
-	public NATMode[] getNat(String ifaceName, String range) throws IOException {
+	public Optional<NATMode> getNat(String ifaceName) throws IOException {
 		
 		
-		NATMode.MASQUERADE masq = null;
-		NATMode.SNAT snat = null;
+		String foundMASQIface = null;
+		List<String> foundMASQOuts = new ArrayList<>();
+		String foundSNATIface = null;
+		List<String> foundSNATOuts = new ArrayList<>();
+		List<String> foundSNATTos = new ArrayList<>();
 		
 		for (var l : context.commands().privileged().output("iptables", "-t", "nat", "-L", POSTROUTING_VPN, "-v", "-n")) {
 			var els = l.trim().split("\\s+");
-			if(els.length > 6 && els[2].equals(MASQUERADE) && els[5].equals(ifaceName)) {
-				var out = els[6];
-				if(masq == null) {
-					masq = new NATMode.MASQUERADE();
-				}
-				masq.addOut(NetworkInterface.getByName(out));
+			if(els.length > 6 && els[2].equals(MASQUERADE) && els[5].equals(ifaceName) && els[6].equals("*")) {
+				foundMASQIface = els[5];
 			}
-			else if(els.length > 8 && els[5].equals(ifaceName)  && els[2].equals(SNAT)) {
+			else if(els.length > 6 && els[2].equals(MASQUERADE) && els[6].equals(ifaceName)) {
+				foundMASQOuts.add(els[5]);				
+			}
+			else if(els.length > 9 && els[2].equals(SNAT) && els[5].equals(ifaceName) && els[6].equals("*")) {
+				foundSNATIface = els[5];
+			}
+			else if(els.length > 9 && els[2].equals(SNAT) && els[6].equals(ifaceName)) {
+				foundSNATOuts.add(els[5]);
+				if(els[9].startsWith(els[9].substring(3))) {
+					foundSNATTos.add(els[5]);
+				}
+			}
+		}
+		
+		if(foundMASQIface != null) {
+			return Optional.of(new NATMode.MASQUERADE(foundMASQOuts.stream().map(out -> {
 				try {
-					if(els[9].startsWith("to:")) {
-						var to = els[9].substring(3);
-						if(snat == null) {
-							snat = new NATMode.SNAT(range);
-						}
-						snat = snat.addTo(getInterfaceForAddress(to));
-					}
+					return NetworkInterface.getByName(out);
+				} catch (SocketException e) {
+					throw new UncheckedIOException(e);
 				}
-				catch(Exception e) {
-					LOG.warn("Failed to interface address for SNAT match.", e);
-				}
-			}
+			}).collect(Collectors.toSet())));
 		}
 		
-		var a = new ArrayList<NATMode>();
-		if(masq != null) {
-			a.add(masq);
+		if(foundSNATIface != null) {
+			return Optional.of(new NATMode.SNAT(foundMASQOuts.stream().map(out -> {
+				try {
+					return NetworkInterface.getByName(out);
+				} catch (SocketException e) {
+					throw new UncheckedIOException(e);
+				}
+			}).collect(Collectors.toSet())));
 		}
-		if(snat != null) {
-			a.add(snat);
-		}
-		
-		return a.toArray(new NATMode[0]);
+		return Optional.empty();
 	}
 
 	@Override

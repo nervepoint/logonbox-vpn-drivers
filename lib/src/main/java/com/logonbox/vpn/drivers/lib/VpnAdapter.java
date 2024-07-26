@@ -103,12 +103,12 @@ public final class VpnAdapter implements Closeable {
 		service.sync(this, cfg);
 	}
 	
-	public NATMode[] nat(String range) throws IOException {
-		return service.getNat(this.address().nativeName(), range);
+	public Optional<NATMode> nat() throws IOException {
+		return service.getNat(this.address().nativeName());
 	}
 	
-	public void nat(String range, NATMode[] nat) throws IOException {
-		service.setNat(this.address().nativeName(), range, nat);
+	public void nat(Optional<NATMode> nat) throws IOException {
+		service.setNat(this.address().nativeName(), nat);
 	}
 
     public VpnInterfaceInformation information() {

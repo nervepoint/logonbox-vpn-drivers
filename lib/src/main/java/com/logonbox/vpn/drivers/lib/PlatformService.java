@@ -353,11 +353,10 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	 * Set whether the supplied interface should do NAT translation.
 	 * 
 	 * @param iface native interface name
-	 * @param range network range
 	 * @param nat 			do NAT translation
 	 * @throws IOException on error
 	 */
-	void setNat(String iface, String range, NATMode... nat) throws IOException; 
+	void setNat(String iface, Optional<NATMode> nat) throws IOException; 
 
 	/**
 	 * Get whether the supplied interface is doing NAT/SNAT translation.
@@ -367,7 +366,7 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	 * @return doing NAT translation
 	 * @throws IOException on error
 	 */
-	NATMode[] getNat(String iface, String range) throws IOException;
+	Optional<NATMode> getNat(String iface) throws IOException;
 
 	/**
 	 * Get the actual default gateway interface if one is set and detectable.

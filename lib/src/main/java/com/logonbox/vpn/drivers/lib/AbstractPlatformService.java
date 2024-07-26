@@ -60,14 +60,14 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
 	}
 
 	@Override
-	public void setNat(String iface, String range, NATMode... nat) throws IOException {
-		if(nat.length > 0)
+	public void setNat(String iface, Optional<NATMode> nat) throws IOException {
+		if(nat.isPresent())
 			throw new UnsupportedOperationException("Only routed supported on this platform.");
 	}
 
 	@Override
-	public NATMode[] getNat(String iface, String range) throws IOException {
-		return new NATMode[0];
+	public Optional<NATMode> getNat(String iface) throws IOException {
+		return Optional.empty();
 	}
 
 	@Override
