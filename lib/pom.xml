@@ -52,6 +52,18 @@
             <artifactId>jini-lib</artifactId>
             <version>0.3.2</version>
         </dependency>
+        <dependency>
+		    <groupId>com.wavesplatform</groupId>
+		    <artifactId>curve25519-java</artifactId>
+		    <version>0.6.6</version>
+		    <exclusions>
+		    	<exclusion>
+		    		<groupId>net.java.dev.jna</groupId>
+		    		<artifactId>jna</artifactId>
+		    	</exclusion>
+		    </exclusions>
+        </dependency>
+
     </dependencies>
    
     <repositories>

@@ -314,15 +314,16 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
     }
 
     private void addDefault(String route) throws IOException {
-        int table = getFWMark("table");
-        if (table == 0) {
+        var table = getFWMark("table");
+        var priv = commands.privileged();
+		if (table == 0) {
             table = 51820;
-            while (!commands.privileged().silentOutput("ip", "-4", "route", "show", "table", String.valueOf(table)).isEmpty()
-                    || !commands.privileged().silentOutput("ip", "-6", "route", "show", "table", String.valueOf(table))
+            while (!priv.silentOutput("ip", "-4", "route", "show", "table", String.valueOf(table)).isEmpty()
+                    || !priv.silentOutput("ip", "-6", "route", "show", "table", String.valueOf(table))
                             .isEmpty()) {
                 table++;
             }
-            commands.privileged().logged().result(platform.context().nativeComponents().tool(Tool.WG), "set", name(), "fwmark",
+            priv.logged().result(platform.context().nativeComponents().tool(Tool.WG), "set", name(), "fwmark",
                     String.valueOf(table));
         }
         var proto = "-4";
@@ -335,11 +336,11 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
             pf = "ip6";
         }
 
-        commands.privileged().logged().result("ip", proto, "route", "add", route, "dev", nativeName(), "table",
+        priv.logged().result("ip", proto, "route", "add", route, "dev", nativeName(), "table",
                 String.valueOf(table));
-        commands.privileged().logged().result("ip", proto, "rule", "add", "not", "fwmark", String.valueOf(table),
+        priv.logged().result("ip", proto, "rule", "add", "not", "fwmark", String.valueOf(table),
                 "table", String.valueOf(table));
-        commands.privileged().logged().result("ip", proto, "rule", "add", "table", "main", "suppress_prefixlength",
+        priv.logged().result("ip", proto, "rule", "add", "table", "main", "suppress_prefixlength",
                 "0");
 
         var marker = String.format("-m comment --comment \"LogonBoxVPN rule for %s\"", nativeName());
@@ -356,7 +357,7 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
                 nftable));
 
         var pattern = Pattern.compile(".*inet6?\\ ([0-9a-f:.]+)/[0-9]+.*");
-        for (var line : commands.privileged().output("ip", "-o", proto, "addr", "show", "dev", nativeName())) {
+        for (var line : priv.output("ip", "-o", proto, "addr", "show", "dev", nativeName())) {
             var m = pattern.matcher(line);
             if (!m.matches()) {
                 continue;
@@ -375,7 +376,7 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
         nftcmd.append(String.format("add rule %s %s premangle meta l4proto udp meta mark set ct mark \n", pf, nftable));
 
         if (proto.equals("-4")) {
-            commands.privileged().logged().result("sysctl", "-q", "net.ipv4.conf.all.src_valid_mark=1");
+            priv.logged().result("sysctl", "-q", "net.ipv4.conf.all.src_valid_mark=1");
         }
 
         if (OsUtil.doesCommandExist(NFT_COMMAND)) {
@@ -385,14 +386,14 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
                 try(var out = Files.newBufferedWriter(temp)) {
                     out.write(nftcmd.toString());
                 }
-                commands.privileged().logged().pipeTo(nftcmd.toString(), "nft", "-f", temp.toAbsolutePath().toString());
+                priv.logged().pipeTo(nftcmd.toString(), "nft", "-f", temp.toAbsolutePath().toString());
             }
             finally {
                 Files.delete(temp);
             }
         } else {
             LOG.info("Updating firewall (IpTables): {}", restore);
-            commands.privileged().logged().pipeTo(restore, iptables + "-restore", "-n");
+            priv.logged().pipeTo(restore, iptables + "-restore", "-n");
         }
     }
 

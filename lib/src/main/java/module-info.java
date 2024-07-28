@@ -20,6 +20,10 @@
  */
 import com.logonbox.vpn.drivers.lib.DNSProvider;
 import com.logonbox.vpn.drivers.lib.PlatformServiceFactory;
+import com.logonbox.vpn.drivers.lib.util.Keys;
+import com.logonbox.vpn.drivers.lib.util.impl.BasicKeys;
+import com.logonbox.vpn.drivers.lib.util.impl.JCEKeys;
+import com.logonbox.vpn.drivers.lib.util.impl.WhisperKeys;
 
 open module com.logonbox.vpn.drivers.lib {
     exports com.logonbox.vpn.drivers.lib;
@@ -30,7 +34,11 @@ open module com.logonbox.vpn.drivers.lib {
     requires transitive com.sshtools.jini;
     requires static uk.co.bithatch.nativeimage.annotations;
 	requires transitive java.prefs;
+	requires curve25519.java; // boo
     
     uses PlatformServiceFactory;
     uses DNSProvider.Factory;
+    
+    uses Keys.KeyPairProvider;
+    provides Keys.KeyPairProvider with WhisperKeys, BasicKeys, JCEKeys;
 }

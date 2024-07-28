@@ -20,14 +20,10 @@
  */
 package com.logonbox.vpn.drivers.linux;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.Serializable;
 import java.io.UncheckedIOException;
 import java.io.Writer;
-import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.nio.file.Files;
@@ -38,7 +34,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -150,7 +145,8 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 		 * 
 		 * Note, kernels prior to 5.5.x don't. But all our VMs have this.
 		 * 
-		 * TODO this is all IPv4 only anyway!
+		 * TODO this is all IPv4 only anyway! add IPv6 support
+		 * TODO maybe switch to nftables, or support both
 		 */
 		
 		var is = getNat(iface);
@@ -482,33 +478,6 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
     		throw new UncheckedIOException(ioe);
     	}
 	}
-
-	private NetworkInterface getInterfaceForAddress(String address) {
-		try {
-			return NetworkInterface.getByInetAddress(InetAddress.getByName(address));
-		} catch (IOException e) {
-			throw new UncheckedIOException(e);
-		}
-	}
-
-    String resolvconfIfacePrefix() {
-        var f = new File("/etc/resolvconf/interface-order");
-        if (f.exists()) {
-            try (var br = new BufferedReader(new FileReader(f))) {
-                String l;
-                var p = Pattern.compile("^([A-Za-z0-9-]+)\\*$");
-                while ((l = br.readLine()) != null) {
-                    var m = p.matcher(l);
-                    if (m.matches()) {
-                        return m.group(1);
-                    }
-                }
-            } catch (IOException ioe) {
-                throw new UncheckedIOException(ioe);
-            }
-        }
-        return "";
-    }
 
     @SuppressWarnings("serial")
 	@Serialization

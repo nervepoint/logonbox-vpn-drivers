@@ -20,59 +20,96 @@
  */
 package com.logonbox.vpn.drivers.lib.util;
 
-import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.ServiceLoader;
 
 public class Keys {
 
-	public static class KeyPair {
-		private byte[] publicKey;
-		private final byte[] privateKey;
+	public interface KeyPair {
 
-		private KeyPair(byte[] privateKey) {
-			this.privateKey = privateKey;
+		byte[] getPublicKey();
+
+		default String getBase64PublicKey() {
+			return Base64.getEncoder().encodeToString(getPublicKey());
 		}
 
-		private KeyPair() {
-			privateKey = new byte[32];
+		byte[] getPrivateKey();
+
+		default String getBase64PrivateKey() {
+			return Base64.getEncoder().encodeToString(getPrivateKey());
 		}
 
-		public byte[] getPublicKey() {
-			return publicKey;
-		}
-		
-		public String getBase64PublicKey() {
-			return Base64.getEncoder().encodeToString(publicKey);
+		byte[] agreement();
+
+		byte[] sign(byte[] data);
+
+	}
+
+	public interface KeyPairProvider {
+
+		default boolean verifyBase64(String publicKey, String data, String sig) {
+			var decoder = Base64.getDecoder();
+			return verify(decoder.decode(publicKey), decoder.decode(data), decoder.decode(sig));
 		}
 
-		public byte[] getPrivateKey() {
-			return privateKey;
+		boolean verify(byte[] publicKey, byte[] data, byte[] sig);
+
+		KeyPair genkey();
+
+		default KeyPair pubkey(String base64PrivateKey) {
+			return pubkey(Base64.getDecoder().decode(base64PrivateKey));
 		}
 
-		public String getBase64PrivateKey() {
-			return Base64.getEncoder().encodeToString(privateKey);
-		}
-
+		KeyPair pubkey(byte[] privateKey);
 	}
 
 	private Keys() {
 	}
 
-	public static KeyPair genkey() {
-		KeyPair kp = new KeyPair();
-		SecureRandom random = new SecureRandom();
-		random.nextBytes(kp.privateKey);
-		kp.publicKey = Curve25519.scalarBaseMult(kp.privateKey);
-		return kp;
+	public static boolean verify(byte[] publicKey, byte[] data, byte[] sig) {
+		for (var prov : ServiceLoader.load(KeyPairProvider.class, Keys.class.getClassLoader())) {
+			try {
+				return prov.verify(publicKey, data, sig);
+			} catch (UnsupportedOperationException uoe) {
+			}
+		}
+		throw new UnsupportedOperationException();
 	}
 
-	public static KeyPair pubkey(String base64PrivateKey) {
-		return pubkey(Base64.getDecoder().decode(base64PrivateKey));
+	public static boolean verifyBase64(String publicKey, String data, String sig) {
+		var decoder = Base64.getDecoder();
+		return verify(decoder.decode(publicKey), decoder.decode(data), decoder.decode(sig));
+	}
+
+	public static KeyPair genkey() {
+		for (var prov : ServiceLoader.load(KeyPairProvider.class, Keys.class.getClassLoader())) {
+			try {
+				return prov.genkey();
+			} catch (UnsupportedOperationException uoe) {
+			}
+		}
+		throw new UnsupportedOperationException();
+
+	}
+
+	public static KeyPair pubkeyBase64(String base64PrivateKey) {
+		for (var prov : ServiceLoader.load(KeyPairProvider.class, Keys.class.getClassLoader())) {
+			try {
+				return prov.pubkey(Base64.getDecoder().decode(base64PrivateKey));
+			} catch (UnsupportedOperationException uoe) {
+			}
+		}
+		throw new UnsupportedOperationException();
 	}
 
 	public static KeyPair pubkey(byte[] privateKey) {
-		KeyPair kp = new KeyPair(privateKey);
-		kp.publicKey = Curve25519.scalarBaseMult(kp.privateKey);
-		return kp;
+		for (var prov : ServiceLoader.load(KeyPairProvider.class, Keys.class.getClassLoader())) {
+			try {
+				return prov.pubkey(privateKey);
+			} catch (UnsupportedOperationException uoe) {
+			}
+		}
+		throw new UnsupportedOperationException();
 	}
+
 }

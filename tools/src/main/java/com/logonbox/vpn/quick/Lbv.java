@@ -645,7 +645,7 @@ public class Lbv extends AbstractCommand implements SystemContext {
         public Integer call() throws Exception {
             parent.initCommand();
             try (var in = new BufferedReader(new InputStreamReader(System.in))) {
-                out.println(Keys.pubkey(in.readLine().trim()).getBase64PublicKey());
+                out.println(Keys.pubkeyBase64(in.readLine().trim()).getBase64PublicKey());
             }
             return 0;
         }

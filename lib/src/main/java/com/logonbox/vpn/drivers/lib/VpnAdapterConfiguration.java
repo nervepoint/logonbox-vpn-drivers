@@ -228,7 +228,7 @@ public interface VpnAdapterConfiguration extends Serializable {
             publicKey = builder.publicKey.orElseGet(() -> {
             	if(privateKey == null)
             		throw new IllegalStateException("No public key, and no private key, so public key cannot be derived.");
-            	return Keys.pubkey(privateKey).getBase64PublicKey();
+            	return Keys.pubkeyBase64(privateKey).getBase64PublicKey();
             });
             peers = new ArrayList<>(builder.peers);
             fwMark = builder.fwMark.orElse(0);
@@ -268,7 +268,7 @@ public interface VpnAdapterConfiguration extends Serializable {
     String privateKey();
 
     default String publicKey() {
-        return Keys.pubkey(privateKey()).getBase64PublicKey();
+        return Keys.pubkeyBase64(privateKey()).getBase64PublicKey();
     }
     
     Optional<Integer> fwMark();
