@@ -23,7 +23,6 @@ package com.logonbox.vpn.drivers.lib.util.impl;
 
 import org.whispersystems.curve25519.Curve25519;
 import org.whispersystems.curve25519.Curve25519KeyPair;
-import org.whispersystems.curve25519.JavaCurve25519Provider;
 
 import com.logonbox.vpn.drivers.lib.util.Keys.KeyPair;
 import com.logonbox.vpn.drivers.lib.util.Keys.KeyPairProvider;
@@ -74,24 +73,31 @@ public class WhisperKeys implements KeyPairProvider {
 
 	@Override
 	public KeyPair pubkey(byte[] privateKey) {
-		/* TODO no API for this! horrible hack that always uses pure Java provider */
-		JavaCurve25519Provider jcp = new JavaCurve25519Provider() {
-			// No public constructor, but there is a protected one so we can do this
-		};
-        byte[] publicKey = jcp.generatePublicKey(privateKey);
-        return new KeyPairImpl(null, provider) {
-
+		/* TODO no API for this! horrible hack that always uses pure base provider */
+		var basic = new BasicKeys();
+		var pubkeyPair = basic.pubkey(privateKey);
+		return new KeyPair() {
+			
+			@Override
+			public byte[] sign(byte[] data) {
+				return provider.calculateSignature(getPrivateKey(), data);
+			}
+			
 			@Override
 			public byte[] getPublicKey() {
-				return publicKey;
+				return pubkeyPair.getPublicKey();
 			}
-
+			
 			@Override
 			public byte[] getPrivateKey() {
 				return privateKey;
 			}
-
-        };
+			
+			@Override
+			public byte[] agreement() {
+				return provider.calculateAgreement(getPublicKey(), getPublicKey());
+			}
+		};
 	}
 
 	@Override

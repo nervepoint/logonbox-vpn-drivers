@@ -23,6 +23,8 @@ package com.logonbox.vpn.drivers.lib.util;
 import java.util.Base64;
 import java.util.ServiceLoader;
 
+import com.logonbox.vpn.drivers.lib.util.impl.BasicKeys;
+
 public class Keys {
 
 	public interface KeyPair {
@@ -110,6 +112,18 @@ public class Keys {
 			}
 		}
 		throw new UnsupportedOperationException();
+	}
+	
+	public static  void main(String[] args) {
+		var prikey = Base64.getDecoder().decode("O+F8ZCJK45oWdatKccPXruuvojilgBaS97KLfCvx754=");
+		var keypair = Keys.pubkey(
+				prikey
+			);
+		System.out.println("Auto: " + keypair.getBase64PublicKey());
+		
+		var bsc = new BasicKeys();
+		var kp2 = bsc.pubkey(prikey);
+		System.out.println("Bsc: " + kp2.getBase64PublicKey());
 	}
 
 }
