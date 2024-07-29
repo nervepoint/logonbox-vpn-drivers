@@ -40,5 +40,6 @@ open module com.logonbox.vpn.drivers.lib {
     uses DNSProvider.Factory;
     
     uses Keys.KeyPairProvider;
-    provides Keys.KeyPairProvider with WhisperKeys, BasicKeys, JCEKeys;
+
+	provides Keys.KeyPairProvider with WhisperKeys/* , BasicKeys, JCEKeys */;
 }

@@ -73,7 +73,7 @@ public class WhisperKeys implements KeyPairProvider {
 
 	@Override
 	public KeyPair pubkey(byte[] privateKey) {
-		/* TODO no API for this! horrible hack that always uses pure base provider */
+		/* TODO no API for this! horrible hack that always uses pure Java basic provider */
 		var basic = new BasicKeys();
 		var pubkeyPair = basic.pubkey(privateKey);
 		return new KeyPair() {
