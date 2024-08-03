@@ -23,10 +23,17 @@ package com.logonbox.vpn.drivers.lib.util.impl;
 
 import org.whispersystems.curve25519.Curve25519;
 import org.whispersystems.curve25519.Curve25519KeyPair;
+import org.whispersystems.curve25519.JavaCurve25519Provider;
+
+import uk.co.bithatch.nativeimage.annotations.OtherReflectable;
+import uk.co.bithatch.nativeimage.annotations.OtherReflectables;
 
 import com.logonbox.vpn.drivers.lib.util.Keys.KeyPair;
 import com.logonbox.vpn.drivers.lib.util.Keys.KeyPairProvider;
 
+@OtherReflectables(
+    @OtherReflectable(all = true, value = JavaCurve25519Provider.class)
+)
 public class WhisperKeys implements KeyPairProvider {
 
 	private static class KeyPairImpl implements KeyPair {
