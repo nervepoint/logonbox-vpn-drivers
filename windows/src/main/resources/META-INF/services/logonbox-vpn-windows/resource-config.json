@@ -1,0 +1,16 @@
+{
+	"resources": {
+		"includes": [
+			{
+				"pattern": "com/sun/jna/win32-x86-64/.*"
+			},
+			{
+				"pattern": ".*/.*\\.exe"
+			},
+			{
+				"pattern": ".*/.*\\.dll"
+			}
+		]
+	},
+	"bundles": []
+}
