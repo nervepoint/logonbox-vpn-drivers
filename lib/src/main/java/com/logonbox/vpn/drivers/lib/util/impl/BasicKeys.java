@@ -26,6 +26,9 @@ import java.security.SecureRandom;
 import com.logonbox.vpn.drivers.lib.util.Keys.KeyPair;
 import com.logonbox.vpn.drivers.lib.util.Keys.KeyPairProvider;
 
+import uk.co.bithatch.nativeimage.annotations.Reflectable;
+
+@Reflectable
 public class BasicKeys implements KeyPairProvider {
 
 	private static class KeyPairImpl implements KeyPair {

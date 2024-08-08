@@ -27,6 +27,7 @@ import org.whispersystems.curve25519.JavaCurve25519Provider;
 
 import uk.co.bithatch.nativeimage.annotations.OtherReflectable;
 import uk.co.bithatch.nativeimage.annotations.OtherReflectables;
+import uk.co.bithatch.nativeimage.annotations.Reflectable;
 
 import com.logonbox.vpn.drivers.lib.util.Keys.KeyPair;
 import com.logonbox.vpn.drivers.lib.util.Keys.KeyPairProvider;
@@ -34,6 +35,7 @@ import com.logonbox.vpn.drivers.lib.util.Keys.KeyPairProvider;
 @OtherReflectables(
     @OtherReflectable(all = true, value = JavaCurve25519Provider.class)
 )
+@Reflectable
 public class WhisperKeys implements KeyPairProvider {
 
 	private static class KeyPairImpl implements KeyPair {

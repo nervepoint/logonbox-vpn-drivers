@@ -35,7 +35,7 @@
         <maven.compiler.source>17</maven.compiler.source>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <native.image.annotations.version>0.9.3-SNAPSHOT</native.image.annotations.version>
+        <native.image.annotations.version>0.9.3</native.image.annotations.version>
         <dbus.version>5.0.0</dbus.version>
         <graalvm.version>0.9.28</graalvm.version>
     </properties>

@@ -34,9 +34,12 @@ import javax.crypto.KeyAgreement;
 import com.logonbox.vpn.drivers.lib.util.Keys;
 import com.logonbox.vpn.drivers.lib.util.Keys.KeyPair;
 
+import uk.co.bithatch.nativeimage.annotations.Reflectable;
+
 /**
  * TODO: Not yet used
  */
+@Reflectable
 public class JCEKeys implements Keys.KeyPairProvider {
 
     private static class KeyPairImpl implements Keys.KeyPair {
