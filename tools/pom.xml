@@ -195,7 +195,7 @@ ACTION
 										<buildArg>--install-exit-handlers</buildArg>
 										<buildArg>--enable-http</buildArg>
 										<buildArg>--enable-https</buildArg>
-										<buildArg>--enable-url-protocols=http,https,file</buildArg>
+										<buildArg>--enable-url-protocols=http,https</buildArg>
                                         
                                         <!--TODO This should not be necessary! For some reason native-image-annotations is not working for these -->
                                         <buildArg>-H:IncludeResources=win32.*</buildArg>
