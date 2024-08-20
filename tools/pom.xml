@@ -173,6 +173,7 @@ ACTION
                                         
                                         <!--TODO This should not be necessary! For some reason native-image-annotations is not working for these -->
                                         <buildArg>-H:IncludeResources=win32.*</buildArg>
+                                        <buildArgs>-march=compatibility</buildArgs>
                                     </buildArgs>
                                      <metadataRepository>
                                         <enabled>true</enabled>

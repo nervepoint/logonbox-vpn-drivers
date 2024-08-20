@@ -20,16 +20,6 @@
  */
 package com.logonbox.vpn.drivers.lib;
 
-import com.logonbox.vpn.drivers.lib.util.Keys;
-import com.logonbox.vpn.drivers.lib.util.Util;
-import com.sshtools.jini.INI;
-import com.sshtools.jini.INI.Section;
-import com.sshtools.jini.INIReader;
-import com.sshtools.jini.INIReader.DuplicateAction;
-import com.sshtools.jini.INIReader.MultiValueMode;
-import com.sshtools.jini.INIWriter;
-import com.sshtools.jini.INIWriter.StringQuoteMode;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -50,10 +40,24 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.logonbox.vpn.drivers.lib.util.Keys;
+import com.logonbox.vpn.drivers.lib.util.Util;
+import com.sshtools.jini.INI;
+import com.sshtools.jini.INI.Section;
+import com.sshtools.jini.INIReader;
+import com.sshtools.jini.INIReader.DuplicateAction;
+import com.sshtools.jini.INIReader.MultiValueMode;
+import com.sshtools.jini.INIWriter;
+import com.sshtools.jini.INIWriter.StringQuoteMode;
+
 import uk.co.bithatch.nativeimage.annotations.Serialization;
 
 @Serialization
 public interface VpnAdapterConfiguration extends Serializable {
+	public final static Logger LOG = LoggerFactory.getLogger(VpnAdapterConfiguration.class);
 
     public abstract static class AbstractBuilder<B extends AbstractBuilder<B>> {
 
@@ -99,8 +103,13 @@ public interface VpnAdapterConfiguration extends Serializable {
             if(ini.containsSection("Peer")) {
                 for(var peer : ini.allSections("Peer")) {
                     var peerBldr = new VpnPeer.Builder();
-                    readPeerSection(peer, peerBldr);
-                    addPeers(peerBldr.build());
+                    if(peer.contains("PublicKey")) {
+	                    readPeerSection(peer, peerBldr);
+	                    addPeers(peerBldr.build());
+                    }
+                    else {
+                    	LOG.warn("Skipping peer with no public key.");
+                    }
                 }
             }
 
