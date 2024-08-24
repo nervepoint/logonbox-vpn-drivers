@@ -204,16 +204,20 @@ public abstract class AbstractLinuxAddress extends AbstractUnixAddress<AbstractL
 
     @Override
     public void setRoutes(Collection<String> allows) throws IOException {
+    	allows = allows.stream().map(IpUtil::normalizeMasked).toList();
+    	
 
-        /* Remove all the current routes for this interface */
+        /* Remove all the current routes for this interface. Normalize all the addresses (both
+         * those we want and those we have) to be full masked */
         var have = new HashSet<>();
         for (var row : commands.privileged().output("ip", "route", "show", "dev", nativeName())) {
             String[] l = row.split("\\s+");
             if (l.length > 0) {
-                have.add(l[0]);
-                if (!allows.contains(l[0])) {
-                    LOG.info("Removing route {} for {}", l[0], shortName());
-                    commands.privileged().logged().result("ip", "route", "del", l[0], "dev", nativeName());
+                var routeAddr = IpUtil.normalizeMasked(l[0]);
+				have.add(routeAddr);
+                if (!allows.contains(routeAddr)) {
+                    LOG.info("Removing route {} for {}", routeAddr, shortName());
+                    commands.privileged().logged().result("ip", "route", "del", routeAddr, "dev", nativeName());
                 }
             }
         }

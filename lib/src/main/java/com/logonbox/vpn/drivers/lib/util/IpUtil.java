@@ -123,4 +123,12 @@ public class IpUtil {
 		return l.toArray(new String[0]);
 	}
 
+	public static String normalizeMasked(String address) {
+		if(address.contains("/"))
+			return address;
+		else {
+			var a  = IpUtil.parse(address);
+			return a.toString() + "/" + a.bitSize();
+		}
+	}
 }

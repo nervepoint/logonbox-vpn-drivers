@@ -29,6 +29,7 @@ import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -219,29 +220,39 @@ public class UserspaceMacOsAddress extends AbstractUnixAddress<UserspaceMacOsPla
 	@Override
 	public void setRoutes(Collection<String> allows) throws IOException {
 
-		/* Remove all the current routes for this interface */
+    	allows = allows.stream().map(IpUtil::normalizeMasked).toList();
+
+        /* Remove all the current routes for this interface. Normalize all the addresses (both
+         * those we want and those we have) to be full masked */
+    	
 		var ipv6 = false;
+        var have = new HashSet<>();
 		for (var row : commands.privileged().output(OsUtil.debugCommandArgs("netstat", "-nr"))) {
 			var l = row.trim().split("\\s+");
-			if (l[0].equals("Destination") || l[0].equals("Routing")) {
+			String routeAddr = l[0];
+			if (routeAddr.equals("Destination") || routeAddr.equals("Routing")) {
 				continue;
 			}
-			if (l.length > 0 && l[0].equals("Internet6:")) {
+			if (l.length > 0 && routeAddr.equals("Internet6:")) {
 				ipv6 = true;
 			} else if (l.length > 3 && l[3].equals(nativeName())) {
 				var gateway = l[1];
 				try {
 					InetAddress.getByName(gateway);
 					if(!getAddresses().contains(gateway)) {
-						LOG.info("Removing route {} {} for {}", l[0], gateway, nativeName());
-						if (ipv6) {
-							commands.privileged().logged().stdout(ProcessRedirect.DISCARD).result(
-									OsUtil.debugCommandArgs("route", "-qn", "delete", "-inet6", "-ifp",
-											nativeName(), l[0], gateway));
-						} else {
-							commands.privileged().logged().stdout(ProcessRedirect.DISCARD).result(
-									OsUtil.debugCommandArgs("route", "-qn", "delete", "-ifp", nativeName(), l[0], gateway));
-						}
+						routeAddr = IpUtil.normalizeMasked(routeAddr);
+						have.add(routeAddr);
+		                if (!allows.contains(routeAddr)) {
+							LOG.info("Removing route {} {} for {}", routeAddr, gateway, nativeName());
+							if (ipv6) {
+								commands.privileged().logged().stdout(ProcessRedirect.DISCARD).result(
+										OsUtil.debugCommandArgs("route", "-qn", "delete", "-inet6", "-ifp",
+												nativeName(), routeAddr, gateway));
+							} else {
+								commands.privileged().logged().stdout(ProcessRedirect.DISCARD).result(
+										OsUtil.debugCommandArgs("route", "-qn", "delete", "-ifp", nativeName(), routeAddr, gateway));
+							}
+		                }
 					}
 				}
 				catch(Exception e) {
@@ -251,7 +262,8 @@ public class UserspaceMacOsAddress extends AbstractUnixAddress<UserspaceMacOsPla
 		}
 
 		for (String route : allows) {
-			addRoute(route);
+            if (!have.contains(route))
+            	addRoute(route);
 		}
 	}
 
