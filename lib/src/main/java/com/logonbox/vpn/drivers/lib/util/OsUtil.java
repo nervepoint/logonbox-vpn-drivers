@@ -95,28 +95,6 @@ public class OsUtil {
         return OS.isWindows() ? System.getenv("COMPUTERNAME") : System.getenv("HOSTNAME");
     }
 
-    public static boolean isAdministrator() {
-    	if (OS.isWindows()) {
-    		try {
-    			String programFiles = System.getenv("ProgramFiles");
-    			if (programFiles == null) {
-    				programFiles = "C:\\Program Files";
-    			}
-    			Path temp = Files.createTempFile(Paths.get(programFiles), "foo", "txt");
-    			temp.toFile().deleteOnExit();
-    			Files.delete(temp);
-    			return true;
-    		} catch (Exception e) {
-    			return false;
-    		}
-    	}
-    	if (OS.isUnixLike()) {
-    		return System.getProperty("forker.administratorUsername", System.getProperty("vm.rootUser", "root"))
-    				.equals(System.getProperty("user.name"));
-    	}
-    	return false;
-    }
-
     private static boolean is64bit0() {
     	String systemProp = System.getProperty("com.ibm.vm.bitmode");
     	if (systemProp != null) {
