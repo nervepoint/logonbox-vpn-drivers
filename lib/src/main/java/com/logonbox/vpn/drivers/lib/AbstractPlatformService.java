@@ -179,10 +179,12 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
             LOG.info("Stopping VPN for {}", session.address().shortName());
             
             try {
-                var dnsOr = dns();
-                if(dnsOr.isPresent()) {
-                    dnsOr.get().unset(new DNSEntry.Builder().fromConfiguration(configuration).withInterface(session.address().nativeName()).build());
-                }
+            	if(!configuration.addresses().isEmpty()) {
+	                var dnsOr = dns();
+	                if(dnsOr.isPresent()) {
+	                    dnsOr.get().unset(new DNSEntry.Builder().fromConfiguration(configuration).withInterface(session.address().nativeName()).build());
+	                }
+            	}
             }
             finally {
 
