@@ -442,7 +442,8 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
 
         /* DNS */
         try {
-            dns(configuration, ip);
+            if (configuration.addresses().size() > 0)
+            	dns(configuration, ip);
         } catch (IOException | RuntimeException ioe) {
             try {
                 session.close();
