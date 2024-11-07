@@ -20,7 +20,9 @@
  */
 package com.logonbox.vpn.drivers.linux;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.Reader;
 import java.io.Serializable;
 import java.io.UncheckedIOException;
 import java.io.Writer;
@@ -410,6 +412,15 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
             try (Writer writer = Files.newBufferedWriter(tempFile)) {
                 transform(configuration).write(writer);
             }
+            
+            // TEMP
+            try(BufferedReader reader =  Files.newBufferedReader(tempFile)) {
+            	String line;
+            	while( ( line = reader.readLine()) != null) {
+            		LOG.info("{}", line);
+            	}
+            }
+            
             LOG.info("Activating Wireguard configuration for {} (in {})", ip.shortName(), tempFile);
             context().commands().privileged().logged().result(context().nativeComponents().tool(Tool.WG), "setconf", ip.name(),
                     tempFile.toString());
