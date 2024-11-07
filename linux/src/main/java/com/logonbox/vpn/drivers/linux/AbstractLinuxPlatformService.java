@@ -22,7 +22,6 @@ package com.logonbox.vpn.drivers.linux;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.Reader;
 import java.io.Serializable;
 import java.io.UncheckedIOException;
 import java.io.Writer;
