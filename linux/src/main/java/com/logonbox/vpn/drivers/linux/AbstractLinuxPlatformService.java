@@ -399,7 +399,6 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
     	}
 		
 		var configuration  = startRequest.configuration();
-		var peer = startRequest.peer();
         var ip = findAddress(startRequest);
 
         /* Set the address reserved */
@@ -445,6 +444,7 @@ public abstract class AbstractLinuxPlatformService extends AbstractUnixDesktopPl
          * we don't get a handshake in that time, then consider this a failed
          * connection. We don't know WHY, just it has failed
          */
+		var peer = startRequest.peer();
         if (peer.isPresent() && context.configuration().connectTimeout().isPresent()) {
             waitForFirstHandshake(configuration, session, connectionStarted, peer,
                     context.configuration().connectTimeout().get());

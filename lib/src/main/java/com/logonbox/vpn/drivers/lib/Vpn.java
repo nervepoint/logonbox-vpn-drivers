@@ -170,17 +170,18 @@ public final class Vpn implements Closeable {
         	else
         		throw new IllegalStateException("No interface supplied, and no configuration supplied. What now?");
         }
-        
-        /* If no specific peer, then try to find the first with an endpoint address and
-         * assume that's the one to use.
-         */
-        peer = builder.vpnPeer.or(() -> {
-            for(var p : cfg.peers()) {
-                if(p.endpointAddress().isPresent())
-                    return Optional.of(p);
-            }
-            return Optional.empty();
-        });
+//        
+//        /* If no specific peer, then try to find the first with an endpoint address and
+//         * assume that's the one to use.
+//         */
+//        peer = builder.vpnPeer.or(() -> {
+//            for(var p : cfg.peers()) {
+//                if(p.endpointAddress().isPresent())
+//                    return Optional.of(p);
+//            }
+//            return Optional.empty();
+//        });
+        peer = builder.vpnPeer;
     }
     
     public boolean started() {

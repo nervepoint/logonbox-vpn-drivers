@@ -493,9 +493,14 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 		
         var gw = defaultGatewayPeer();
         transformBldr.fromConfiguration(configuration);
+        LOG.info("REMOVEME TRANSFORMBLDR HAD {} peers. Config has {}", transformBldr.peers.size(), configuration.peers().size());
         transformBldr.withPeers();
+        LOG.info("REMOVEME AFTER TRANSFORMBLDR HAD {} peers. Config has {}", transformBldr.peers.size(), configuration.peers().size());
 		transformInterface(configuration, transformBldr);
+        LOG.info("REMOVEME AFTER2 TRANSFORMBLDR HAD {} peers. Config has {}", transformBldr.peers.size(), configuration.peers().size());
 		for(var peer : configuration.peers()) {
+            LOG.info("REMOVEME ZZ CHECKING PEER " + peer.publicKey());
+            
 			var transformPeerBldr = new VpnPeer.Builder();
 			transformPeerBldr.withPeer(peer);
     		var allowedIps = new ArrayList<>(peer.allowedIps());
@@ -587,8 +592,13 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
     			transformPeerBldr.withAllowedIps(allowedIps);
     		}
     		transformPeer(configuration, peer, transformPeerBldr);
+
+            LOG.info("REMOVEME ZZ ADDING PEER " + peer.publicKey());
     		transformBldr.addPeers(peer);
 		}
+
+        LOG.info("REMOVEME AFTER3 TRANSFORMBLDR HAD {} peers. Config has {}", transformBldr.peers.size(), configuration.peers().size());
+        
 		return transformBldr.build();
 	}
 	
