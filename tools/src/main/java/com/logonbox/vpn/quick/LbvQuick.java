@@ -245,6 +245,10 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
                 "--ignore-ssl-trust" }, description = "When this option is present, SSL certificate trust issues will be ignored. Only used when retrieving configuration from a URL ('up' command).")
         private boolean ignoreSslTrust;
 
+        @Option(names = { 
+                "--authorization" }, description = "When used configuration is obtained over HTTP, you may use this option to provide an `Authorization` header.")
+        private Optional<String> authorization;
+
         @Parameters(arity = "1", paramLabel = "CONFIG_FILE | URL | INTERFACE", description = 
         		"CONFIG_FILE is a configuration file, whose filename is the interface name " 
         		+ "followed by `.conf'. It can also be the entire content of a configuration file "
@@ -290,6 +294,10 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
                             })
                             .build();
                     
+                    if(authorization.isPresent()) {
+                        http = http.authenticate(authorization.get());
+                    }
+                    
                     try {
                         registerNode(uri, bldr, null, null, http);
                     }
@@ -310,9 +318,6 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
                                       .build()
                                       .authorize();
                                     
-                                }
-                                else if(authType.equalsIgnoreCase("basic")) {
-                                    throw new IllegalStateException("Should have been handled by Authenticator.");
                                 }
                                 else {
                                     throw new IllegalStateException("Unsupported authentication type " + authType);
