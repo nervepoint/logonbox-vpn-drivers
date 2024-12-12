@@ -95,6 +95,16 @@ ACTION
             </plugin>
         </plugins>
     </build>
+    <repositories>
+        <repository>
+            <id>oss-snapshots</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+            <snapshots/>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+        </repository>
+    </repositories>
 
     <profiles>
         <!-- Native Driver Activation -->
