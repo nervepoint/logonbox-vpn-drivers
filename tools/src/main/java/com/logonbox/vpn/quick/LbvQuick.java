@@ -1,46 +1,13 @@
 package com.logonbox.vpn.quick;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.PrintStream;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.net.Authenticator;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.PasswordAuthentication;
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.cert.CertificateException;
-import java.text.DateFormat;
-import java.text.MessageFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.ServiceLoader;
-import java.util.StringTokenizer;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.stream.Collectors;
-
-import javax.net.ssl.HostnameVerifier;
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLSession;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
-
+import com.jadaptive.oauth.client.CertManager;
+import com.jadaptive.oauth.client.ConsoleUtil;
+import com.jadaptive.oauth.client.DefaultConsolePromptingCertManager;
+import com.jadaptive.oauth.client.Http;
+import com.jadaptive.oauth.client.OAuth2Objects.BearerToken;
+import com.jadaptive.oauth.client.OAuth2Objects.DeviceCode;
+import com.jadaptive.oauth.client.OAuthClient;
+import com.jadaptive.oauth.client.ResponseException;
 import com.logonbox.vpn.drivers.lib.DNSProvider;
 import com.logonbox.vpn.drivers.lib.NativeComponents;
 import com.logonbox.vpn.drivers.lib.PlatformService;
@@ -58,11 +25,45 @@ import com.sshtools.liftlib.commands.ElevatableSystemCommands;
 import com.sshtools.liftlib.commands.SystemCommands;
 import com.sshtools.liftlib.commands.SystemCommands.ProcessRedirect;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.io.UncheckedIOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.http.HttpClient;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.text.DateFormat;
+import java.text.MessageFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.ResourceBundle;
+import java.util.ServiceLoader;
+import java.util.StringTokenizer;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.stream.Collectors;
+
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
+import uk.co.bithatch.nativeimage.annotations.Bundle;
 import uk.co.bithatch.nativeimage.annotations.Resource;
 
 @Command(name = "lbv-quick", description = "Set up a WireGuard interface simply.", mixinStandardHelpOptions = true, subcommands = {
@@ -70,7 +71,10 @@ import uk.co.bithatch.nativeimage.annotations.Resource;
         LbvQuick.Strip.class, LbvQuick.Safe.class, LbvQuick.DNS.class, LbvQuick.DNSProviders.class
 })
 @Resource({ "windows-task\\.xml" })
+@Bundle
 public class LbvQuick extends AbstractCommand implements SystemContext {
+
+    public final static ResourceBundle BUNDLE = ResourceBundle.getBundle(LbvQuick.class.getName());
 
     private final class LbvConfiguration implements SystemConfiguration {
         @Override
@@ -231,47 +235,8 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
     }
     
     abstract static class AbstractQuickCommand implements Callable<Integer> {
-    	
-    	
-		static void ignoreSslTrust() {
-			// Create a trust manager that does not validate certificate chains
-			var trustAllCerts = new TrustManager[] { new X509TrustManager() {
 
-				@Override
-				public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType)
-						throws CertificateException {
-				}
-
-				@Override
-				public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType)
-						throws CertificateException {
-				}
-
-				@Override
-				public java.security.cert.X509Certificate[] getAcceptedIssuers() {
-					return null;
-				}
-			} };
-
-			// Install the all-trusting trust manager
-			try {
-				var sc = SSLContext.getInstance("SSL");
-				sc.init(null, trustAllCerts, new java.security.SecureRandom());
-				HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
-
-				// Create all-trusting host name verifier
-				var allHostsValid = new HostnameVerifier() {
-					public boolean verify(String hostname, SSLSession session) {
-						return true;
-					}
-				};
-
-				// Install the all-trusting host verifier
-				HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid);
-			} catch (Exception e) {
-				throw new IllegalStateException(e);
-			}
-		}
+        private static final String OAUTH_SCOPE = "getVpn";
 
         @ParentCommand
         protected LbvQuick parent;
@@ -290,19 +255,13 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
         private String configFileOrInterface;
 
         @Override
-        public Integer call() throws Exception {
+        public final Integer call() throws Exception {
             Optional<Path> file = Optional.empty();
             
             parent.initCommand();
             
-            if(ignoreSslTrust) {
-            	ignoreSslTrust();
-            }
-
             Optional<String> ifaceName = Optional.empty();
             var bldr = new Vpn.Builder().withSystemContext(parent);
-            var alert = false;
-            
             
 			if(configFileOrInterface.equals("[")) {
             	bldr.withVpnConfiguration(new InputStreamReader(System.in));
@@ -314,31 +273,59 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
             	bldr.withVpnConfiguration(new String(Base64.getDecoder().decode(configFileOrInterface.substring(23)), "UTF-8"));
             }
             else {
+                
             	try {
-            		var url = new URL(configFileOrInterface);
-            		Authenticator.setDefault(new Authenticator() {
-
-						@Override
-						protected PasswordAuthentication getPasswordAuthentication() {
-							var cnsl = System.console();
-							if(cnsl == null)
-								throw new IllegalStateException("Authentication required, but not interactive.");
-							var username = cnsl.readLine("Username: ");
-							if(username == null)
-								return null;
-							var password = cnsl.readPassword("Password: ");
-							if(password == null)
-								return null;
-							return new PasswordAuthentication(username, password);
-						}
-					});
-            		var conx = (HttpURLConnection)url.openConnection();
-            		conx.setRequestProperty("Accept", "text/plain");
-            		try(var in = conx.getInputStream()) {
-            			bldr.withVpnConfiguration(new InputStreamReader(in));
+            		var uri = URI.create(configFileOrInterface);
+            		
+            		if(uri.getScheme().equals("http") && !uri.getScheme().equals("https")) {
+            		    throw new URISyntaxException(configFileOrInterface, "Incorrect scheme.");
             		}
+
+                    var http = new Http.Builder().withUri(uri.resolve("/"))
+                            .withClient(() -> {
+                                var cm = certManager();
+                                var cbldr =  HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1);
+                                cbldr.sslContext(cm.getSSLContext()).sslParameters(cm.getSSLParameters());
+                                return cbldr.connectTimeout(Duration.ofSeconds(15)).followRedirects(HttpClient.Redirect.NORMAL).build();
+                            })
+                            .build();
+                    
+                    try {
+                        registerNode(uri, bldr, null, null, http);
+                    }
+                    catch(ResponseException re) {
+                        if(re.getStatus() == 401) {
+                            var authOr = re.getHttpHeaders().firstValue("WWW-Authenticate");
+                            if(authOr.isPresent()) {
+                                var auth = authOr.get();
+                                var authType = auth.split("\\s+")[0];
+                                if(authType.equalsIgnoreCase("bearer")) {
+                                    /* TODO update scope if provided? */
+                                    
+                                    new OAuthClient.Builder()
+                                      .withHttp(http)
+                                      .withScope(OAUTH_SCOPE)
+                                      .onPrompt(dc -> ConsoleUtil.defaultConsoleDeviceCodePrompt(BUNDLE, dc))
+                                      .onToken((code,token,httpc) -> registerNode(uri, bldr, code, token, httpc))
+                                      .build()
+                                      .authorize();
+                                    
+                                }
+                                else if(authType.equalsIgnoreCase("basic")) {
+                                    throw new IllegalStateException("Should have been handled by Authenticator.");
+                                }
+                                else {
+                                    throw new IllegalStateException("Unsupported authentication type " + authType);
+                                }
+                            }
+                            else
+                                throw re;
+                        }
+                        else 
+                            throw re;
+                    }
             	}
-            	catch(MalformedURLException murle) {
+            	catch(URISyntaxException murle) {
             		var asFile = Paths.get(configFileOrInterface);
 		            if (Files.exists(asFile)) {
 		                var iface = parent.toInterfaceName(asFile);
@@ -369,11 +356,28 @@ public class LbvQuick extends AbstractCommand implements SystemContext {
             return onCall(vpn, file, ifaceName);
         }
         
+        protected CertManager certManager() {
+            return new DefaultConsolePromptingCertManager(
+                    BUNDLE, !ignoreSslTrust, () -> null, (l) -> {}
+            );
+        }
+        
         protected void onBuild(Builder bldr) {
         }
 
 		protected abstract Integer onCall(Vpn vpn, Optional<Path> configFile, Optional<String> interfaceName) throws Exception;
 
+
+	    private void registerNode(URI uri, Vpn.Builder bldr, DeviceCode code, BearerToken token, Http http) throws ResponseException {
+	        try {
+                bldr.withVpnConfiguration(http.get(uri.getPath()));
+            } catch(IOException ioe) {
+                throw new UncheckedIOException(ioe);
+            }
+	        catch (ParseException e) {
+                throw new IllegalStateException(e);
+            }
+	    }
     }
 
     @Command(name = "up", description = "Bring a VPN interface up.")

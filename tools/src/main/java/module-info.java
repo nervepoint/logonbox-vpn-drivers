@@ -28,4 +28,5 @@ open module com.logonbox.vpn.quick {
     requires com.sshtools.liftlib;
     requires transitive jul.to.slf4j;
 	requires java.logging;
+    requires transitive com.jdapaptive.oauth.client;
 }

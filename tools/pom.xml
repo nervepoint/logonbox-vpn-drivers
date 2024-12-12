@@ -68,6 +68,11 @@ ACTION
             <artifactId>logonbox-vpn-lib</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.sshtools</groupId>
+            <artifactId>jadaptive-oauth-client</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
     </dependencies>
     <description>
         An example of how to use logonbox-vpn-drivers, lbvq sets up a simple
