@@ -609,6 +609,10 @@ public abstract class AbstractDesktopPlatformService<I extends VpnAddress> exten
 			}
 		}
 		Map<String, String> env = new HashMap<String, String>();
+
+        env.put("LBVPN_LOCAL_MAC", Util.getBestLocalhostMAC());
+        env.put("LBVPN_LOCAL_DEVICE_NAME", Util.getDeviceName());
+        
 		if(connection != null) {
 		    env.put("LBVPN_ADDRESS", String.join(",", connection.addresses()));
 			env.put("LBVPN_USER_PUBLIC_KEY", connection.publicKey());
