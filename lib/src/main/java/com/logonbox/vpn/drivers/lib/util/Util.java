@@ -21,6 +21,7 @@
 package com.logonbox.vpn.drivers.lib.util;
 
 import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.security.MessageDigest;
 import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
@@ -139,6 +140,22 @@ public class Util {
 	
 	public static Optional<String> stringOr(String str) {
 		return str == null || str.length() == 0 ? Optional.empty() : Optional.of(str);
+	}
+	
+	public static String getBestLocalhostMAC() {
+	    try {
+    	    var localHost = InetAddress.getLocalHost();
+    	    var ni = NetworkInterface.getByInetAddress(localHost);
+    	    var hardwareAddress = ni.getHardwareAddress();
+    	    var hexadecimal = new String[hardwareAddress.length];
+    	    for (var i = 0; i < hardwareAddress.length; i++) {
+    	        hexadecimal[i] = String.format("%02X", hardwareAddress[i]);
+    	    }
+    	    return String.join(":", hexadecimal);
+	    }
+	    catch(Exception e) {
+	        return "00:00:00:00:00:00";
+	    }
 	}
 
     public static int parseFwMark(String tkn) {
