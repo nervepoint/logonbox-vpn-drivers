@@ -44,6 +44,7 @@
         <module>linux</module>
         <module>windows</module>
         <module>macos</module>
+        <module>remote</module>
         <module>tools</module>
         <module>dll</module>
     </modules>
@@ -111,6 +112,21 @@
     </dependencies>
     <dependencyManagement>
 	    <dependencies>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>2.0.9</version>
+            </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-simple</artifactId>
+                <version>2.0.9</version>
+            </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>jul-to-slf4j</artifactId>
+                <version>2.0.9</version>
+            </dependency>
 			<dependency>
 				<groupId>com.github.hypfvieh</groupId>
 				<artifactId>dbus-java-core</artifactId>

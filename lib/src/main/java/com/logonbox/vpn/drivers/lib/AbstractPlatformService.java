@@ -22,8 +22,6 @@ package com.logonbox.vpn.drivers.lib;
 
 import static java.nio.file.Files.setPosixFilePermissions;
 
-import com.logonbox.vpn.drivers.lib.DNSProvider.DNSEntry;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,11 +30,10 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.prefs.Preferences;
 
-public abstract class AbstractPlatformService<I extends VpnAddress> implements PlatformService<I> {
+public abstract class AbstractPlatformService<I extends VpnAddress> extends BasePlatformService<I> {
 	final static Logger LOG = LoggerFactory.getLogger(AbstractPlatformService.class);
 	protected static final int MAX_INTERFACES = Integer.parseInt(System.getProperty("logonbox.vpn.maxInterfaces", "250"));
 
@@ -171,51 +168,6 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
     public Optional<DNSProvider> dns() {
         return Optional.empty();
     }
-    
-    @Override
-    public final void stop(VpnConfiguration configuration, VpnAdapter session) throws IOException {
-        try {
-
-            LOG.info("Stopping VPN for {}", session.address().shortName());
-            
-            try {
-            	if(!configuration.addresses().isEmpty()) {
-	                var dnsOr = dns();
-	                if(dnsOr.isPresent()) {
-	                    dnsOr.get().unset(new DNSEntry.Builder().fromConfiguration(configuration).withInterface(session.address().nativeName()).build());
-	                }
-            	}
-            }
-            finally {
-
-                try {
-                    if(configuration.preDown().length > 0) {
-                        var p = configuration.preDown();
-                        LOG.info("Running pre-down commands. {}", String.join(" ; ", p).trim());
-                        runHook(configuration, session, p);
-                    }
-                }
-                finally {
-                    session.close();
-                }
-            }
-        } finally {
-            try {
-                onStop(configuration, session);
-            } finally {
-                if(configuration.postDown().length > 0) {
-                    var p = configuration.postDown();
-                    LOG.info("Running post-down commands. {}", String.join(" ; ", p).trim());
-                    runHook(configuration, session, p);
-                }
-            }
-        }
-        
-    }
-
-    protected void onStop(VpnConfiguration configuration, VpnAdapter session) {
-        
-    }
 
     @Override
 	public final void defaultGateway(Optional<Gateway> addr) {
@@ -239,28 +191,6 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
 		return System.getProperty("logonbox.vpn.interfacePrefix", interfacePrefix);
 	}
 
-	protected boolean exists(String nativeName, Iterable<I> links) {
-		try {
-			return find(nativeName, links).isPresent();
-		} catch (IllegalArgumentException iae) {
-			return false;
-		}
-	}
-
-	protected final Optional<I> find(String nativeName, Iterable<I> links) {
-		for (var link : links)
-			if (Objects.equals(nativeName, link.nativeName()))
-				return Optional.of(link);
-		return Optional.empty();
-	}
-
-    protected final Optional<VpnAdapter> findAdapter(String nativeName, Iterable<VpnAdapter> links) {
-        for (var link : links)
-            if (Objects.equals(nativeName, link.address().nativeName()))
-                return Optional.of(link);
-        return Optional.empty();
-    }
-
 	@Override
 	public boolean isValidNativeInterfaceName(String ifaceName) {
 		return ifaceName.startsWith(getInterfacePrefix()) && ifaceName.length() < 17 && ifaceName.matches("[a-z]+[0-9]+");
@@ -270,9 +200,4 @@ public abstract class AbstractPlatformService<I extends VpnAddress> implements P
 	public final I address(String nativeName) {
 		return find(nativeName, addresses()).orElseThrow(() -> new IllegalArgumentException(String.format("No address %s", nativeName)));
 	}
-
-    @Override
-    public final VpnAdapter adapter(String nativeName) {
-        return findAdapter(nativeName, adapters()).orElseThrow(() -> new IllegalArgumentException(String.format("No adapter %s", nativeName)));
-    }
 }

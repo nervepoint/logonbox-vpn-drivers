@@ -35,10 +35,12 @@ For example,
 <dependency>
     <groupId>com.logonbox</groupId>
     <artifactId>logonbox-vpn-linux</artifactId>
-    <version>0.0.1-SNAPSHOT
+    <version>0.9.0-SNAPSHOT
 </dependency>
     
 ```
+
+Also part of this project, are the `remote` modules. These make it possible to access the low level API over D-Bus, in a separate process, or even potentially on a totally different machine (e.g. over SSH).
 
 ## Usage
 
@@ -48,7 +50,7 @@ The simplest usage is to create a working VPN tunnel given a standard Wireguard 
 
 ```java
 /* TODO */ 
-``` 
+```
 
 ## Full Example Application And Tools
 

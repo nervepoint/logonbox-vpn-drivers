@@ -80,7 +80,11 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	 * 
 	 * @param path path of file to open
 	 * @throws IOException
+	 * 
+	 * TODO Move this to VPN client suite, it is not needed here at low level  It was only here
+     * because at the time this was a convenient place for some platform specific code.
 	 */
+	@Deprecated
 	void openToEveryone(Path path) throws IOException;
 
 	/**
@@ -88,7 +92,11 @@ public interface PlatformService<ADDR extends VpnAddress> {
 	 * 
 	 * @param path path of file to restrict
 	 * @throws IOException
+     * 
+     * TODO Move this to VPN client suite, it is not needed here at low level. It was only here
+     * because at the time this was a convenient place for some platform specific code. 
 	 */
+    @Deprecated
 	void restrictToUser(Path path) throws IOException;
 
 	/**

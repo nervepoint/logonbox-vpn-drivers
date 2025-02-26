@@ -38,11 +38,11 @@ public final class VpnAdapter implements Closeable {
     private final PlatformService<?> service;
     private Optional<VpnAddress> ip;
 
-    VpnAdapter(PlatformService<?> service) {
+    public VpnAdapter(PlatformService<?> service) {
         this(service, Optional.empty());
     }
 
-    VpnAdapter(PlatformService<?> service, Optional<VpnAddress> ip) {
+    public VpnAdapter(PlatformService<?> service, Optional<VpnAddress> ip) {
         this.service = service;
         this.ip = ip;
     }
