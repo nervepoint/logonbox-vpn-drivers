@@ -26,7 +26,7 @@ public class RemoteVpnPeer extends Struct {
     @Position(4)
     private String[] allowedIps = new String[0];
     
-    @Position(4)
+    @Position(5)
     private String presharedKey = "";
 
     
@@ -34,7 +34,18 @@ public class RemoteVpnPeer extends Struct {
         
     }
     
-    public RemoteVpnPeer(VpnPeer peer) {
+    public RemoteVpnPeer(String endpointAddress, int endpointPort, String publicKey, int persistentKeepalive,
+			String[] allowedIps, String presharedKey) {
+		super();
+		this.endpointAddress = endpointAddress;
+		this.endpointPort = endpointPort;
+		this.publicKey = publicKey;
+		this.persistentKeepalive = persistentKeepalive;
+		this.allowedIps = allowedIps;
+		this.presharedKey = presharedKey;
+	}
+
+	public RemoteVpnPeer(VpnPeer peer) {
         this.publicKey = peer.publicKey();
         this.endpointAddress = peer.endpointAddress().orElse("");
         this.endpointPort = peer.endpointPort().orElse(0);

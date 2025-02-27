@@ -8,6 +8,7 @@ import com.logonbox.vpn.drivers.remote.lib.RemoteVpnAddress;
 import org.freedesktop.dbus.annotations.DBusInterfaceName;
 
 import java.io.IOException;
+import java.util.function.Consumer;
 
 import uk.co.bithatch.nativeimage.annotations.Proxy;
 import uk.co.bithatch.nativeimage.annotations.Reflectable;
@@ -20,9 +21,11 @@ import uk.co.bithatch.nativeimage.annotations.TypeReflect;
 public class RemoteVpnAddressDelegate implements RemoteVpnAddress {
     
     private final VpnAddress delegate;
+    private final Consumer<RemoteVpnAddressDelegate> onDelete;
 
-    RemoteVpnAddressDelegate(VpnAddress delegate) {
+    RemoteVpnAddressDelegate(VpnAddress delegate, Consumer<RemoteVpnAddressDelegate> onDelete) {
         this.delegate = delegate;
+        this.onDelete = onDelete;
     }
 
     @Override
@@ -47,7 +50,12 @@ public class RemoteVpnAddressDelegate implements RemoteVpnAddress {
 
     @Override
     public void delete() throws IOException {
-        delegate.delete();
+        try {
+            delegate.delete();
+        }
+        finally {
+            onDelete.accept(this);
+        }
     }
 
     @Override

@@ -27,7 +27,13 @@ public class RemoteNATMode extends Struct {
     public RemoteNATMode() {
     }
     
-    public Optional<NATMode> toNative() {
+    public RemoteNATMode(String mode, String[] names) {
+		super();
+		this.mode = mode;
+		this.names = names;
+	}
+
+	public Optional<NATMode> toNative() {
         if(mode.equals(NATMode.MASQUERADE.class.getSimpleName())) {
             return Optional.of(NATMode.MASQUERADE.forNames(names));
         }
@@ -41,6 +47,14 @@ public class RemoteNATMode extends Struct {
             throw new UnsupportedOperationException("Unsupported NAT mode.");
         }
     }
+
+	public String getMode() {
+		return mode;
+	}
+
+	public String[] getNames() {
+		return names;
+	}
 
     
 }

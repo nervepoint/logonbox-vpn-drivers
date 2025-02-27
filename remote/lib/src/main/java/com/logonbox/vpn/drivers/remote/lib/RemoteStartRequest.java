@@ -39,7 +39,15 @@ public class RemoteStartRequest extends Struct {
         this.peer = nativeStartRequest.peer().map(r -> new RemoteVpnPeer(r)).orElseGet(() -> new RemoteVpnPeer());
     }
 
-    public String getNativeInterfaceName() {
+    public RemoteStartRequest(String nativeInterfaceName, String interfaceName, String configuration, RemoteVpnPeer peer) {
+		super();
+		this.nativeInterfaceName = nativeInterfaceName;
+		this.interfaceName = interfaceName;
+		this.configuration = configuration;
+		this.peer = peer;
+	}
+
+	public String getNativeInterfaceName() {
         return nativeInterfaceName;
     }
 

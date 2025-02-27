@@ -1,7 +1,13 @@
 package com.logonbox.vpn.drivers.remote.node;
 
 import static java.lang.Thread.sleep;
-import static java.time.Duration.ofDays;
+
+import java.text.MessageFormat;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ScheduledExecutorService;
+
+import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder;
 
 import com.logonbox.vpn.drivers.lib.AbstractSystemContext;
 import com.logonbox.vpn.drivers.lib.PlatformService;
@@ -9,23 +15,15 @@ import com.logonbox.vpn.drivers.lib.SystemConfiguration;
 import com.logonbox.vpn.drivers.lib.VpnAdapter;
 import com.logonbox.vpn.drivers.remote.lib.RemotePlatformService;
 
-import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder;
-import org.freedesktop.dbus.exceptions.DBusException;
-
-import java.text.MessageFormat;
-import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ScheduledExecutorService;
-
-public class NodeTest extends AbstractSystemContext implements Callable<Integer> {
+public class Node extends AbstractSystemContext implements Callable<Integer> {
 
     public static void main(String[] args) throws Exception {
-        System.exit(new NodeTest().call());
+        System.exit(new Node().call());
     }
 
     private final SystemConfiguration cfg;
     
-    public NodeTest() {
+    public Node() {
         cfg = SystemConfiguration.defaultConfiguration();
     }
     
@@ -36,24 +34,11 @@ public class NodeTest extends AbstractSystemContext implements Callable<Integer>
         var conx = DBusConnectionBuilder.forSessionBus().build();
         conx.requestBusName(RemotePlatformService.BUS_NAME);
         
-        var addresses = ps.addresses().stream().map(RemoteVpnAddressDelegate::new).
-                peek(a -> {
-                    try {
-                        System.out.println("EXP: " +a);
-                        conx.exportObject(a);
-                    } catch (DBusException e) {
-                        throw new IllegalStateException(e);
-                    }
-                }).
-                toList();
-        
-        conx.exportObject(new RemotePlatformServiceDelegate(ps, addresses));
-        if(ps.dns().isPresent())
-            conx.exportObject(new RemoteDNSProviderDelegate(ps.dns().get()));
+        new RemotePlatformServiceDelegate(ps, conx);
         
         System.out.println("*Ready*");
         
-        sleep(ofDays(Integer.MAX_VALUE));
+        sleep(Integer.MAX_VALUE);
         
         return 0;
     }

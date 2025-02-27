@@ -64,8 +64,17 @@ public final class BusRemotePlatformService extends BasePlatformService<BusVpnAd
 
     @Override
     public List<VpnAdapter> adapters() {
-        return Arrays.asList(remote.adapters()).stream().map(a -> new VpnAdapter(this, Optional.of(address(a))))
+        return Arrays.asList(remote.adapters()).stream().map(a -> new VpnAdapter(this, adapterAddress(a)))
                 .toList();
+    }
+
+    protected Optional<VpnAddress> adapterAddress(String a) {
+        try {
+            return Optional.of(address(a));
+        }
+        catch(Exception e) {
+            return Optional.empty();
+        }
     }
 
     @Override
