@@ -6,6 +6,13 @@ import org.freedesktop.dbus.interfaces.DBusInterface;
 
 import java.io.IOException;
 
+import uk.co.bithatch.nativeimage.annotations.Proxy;
+import uk.co.bithatch.nativeimage.annotations.Reflectable;
+import uk.co.bithatch.nativeimage.annotations.TypeReflect;
+
+@Proxy
+@Reflectable
+@TypeReflect(methods = true, classes = true)
 public interface RemoteVpnAddress  extends DBusInterface {
 
     String DBUS_INTERFACE_NAME = "com.logonbox.vpn.drivers.RemoteVpnAddress";

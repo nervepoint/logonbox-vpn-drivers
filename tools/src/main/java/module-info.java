@@ -24,9 +24,11 @@ open module com.logonbox.vpn.quick {
 	requires info.picocli;
 	requires static uk.co.bithatch.nativeimage.annotations;
     requires com.logonbox.vpn.drivers.lib;
+    requires transitive com.logonbox.vpn.drivers.remote.node;
     requires transitive com.sshtools.porter;
     requires com.sshtools.liftlib;
     requires transitive jul.to.slf4j;
 	requires java.logging;
     requires transitive com.jdapaptive.oauth.client;
+	requires org.freedesktop.dbus;
 }

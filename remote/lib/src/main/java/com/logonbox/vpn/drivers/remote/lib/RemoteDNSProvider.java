@@ -5,6 +5,13 @@ import com.logonbox.vpn.drivers.lib.DNSProvider.DNSEntry;
 
 import org.freedesktop.dbus.interfaces.DBusInterface;
 
+import uk.co.bithatch.nativeimage.annotations.Proxy;
+import uk.co.bithatch.nativeimage.annotations.Reflectable;
+import uk.co.bithatch.nativeimage.annotations.TypeReflect;
+
+@Proxy
+@Reflectable
+@TypeReflect(methods = true, classes = true)
 public interface RemoteDNSProvider extends DBusInterface {
     String DBUS_INTERFACE_NAME = "com.logonbox.vpn.drivers.RemoteDNSProvider";
     String OBJECT_PATH = "/" + DBUS_INTERFACE_NAME.replace('.', '/');

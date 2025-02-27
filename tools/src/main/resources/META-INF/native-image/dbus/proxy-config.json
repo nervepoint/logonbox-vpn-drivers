@@ -1,0 +1,17 @@
+[
+	{
+		"interfaces": [
+			"org.freedesktop.dbus.interfaces.DBus"
+		]
+	},
+	{
+		"interfaces": [
+			"org.freedesktop.dbus.interfaces.Properties"
+		]
+	},
+    {
+        "interfaces": [
+            "org.freedesktop.dbus.interfaces.Introspectable"
+        ]
+    }
+]

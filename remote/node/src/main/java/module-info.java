@@ -19,7 +19,8 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-open module com.logonbox.vpn.drivers.remote.node {
+module com.logonbox.vpn.drivers.remote.node {
+	exports com.logonbox.vpn.drivers.remote.node;
     requires transitive com.logonbox.vpn.drivers.remote.lib;
     requires com.logonbox.vpn.drivers.lib;
     requires org.freedesktop.dbus;

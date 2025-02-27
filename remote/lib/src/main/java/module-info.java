@@ -19,7 +19,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-open module com.logonbox.vpn.drivers.remote.lib {
+module com.logonbox.vpn.drivers.remote.lib {
     requires org.freedesktop.dbus;
     requires transitive com.logonbox.vpn.drivers.lib;
     requires uk.co.bithatch.nativeimage.annotations;

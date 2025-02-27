@@ -67,6 +67,11 @@ ACTION
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>logonbox-vpn-remote-node</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>com.sshtools</groupId>
             <artifactId>jadaptive-oauth-client</artifactId>
             <version>0.0.1-SNAPSHOT</version>
@@ -210,6 +215,32 @@ ACTION
                                 <configuration>
                                     <mainClass>com.logonbox.vpn.quick.LbvQuick</mainClass>
                                     <imageName>lbv-quick</imageName>
+                                    <buildArgs>
+										<buildArg>-H:Log=registerResource:verbose</buildArg>
+                                        <buildArg>--report-unsupported-elements-at-runtime</buildArg>
+                                        <buildArg>-R:MaxHeapSize=64m</buildArg>
+										<buildArg>--install-exit-handlers</buildArg>
+										<buildArg>--enable-http</buildArg>
+										<buildArg>--enable-https</buildArg>
+										<buildArg>--enable-url-protocols=http,https</buildArg>
+                                        
+                                        <!--TODO This should not be necessary! For some reason native-image-annotations is not working for these -->
+                                        <buildArg>-H:IncludeResources=win32.*</buildArg>
+                                    </buildArgs>
+                                     <metadataRepository>
+                                        <enabled>true</enabled>
+                                     </metadataRepository>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>lbv-remote-node-agent</id>
+                                <goals>
+                                    <goal>compile-no-fork</goal>
+                                </goals>
+                                <phase>package</phase>
+                                <configuration>
+                                    <mainClass>com.logonbox.vpn.quick.LbvRemoteNodeAgent</mainClass>
+                                    <imageName>lbv-remote-node-agent</imageName>
                                     <buildArgs>
 										<buildArg>-H:Log=registerResource:verbose</buildArg>
                                         <buildArg>--report-unsupported-elements-at-runtime</buildArg>

@@ -1,0 +1,17 @@
+[
+{
+  "name":"org.freedesktop.dbus.interfaces.DBus$NameAcquired",
+  "queryAllDeclaredConstructors":true,
+  "methods":[{"name":"<init>","parameterTypes":["java.lang.String","java.lang.String"] }]
+},
+{
+  "name":"org.freedesktop.dbus.interfaces.Introspectable",
+  "allDeclaredClasses":true,
+  "queryAllDeclaredMethods":true
+},
+{
+  "name":"org.freedesktop.dbus.interfaces.Peer",
+  "allDeclaredClasses":true,
+  "queryAllDeclaredMethods":true
+}
+]

@@ -5,12 +5,19 @@ import com.logonbox.vpn.drivers.lib.PlatformService;
 import org.freedesktop.dbus.annotations.DBusBoundProperty;
 import org.freedesktop.dbus.interfaces.DBusInterface;
 
+import uk.co.bithatch.nativeimage.annotations.Proxy;
+import uk.co.bithatch.nativeimage.annotations.Reflectable;
+import uk.co.bithatch.nativeimage.annotations.TypeReflect;
+
 /**
  * Adapters a {@link PlatformService} to a {@link DBusInterface} to allow VPN
  * interfaces to be remotely controlled over D-Bus. This interface is used both
  * on the node agent side acting as a provider, and the controller (cloud) side
  * acting as a consumer.
  */
+@Proxy
+@Reflectable
+@TypeReflect(methods = true, classes = true)
 public interface RemotePlatformService extends DBusInterface {
 
     String DBUS_INTERFACE_NAME = "com.logonbox.vpn.drivers.RemotePlatformService";
