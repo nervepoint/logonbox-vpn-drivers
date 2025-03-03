@@ -130,7 +130,13 @@ public class LbvRemoteNodeAgent extends AbstractCommand implements SystemContext
         
         DBusConnection conx;
         if(dbusAddress.isPresent()) {
-        	conx = DBusConnectionBuilder.forAddress(dbusAddress.get()).build();
+        	var busname = dbusAddress.get();
+        	if(busname.equals("system"))
+                conx = DBusConnectionBuilder.forSystemBus().build();
+        	else if(busname.equals("session"))
+                conx = DBusConnectionBuilder.forSessionBus().build();
+        	else
+        	    conx = DBusConnectionBuilder.forAddress(busname).build();
         }
         else {
         	conx = DBusConnectionBuilder.forSessionBus().build();

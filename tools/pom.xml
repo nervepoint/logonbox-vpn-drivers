@@ -276,7 +276,7 @@ ACTION
                             <transformers>
                                 <transformer
                                     implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>com.logonbox.vpn.quick.LbvQuick</mainClass>
+                                    <mainClass>com.logonbox.vpn.quick.LbvRemoteNodeAgent</mainClass>
                                 </transformer>
                             </transformers>
                             <filters>
