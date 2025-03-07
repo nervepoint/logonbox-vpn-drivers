@@ -15,6 +15,7 @@ import org.freedesktop.dbus.annotations.DBusInterfaceName;
 import org.freedesktop.dbus.connections.impl.DBusConnection;
 import org.freedesktop.dbus.exceptions.DBusException;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.text.ParseException;
@@ -32,11 +33,12 @@ import uk.co.bithatch.nativeimage.annotations.TypeReflect;
 @Proxy
 @Reflectable
 @TypeReflect(methods = true, classes = true)
-public class RemotePlatformServiceDelegate implements RemotePlatformService {
+public class RemotePlatformServiceDelegate implements RemotePlatformService, Closeable {
     
     private final PlatformService<?> delegate;
     private final DBusConnection connection;
     private final Map<String, RemoteVpnAddressDelegate> addresses = new HashMap<>();
+    private final RemoteDNSProviderDelegate rdns;
 
     public RemotePlatformServiceDelegate(PlatformService<?> delegate, DBusConnection connection) throws DBusException {
         this.delegate = delegate;
@@ -44,7 +46,9 @@ public class RemotePlatformServiceDelegate implements RemotePlatformService {
 
         connection.exportObject(this);
         if(delegate.dns().isPresent())
-            connection.exportObject(new RemoteDNSProviderDelegate(delegate.dns().get()));
+            connection.exportObject(rdns = new RemoteDNSProviderDelegate(delegate.dns().get()));
+        else
+        	rdns = null;
         
         updateAddresses();
         
@@ -318,4 +322,16 @@ public class RemotePlatformServiceDelegate implements RemotePlatformService {
         
         throw new DBusException("Multiple exceptions occured while update addresses.", exceptions.get(0));
     }
+
+	@Override
+	public void close() throws IOException {
+		connection.unExportObject(getObjectPath());
+		
+		if(rdns != null)
+			connection.unExportObject(rdns.getObjectPath());
+
+		for(var conx : addresses.values()) {
+            connection.unExportObject(conx.getObjectPath());
+        }
+	}
 }

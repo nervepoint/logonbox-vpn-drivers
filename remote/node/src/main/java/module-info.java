@@ -23,6 +23,6 @@ module com.logonbox.vpn.drivers.remote.node {
 	exports com.logonbox.vpn.drivers.remote.node;
     requires transitive com.logonbox.vpn.drivers.remote.lib;
     requires com.logonbox.vpn.drivers.lib;
-    requires org.freedesktop.dbus;
+    requires transitive org.freedesktop.dbus;
     requires uk.co.bithatch.nativeimage.annotations;
 }
