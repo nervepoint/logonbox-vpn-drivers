@@ -526,12 +526,6 @@ public class BasicKeys implements KeyPairProvider {
 	    protected static class FieldElement {
 	        private long arr[] = new long[10];
 
-	        public FieldElement(long val[]) {
-	            for (int i = 0; i < 10; i++) {
-	                arr[i] = val[i];
-	            }
-	        }
-
 	        public FieldElement(FieldElement fe) {
 	            for (int i = 0; i < arr.length; i++) {
 	                arr[i] = fe.arr[i];

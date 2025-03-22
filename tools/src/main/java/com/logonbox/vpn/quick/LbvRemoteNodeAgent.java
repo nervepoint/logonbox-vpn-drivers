@@ -146,13 +146,14 @@ public class LbvRemoteNodeAgent extends AbstractCommand implements SystemContext
         conx.requestBusName(RemotePlatformService.BUS_NAME);
         
         /* Build and export services */
-        new RemotePlatformServiceDelegate(ps, conx);
+        try(var rs = new RemotePlatformServiceDelegate(ps, conx)) {
         
-        /* Lets go! */
-        alert(BUNDLE.getString("ready"), conx.getAddress());
-        
-        while(true)
-        	sleep(Integer.MAX_VALUE);
+	        /* Lets go! */
+	        alert(BUNDLE.getString("ready"), conx.getAddress());
+	        
+	        while(true)
+	        	sleep(Integer.MAX_VALUE);
+        }
         
     }
 

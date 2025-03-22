@@ -45,8 +45,8 @@ public final class BusRemotePlatformService extends BasePlatformService<BusVpnAd
         }
     }
 
-    public BusRemotePlatformService(SystemContext context, DBusConnection connection) throws DBusException {
-        this(context, connection.getRemoteObject(RemotePlatformService.BUS_NAME, RemotePlatformService.OBJECT_PATH,
+    public BusRemotePlatformService(String busName, SystemContext context, DBusConnection connection) throws DBusException {
+        this(context, connection.getRemoteObject(busName, RemotePlatformService.OBJECT_PATH,
                 RemotePlatformService.class), getDNSProvider(connection));
     }
 
