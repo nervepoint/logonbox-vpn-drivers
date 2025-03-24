@@ -1,20 +1,5 @@
 package com.logonbox.vpn.drivers.remote.node;
 
-import com.logonbox.vpn.drivers.lib.PlatformService;
-import com.logonbox.vpn.drivers.lib.PlatformService.Gateway;
-import com.logonbox.vpn.drivers.lib.VpnAdapterConfiguration;
-import com.logonbox.vpn.drivers.lib.VpnConfiguration;
-import com.logonbox.vpn.drivers.remote.lib.RemoteNATMode;
-import com.logonbox.vpn.drivers.remote.lib.RemotePlatformService;
-import com.logonbox.vpn.drivers.remote.lib.RemoteStartRequest;
-import com.logonbox.vpn.drivers.remote.lib.RemoteVpnAddress;
-import com.logonbox.vpn.drivers.remote.lib.RemoteVpnInterfaceInformation;
-import com.logonbox.vpn.drivers.remote.lib.RemoteVpnPeer;
-
-import org.freedesktop.dbus.annotations.DBusInterfaceName;
-import org.freedesktop.dbus.connections.impl.DBusConnection;
-import org.freedesktop.dbus.exceptions.DBusException;
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -24,6 +9,25 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Predicate;
+
+import org.freedesktop.dbus.annotations.DBusInterfaceName;
+import org.freedesktop.dbus.connections.impl.DBusConnection;
+import org.freedesktop.dbus.exceptions.DBusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.logonbox.vpn.drivers.lib.PlatformService;
+import com.logonbox.vpn.drivers.lib.PlatformService.Gateway;
+import com.logonbox.vpn.drivers.lib.VpnAdapterConfiguration;
+import com.logonbox.vpn.drivers.lib.VpnAddress;
+import com.logonbox.vpn.drivers.lib.VpnConfiguration;
+import com.logonbox.vpn.drivers.remote.lib.RemoteNATMode;
+import com.logonbox.vpn.drivers.remote.lib.RemotePlatformService;
+import com.logonbox.vpn.drivers.remote.lib.RemoteStartRequest;
+import com.logonbox.vpn.drivers.remote.lib.RemoteVpnAddress;
+import com.logonbox.vpn.drivers.remote.lib.RemoteVpnInterfaceInformation;
+import com.logonbox.vpn.drivers.remote.lib.RemoteVpnPeer;
 
 import uk.co.bithatch.nativeimage.annotations.Proxy;
 import uk.co.bithatch.nativeimage.annotations.Reflectable;
@@ -34,15 +38,23 @@ import uk.co.bithatch.nativeimage.annotations.TypeReflect;
 @Reflectable
 @TypeReflect(methods = true, classes = true)
 public class RemotePlatformServiceDelegate implements RemotePlatformService, Closeable {
+	
+	private final static Logger LOG = LoggerFactory.getLogger(RemotePlatformServiceDelegate.class);
     
     private final PlatformService<?> delegate;
     private final DBusConnection connection;
     private final Map<String, RemoteVpnAddressDelegate> addresses = new HashMap<>();
     private final RemoteDNSProviderDelegate rdns;
+	private final Predicate<VpnAddress> addressFilter;
 
     public RemotePlatformServiceDelegate(PlatformService<?> delegate, DBusConnection connection) throws DBusException {
+    	this(delegate, connection, a -> true);
+    }
+
+    public RemotePlatformServiceDelegate(PlatformService<?> delegate, DBusConnection connection, Predicate<VpnAddress> addressFilter) throws DBusException {
         this.delegate = delegate;
         this.connection = connection;
+        this.addressFilter = addressFilter;
 
         connection.exportObject(this);
         if(delegate.dns().isPresent())
@@ -275,6 +287,7 @@ public class RemotePlatformServiceDelegate implements RemotePlatformService, Clo
     }
 
     private void exportAndAdd(RemoteVpnAddressDelegate ra) throws DBusException {
+    	LOG.info("Exporting for {}", ra.nativeName());
         connection.exportObject(ra);
         addresses.put(ra.nativeName(), ra);
     }
@@ -282,7 +295,7 @@ public class RemotePlatformServiceDelegate implements RemotePlatformService, Clo
     private void updateAddresses() throws DBusException {
         var addrNames = new LinkedHashSet<String>();
         var exceptions = new ArrayList<Exception>();
-        for(var addr : delegate.addresses()) {
+        for(var addr : delegate.addresses().stream().filter(addressFilter).toList()) {
             addrNames.add(addr.nativeName());
             if(!addresses.containsKey(addr.nativeName())) {
                 try {
