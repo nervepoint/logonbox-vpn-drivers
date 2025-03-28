@@ -37,7 +37,7 @@ ACTION
     <parent>
         <groupId>com.logonbox</groupId>
         <artifactId>logonbox-vpn-drivers</artifactId>
-    	<version>0.9.0-SNAPSHOT</version>
+    	<version>1.0.0</version>
     </parent>
     <artifactId>logonbox-vpn-tools</artifactId>
     <name>LogonBox VPN Drivers - Example Utility</name>
